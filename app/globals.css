@@ -1,0 +1,149 @@
+/* ═══════════════════════════════════════════════════════════
+   HARVESTFILE — Global Styles & Animations
+   ═══════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: #FAFAF6;
+  color: #111827;
+  overflow-x: hidden;
+}
+
+/* Selection */
+::selection {
+  background: rgba(201, 168, 76, 0.2);
+  color: #1B4332;
+}
+
+/* ─── ANIMATIONS ──────────────────────────────────────── */
+
+@keyframes hf-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes hf-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes hf-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; }
+  50% { opacity: 0.5; box-shadow: 0 0 2px currentColor; }
+}
+
+@keyframes hf-glow-rotate {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes hf-bar-fill {
+  0% { width: 0%; }
+  100% { width: var(--target-width); }
+}
+
+@keyframes hf-fade-up {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hf-counter-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+@keyframes hf-slide-in-bottom {
+  0% { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ─── UTILITY CLASSES ─────────────────────────────────── */
+
+.hf-float {
+  animation: hf-float 5s ease-in-out infinite;
+}
+
+.hf-shimmer-btn {
+  background-size: 200% auto;
+  animation: hf-shimmer 3s linear infinite;
+}
+
+.hf-pulse-dot {
+  animation: hf-pulse 2s ease-in-out infinite;
+}
+
+.hf-glow-ring {
+  animation: hf-glow-rotate 12s linear infinite;
+}
+
+.hf-bar-animate {
+  animation: hf-bar-fill 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hf-card-hover {
+  transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.35s ease;
+}
+
+.hf-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08) !important;
+}
+
+.hf-link-hover {
+  transition: color 0.2s ease;
+}
+
+.hf-link-hover:hover {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.hf-input-focus:focus {
+  border-color: #1B4332 !important;
+  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.08) !important;
+}
+
+.hf-btn-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hf-btn-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(201, 168, 76, 0.3) !important;
+}
+
+.hf-btn-hover:active {
+  transform: translateY(0px);
+}
+
+/* ─── SCROLLBAR ───────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
