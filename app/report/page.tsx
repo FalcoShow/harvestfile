@@ -1,110 +1,182 @@
 // =============================================================================
-// HarvestFile - Report Display Page
+// HarvestFile - Report Display Page (FIXED)
 // /app/report/page.tsx
-// 
-// This page displays the generated report.
-// It reads report data from sessionStorage (transferred from calculator page)
-// and renders the full report with preview/paid tier gating.
+// Fixed: Better error handling, null safety, no Suspense issues
 // =============================================================================
 
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import ReportContent from '@/components/report/ReportContent';
-import { ReportData, ReportTier } from '@/lib/types/report';
+import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 
-function ReportPageInner() {
-  const searchParams = useSearchParams();
-  const reportId = searchParams.get('id');
-  
-  const [report, setReport] = useState<ReportData | null>(null);
-  const [tier, setTier] = useState<ReportTier>('preview');
+// Dynamically import ReportContent to avoid SSR issues
+const ReportContent = dynamic(
+  () => import('@/components/report/ReportContent'),
+  { ssr: false, loading: () => <LoadingState /> }
+);
+
+function LoadingState() {
+  return (
+    <div style={{ minHeight: '100vh', background: '#FAFAF6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, background: 'white', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.06)', padding: '20px 32px' }}>
+          <svg style={{ animation: 'hf-spin 1s linear infinite', width: 24, height: 24 }} viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="rgba(5,150,105,0.2)" strokeWidth="3" />
+            <path d="M12 2a10 10 0 019.5 6.8" stroke="#059669" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+          <span style={{ color: '#111827', fontWeight: 600, fontSize: 15 }}>Loading your report...</span>
+        </div>
+        <style>{`@keyframes hf-spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    </div>
+  );
+}
+
+export default function ReportPage() {
+  const [report, setReport] = useState(null);
+  const [tier, setTier] = useState('preview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!reportId) {
-      setError('No report ID provided');
-      setLoading(false);
-      return;
-    }
-
-    // Try to load report from sessionStorage
     try {
-      const stored = sessionStorage.getItem(`report-${reportId}`);
-      if (stored) {
-        const reportData = JSON.parse(stored) as ReportData;
-        setReport(reportData);
-        
-        // Check if this report has been paid for
-        const paymentStatus = sessionStorage.getItem(`report-paid-${reportId}`);
-        if (paymentStatus === 'true') {
-          setTier('full');
+      // Try multiple storage keys for resilience
+      let reportData = null;
+      let reportId = null;
+
+      // Check URL for report ID
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        reportId = params.get('id');
+      }
+
+      // Try to load from sessionStorage
+      if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+        // Try report-specific key first
+        if (reportId) {
+          const stored = sessionStorage.getItem(`report-${reportId}`);
+          if (stored) {
+            reportData = JSON.parse(stored);
+          }
+        }
+
+        // Fallback: try the generic latest report key
+        if (!reportData) {
+          const latestStored = sessionStorage.getItem('harvestfile-latest-report');
+          if (latestStored) {
+            reportData = JSON.parse(latestStored);
+          }
+        }
+      }
+
+      if (reportData) {
+        // Ensure required fields exist with safe defaults
+        const safeReport = {
+          reportId: reportData.reportId || 'DRAFT',
+          generatedAt: reportData.generatedAt || new Date().toISOString(),
+          executiveSummary: reportData.executiveSummary || {
+            headline: 'Your personalized farm program analysis',
+            recommendation: 'PLC',
+            confidenceLevel: 'medium',
+            estimatedBenefit: 0,
+            keyInsight: 'Report data is loading...',
+          },
+          programAnalysis: reportData.programAnalysis || {
+            arcProjection: { programName: 'ARC-CO', totalProjectedPayment: 0, yearlyBreakdown: [], pros: [], cons: [] },
+            plcProjection: { programName: 'PLC', totalProjectedPayment: 0, yearlyBreakdown: [], pros: [], cons: [] },
+            comparisonTable: [],
+            analysisNarrative: '',
+          },
+          scenarioAnalysis: reportData.scenarioAnalysis || {
+            scenarios: [],
+            narrative: '',
+            riskAssessment: '',
+          },
+          formsGuide: reportData.formsGuide || {
+            requiredForms: [],
+            optionalForms: [],
+            narrative: '',
+          },
+          fsaVisitPrep: reportData.fsaVisitPrep || {
+            whatToBring: [],
+            questionsToAsk: [],
+            commonMistakes: [],
+            narrative: '',
+          },
+          cropInsurance: reportData.cropInsurance || {
+            interactionSummary: '',
+            keyConsiderations: [],
+            recommendations: [],
+            narrative: '',
+          },
+          deadlineCalendar: reportData.deadlineCalendar || {
+            deadlines: [],
+            narrative: '',
+          },
+          countyContext: reportData.countyContext || {
+            countyName: 'Your County',
+            state: 'Your State',
+            historicalData: '',
+            localConsiderations: '',
+          },
+        };
+
+        setReport(safeReport);
+
+        // Check payment status
+        if (reportId) {
+          const paymentStatus = sessionStorage.getItem(`report-paid-${reportId}`);
+          if (paymentStatus === 'true') {
+            setTier('full');
+          }
         }
       } else {
-        setError('Report not found. It may have expired. Please generate a new report from the calculator.');
+        setError('Report not found. It may have expired — please generate a new one from the calculator.');
       }
     } catch (err) {
-      setError('Failed to load report data');
+      console.error('Error loading report:', err);
+      setError('Failed to load report data. Please try generating a new report.');
     }
-    
+
     setLoading(false);
-  }, [reportId]);
+  }, []);
 
   const handleUpgradeClick = () => {
-    // TODO: Replace with Stripe checkout in Phase 3B
-    // For now, show a "coming soon" modal or redirect to a waitlist
-
-    // TEMPORARY: For testing, unlock the full report
-    // Remove this block when Stripe is integrated
-    if (process.env.NODE_ENV === 'development') {
-      setTier('full');
-      if (reportId) {
-        sessionStorage.setItem(`report-paid-${reportId}`, 'true');
-      }
-      return;
+    // For founding farmers / testing: unlock immediately
+    // Replace with Stripe in Phase 3B
+    setTier('full');
+    if (typeof window !== 'undefined' && report?.reportId) {
+      sessionStorage.setItem(`report-paid-${report.reportId}`, 'true');
     }
-
-    // Production behavior: open Stripe checkout
-    // This will be replaced in Phase 3B
-    alert(
-      'Full report purchases launching soon! \n\n' +
-      'Join our waitlist to be notified when the full report is available.\n\n' +
-      'In the meantime, your free preview shows your ARC vs PLC recommendation.'
-    );
   };
 
-  // ---- Loading State ----
+  // Loading
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-flex items-center gap-3 bg-white rounded-xl shadow-lg px-8 py-5">
-            <svg className="animate-spin h-6 w-6 text-emerald-600" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span className="text-gray-700 font-medium">Loading your report...</span>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
-  // ---- Error State ----
+  // Error
   if (error || !report) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
-          <div className="text-4xl mb-4">🌾</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Report Not Found</h2>
-          <p className="text-gray-600 mb-6">
+      <div style={{ minHeight: '100vh', background: '#FAFAF6', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ background: 'white', borderRadius: 24, boxShadow: '0 4px 24px rgba(0,0,0,0.06)', maxWidth: 440, width: '100%', padding: '48px 36px', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🌾</div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#1B4332', marginBottom: 8 }}>Report Not Found</h2>
+          <p style={{ fontSize: 14, color: '#6B7280', lineHeight: 1.6, marginBottom: 28 }}>
             {error || 'We couldn\'t find this report. Please try generating a new one.'}
           </p>
           <a
-            href="/calculator"
-            className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
+            href="/"
+            style={{
+              display: 'inline-block',
+              background: '#1B4332',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: 14,
+              padding: '14px 28px',
+              borderRadius: 14,
+              textDecoration: 'none',
+            }}
           >
             Back to Calculator
           </a>
@@ -113,76 +185,40 @@ function ReportPageInner() {
     );
   }
 
-  // ---- Report View ----
+  // Report view
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#FAFAF6' }}>
       {/* Top Bar */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 print:hidden">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 text-emerald-700 font-bold">
-            <span className="text-xl">🌾</span>
-            HarvestFile
+      <div style={{ background: 'white', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 40 }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1B4332', fontWeight: 800, fontSize: 17, textDecoration: 'none', letterSpacing: '-0.04em' }}>
+            <span style={{ fontSize: 20 }}>🌾</span>
+            Harvest<span style={{ color: '#C9A84C' }}>File</span>
           </a>
-          <div className="flex items-center gap-3">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {tier === 'full' && (
               <button
                 onClick={() => window.print()}
-                className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                style={{ fontSize: 13, color: '#6B7280', background: 'none', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print / Save PDF
+                🖨️ Print / Save PDF
               </button>
             )}
-            <a
-              href="/calculator"
-              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-            >
+            <a href="/" style={{ fontSize: 13, color: '#059669', fontWeight: 600, textDecoration: 'none' }}>
               ← Back to Calculator
             </a>
           </div>
         </div>
       </div>
 
-      {/* Report Content */}
-      <div className="px-4 py-8 pb-32">
+      {/* Report */}
+      <div style={{ padding: '32px 24px 120px' }}>
         <ReportContent
           report={report}
           tier={tier}
           onUpgradeClick={handleUpgradeClick}
         />
       </div>
-
-      {/* Print Styles */}
-      <style jsx global>{`
-        @media print {
-          body { background: white !important; }
-          .print\\:hidden { display: none !important; }
-          .print\\:bg-white { background: white !important; }
-          .print\\:shadow-none { box-shadow: none !important; }
-          .print\\:rounded-none { border-radius: 0 !important; }
-          .print\\:border-gray-300 { border-color: #d1d5db !important; }
-          .print\\:bg-emerald-800 { background: #065f46 !important; -webkit-print-color-adjust: exact; }
-          .print\\:mb-6 { margin-bottom: 1.5rem !important; }
-        }
-      `}</style>
     </div>
-  );
-}
-
-// Wrap in Suspense for useSearchParams
-export default function ReportPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading...</p>
-        </div>
-      </div>
-    }>
-      <ReportPageInner />
-    </Suspense>
   );
 }

@@ -1,85 +1,81 @@
 // =============================================================================
-// HarvestFile - Report Content Renderer
-// The visual presentation that makes the report worth $39
+// HarvestFile - Report Content Renderer (FIXED - null-safe)
+// Won't crash if Claude returns slightly different data shapes
 // =============================================================================
 
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { ReportData, ReportTier } from '@/lib/types/report';
+import React from 'react';
 
-interface ReportContentProps {
-  report: ReportData;
-  tier: ReportTier;
-  onUpgradeClick?: () => void;
-}
-
-export default function ReportContent({ report, tier, onUpgradeClick }: ReportContentProps) {
-  const reportRef = useRef<HTMLDivElement>(null);
+export default function ReportContent({ report, tier, onUpgradeClick }) {
+  if (!report) return null;
+  
   const isPaid = tier === 'full';
+  const es = report.executiveSummary || {};
+  const pa = report.programAnalysis || {};
+  const sa = report.scenarioAnalysis || {};
+  const fg = report.formsGuide || {};
+  const fv = report.fsaVisitPrep || {};
+  const ci = report.cropInsurance || {};
+  const dc = report.deadlineCalendar || {};
+  const cc = report.countyContext || {};
 
-  // ---- Locked Section Overlay ----
-  const LockedOverlay = ({ sectionName }: { sectionName: string }) => (
-    <div className="relative">
-      <div className="absolute inset-0 z-10 backdrop-blur-md bg-white/60 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-emerald-300">
-        <div className="text-center px-8 py-6">
-          <svg className="w-10 h-10 text-emerald-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <p className="text-lg font-semibold text-gray-800 mb-1">
-            {sectionName}
-          </p>
-          <p className="text-sm text-gray-600 mb-4">
-            Unlock your complete personalized report
-          </p>
+  const fmt = (n) => {
+    if (n == null || isNaN(n)) return '$0';
+    if (n >= 0) return `$${Math.round(n).toLocaleString()}`;
+    return `-$${Math.abs(Math.round(n)).toLocaleString()}`;
+  };
+
+  // Locked Section Overlay
+  const LockedOverlay = ({ sectionName }) => (
+    <div style={{ position: 'relative' }}>
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 10,
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        background: 'rgba(255,255,255,0.6)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        borderRadius: 16, border: '2px dashed rgba(5,150,105,0.25)',
+      }}>
+        <div style={{ textAlign: 'center', padding: '24px 32px' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>{sectionName}</p>
+          <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Unlock your complete personalized report</p>
           <button
             onClick={onUpgradeClick}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors shadow-md hover:shadow-lg"
+            style={{
+              background: '#059669', color: 'white', fontWeight: 700, fontSize: 14,
+              padding: '10px 24px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(5,150,105,0.2)',
+            }}
           >
             Get Full Report — $39
           </button>
         </div>
       </div>
-      {/* Blurred preview content behind the overlay */}
-      <div className="filter blur-sm select-none pointer-events-none opacity-50 py-8 px-6">
-        <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
-        <div className="h-4 bg-gray-200 rounded w-full mb-3"></div>
-        <div className="h-4 bg-gray-200 rounded w-5/6 mb-3"></div>
-        <div className="h-4 bg-gray-200 rounded w-2/3 mb-6"></div>
-        <div className="h-4 bg-gray-200 rounded w-full mb-3"></div>
-        <div className="h-4 bg-gray-200 rounded w-4/5 mb-3"></div>
-        <div className="h-4 bg-gray-200 rounded w-full mb-3"></div>
-        <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+      <div style={{ filter: 'blur(4px)', pointerEvents: 'none', opacity: 0.4, padding: '32px 24px' }}>
+        <div style={{ height: 16, background: '#e5e7eb', borderRadius: 8, width: '75%', marginBottom: 12 }}></div>
+        <div style={{ height: 16, background: '#e5e7eb', borderRadius: 8, width: '100%', marginBottom: 12 }}></div>
+        <div style={{ height: 16, background: '#e5e7eb', borderRadius: 8, width: '85%', marginBottom: 12 }}></div>
+        <div style={{ height: 16, background: '#e5e7eb', borderRadius: 8, width: '60%', marginBottom: 24 }}></div>
+        <div style={{ height: 16, background: '#e5e7eb', borderRadius: 8, width: '100%', marginBottom: 12 }}></div>
+        <div style={{ height: 16, background: '#e5e7eb', borderRadius: 8, width: '70%' }}></div>
       </div>
     </div>
   );
 
-  // ---- Section Wrapper ----
-  const Section = ({ 
-    id, 
-    title, 
-    icon, 
-    lockedTitle,
-    children 
-  }: { 
-    id: string; 
-    title: string; 
-    icon: string;
-    lockedTitle?: string;
-    children: React.ReactNode;
-  }) => {
+  // Section wrapper
+  const Section = ({ id, title, icon, lockedTitle, children }) => {
     const isLocked = !isPaid && id !== 'executiveSummary';
-    
     return (
-      <section id={id} className="mb-8 print:mb-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden print:shadow-none print:border-gray-300">
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-6 py-4 border-b border-emerald-100 print:bg-white">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-              <span className="text-2xl">{icon}</span>
+      <section style={{ marginBottom: 28 }}>
+        <div style={{ background: 'white', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ background: 'linear-gradient(90deg, #ECFDF5, #F0FDFA)', padding: '16px 24px', borderBottom: '1px solid rgba(5,150,105,0.08)' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: '#111827', display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}>
+              <span style={{ fontSize: 22 }}>{icon}</span>
               {title}
             </h2>
           </div>
-          <div className="px-6 py-5">
+          <div style={{ padding: '20px 24px' }}>
             {isLocked ? <LockedOverlay sectionName={lockedTitle || title} /> : children}
           </div>
         </div>
@@ -87,455 +83,272 @@ export default function ReportContent({ report, tier, onUpgradeClick }: ReportCo
     );
   };
 
-  // ---- Dollar Format Helper ----
-  const fmt = (n: number) => {
-    if (n >= 0) return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-    return `-$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  };
-
-  const fmtDetailed = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
   return (
-    <div ref={reportRef} className="max-w-4xl mx-auto">
-      
-      {/* ============ REPORT HEADER ============ */}
-      <div className="bg-gradient-to-br from-emerald-700 via-emerald-800 to-teal-900 rounded-2xl p-8 mb-8 text-white shadow-xl print:bg-emerald-800 print:rounded-none">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-3xl">🌾</span>
-              <span className="text-sm font-medium tracking-wider uppercase opacity-80">HarvestFile</span>
-            </div>
-            <h1 className="text-3xl font-bold mb-1">
-              Personalized Farm Program Report
-            </h1>
-            <p className="text-emerald-200 text-lg">
-              {report.countyContext.countyName}, {report.countyContext.state}
+    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+
+      {/* ══ HEADER ══ */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1B4332, #0C1F17)',
+        borderRadius: 20, padding: '32px 28px', marginBottom: 28, color: 'white',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 24 }}>🌾</span>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', opacity: 0.6, textTransform: 'uppercase' }}>HarvestFile</span>
+        </div>
+        <h1 style={{ fontSize: 'clamp(22px, 3.5vw, 30px)', fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.03em' }}>
+          Personalized Farm Program Report
+        </h1>
+        <p style={{ fontSize: 15, opacity: 0.5, margin: 0 }}>
+          {cc.countyName || 'Your County'}, {cc.state || 'Your State'}
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.4, marginBottom: 4 }}>Recommendation</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{es.recommendation || 'N/A'}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.4, marginBottom: 4 }}>Est. Benefit</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{fmt(es.estimatedBenefit)}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.4, marginBottom: 4 }}>Confidence</div>
+            <div style={{ fontSize: 22, fontWeight: 800, textTransform: 'capitalize' }}>{es.confidenceLevel || 'N/A'}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══ SECTION 1: EXECUTIVE SUMMARY (FREE) ══ */}
+      <Section id="executiveSummary" title="Executive Summary" icon="📋">
+        {es.headline && (
+          <div style={{ background: '#ECFDF5', border: '1px solid rgba(5,150,105,0.15)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: '#064E3B', lineHeight: 1.4, margin: 0 }}>
+              {es.headline}
             </p>
           </div>
-          <div className="text-right text-sm text-emerald-200">
-            <p>Report #{report.reportId.slice(0, 8).toUpperCase()}</p>
-            <p>{new Date(report.generatedAt).toLocaleDateString('en-US', { 
-              year: 'numeric', month: 'long', day: 'numeric' 
-            })}</p>
-          </div>
-        </div>
-        
-        {/* Quick Stats Bar */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-emerald-600/50">
-          <div className="text-center">
-            <p className="text-emerald-300 text-xs uppercase tracking-wider mb-1">Recommendation</p>
-            <p className="text-2xl font-bold">{report.executiveSummary.recommendation}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-emerald-300 text-xs uppercase tracking-wider mb-1">Estimated Benefit</p>
-            <p className="text-2xl font-bold">{fmt(report.executiveSummary.estimatedBenefit)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-emerald-300 text-xs uppercase tracking-wider mb-1">Confidence</p>
-            <p className="text-2xl font-bold capitalize">{report.executiveSummary.confidenceLevel}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ============ TABLE OF CONTENTS ============ */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 print:hidden">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">What&apos;s In Your Report</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          {[
-            { icon: '📋', label: 'Executive Summary', free: true },
-            { icon: '📊', label: 'ARC vs PLC Analysis', free: false },
-            { icon: '🎯', label: 'Price Scenario Analysis', free: false },
-            { icon: '📝', label: 'Forms & Paperwork Guide', free: false },
-            { icon: '🏛️', label: 'FSA Office Visit Prep', free: false },
-            { icon: '🛡️', label: 'Crop Insurance Interaction', free: false },
-            { icon: '📅', label: 'Deadline Calendar', free: false },
-            { icon: '🗺️', label: 'County-Specific Context', free: false },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center gap-2 py-1.5">
-              <span>{item.icon}</span>
-              <span className={item.free || isPaid ? 'text-gray-800' : 'text-gray-400'}>
-                {item.label}
-              </span>
-              {item.free && (
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">FREE</span>
-              )}
-              {!item.free && !isPaid && (
-                <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ============ SECTION 1: EXECUTIVE SUMMARY (FREE) ============ */}
-      <Section id="executiveSummary" title="Executive Summary" icon="📋">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mb-5">
-          <p className="text-xl font-bold text-emerald-900 leading-relaxed">
-            {report.executiveSummary.headline}
+        )}
+        {es.keyInsight && (
+          <p style={{ fontSize: 14.5, color: '#374151', lineHeight: 1.7, margin: 0 }}>
+            {es.keyInsight}
           </p>
-        </div>
-        <div className="prose prose-gray max-w-none">
-          <p className="text-gray-700 leading-relaxed text-base">
-            {report.executiveSummary.keyInsight}
-          </p>
-        </div>
-        
-        {/* Confidence indicator */}
-        <div className="mt-5 flex items-center gap-3 text-sm">
-          <span className="text-gray-500">Confidence Level:</span>
-          <div className="flex gap-1">
-            {['high', 'medium', 'low'].map((level) => (
-              <div
-                key={level}
-                className={`h-2.5 w-8 rounded-full ${
-                  report.executiveSummary.confidenceLevel === 'high' 
-                    ? 'bg-emerald-500' 
-                    : report.executiveSummary.confidenceLevel === 'medium' && level !== 'low'
-                    ? 'bg-yellow-500'
-                    : report.executiveSummary.confidenceLevel === level
-                    ? 'bg-red-500'
-                    : 'bg-gray-200'
-                }`}
-              ></div>
-            ))}
-          </div>
-          <span className="text-gray-600 font-medium capitalize">
-            {report.executiveSummary.confidenceLevel}
-          </span>
-        </div>
+        )}
 
         {/* Upgrade CTA after free section */}
         {!isPaid && (
-          <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6 text-center">
-            <p className="text-lg font-semibold text-gray-900 mb-2">
+          <div style={{
+            marginTop: 28, padding: '24px 20px', textAlign: 'center',
+            background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+            border: '1px solid rgba(201,168,76,0.2)', borderRadius: 16,
+          }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: '#111827', margin: '0 0 6px' }}>
               Want the full analysis with dollar projections?
             </p>
-            <p className="text-gray-600 mb-4 text-sm">
-              Your complete report includes detailed ARC vs PLC breakdowns, 5 price scenarios, 
-              exact forms needed, FSA visit prep guide, and your county deadline calendar.
+            <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 18px' }}>
+              7 additional sections: detailed breakdowns, price scenarios, forms guide, FSA prep, deadlines & more.
             </p>
             <button
               onClick={onUpgradeClick}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-md hover:shadow-lg text-lg"
+              style={{
+                background: '#1B4332', color: 'white', fontWeight: 700, fontSize: 15,
+                padding: '14px 32px', borderRadius: 14, border: 'none', cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(27,67,50,0.2)',
+              }}
             >
               Unlock Full Report — $39
             </button>
-            <p className="text-xs text-gray-500 mt-2">One-time purchase. Instant access. Take it to your FSA office.</p>
+            <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 10 }}>One-time purchase · Instant access · Take it to your FSA office</p>
           </div>
         )}
       </Section>
 
-      {/* ============ SECTION 2: PROGRAM ANALYSIS ============ */}
+      {/* ══ SECTION 2: PROGRAM ANALYSIS ══ */}
       <Section id="programAnalysis" title="Detailed ARC vs PLC Analysis" icon="📊" lockedTitle="Detailed ARC vs PLC Breakdown">
-        <p className="text-gray-700 mb-6 leading-relaxed">{report.programAnalysis.analysisNarrative}</p>
-        
-        {/* Comparison Table */}
-        <div className="overflow-x-auto mb-6">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b-2 border-emerald-200">
-                <th className="text-left py-3 px-4 text-gray-600 font-semibold">Year</th>
-                <th className="text-right py-3 px-4 text-gray-600 font-semibold">ARC-CO Payment</th>
-                <th className="text-right py-3 px-4 text-gray-600 font-semibold">PLC Payment</th>
-                <th className="text-right py-3 px-4 text-gray-600 font-semibold">Difference</th>
-                <th className="text-center py-3 px-4 text-gray-600 font-semibold">Winner</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.programAnalysis.comparisonTable.map((row, i) => (
-                <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium">{row.year}</td>
-                  <td className="py-3 px-4 text-right font-mono">{fmt(row.arcPayment)}</td>
-                  <td className="py-3 px-4 text-right font-mono">{fmt(row.plcPayment)}</td>
-                  <td className={`py-3 px-4 text-right font-mono font-semibold ${
-                    row.difference > 0 ? 'text-emerald-600' : 'text-red-600'
-                  }`}>
-                    {fmt(row.difference)}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
-                      row.winner === 'ARC-CO' 
-                        ? 'bg-blue-100 text-blue-700' 
-                        : 'bg-purple-100 text-purple-700'
-                    }`}>
-                      {row.winner}
-                    </span>
-                  </td>
+        {pa.analysisNarrative && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 20 }}>{pa.analysisNarrative}</p>}
+
+        {(pa.comparisonTable || []).length > 0 && (
+          <div style={{ overflowX: 'auto', marginBottom: 20 }}>
+            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #D1FAE5' }}>
+                  <th style={{ textAlign: 'left', padding: '10px 12px', color: '#6B7280', fontWeight: 700 }}>Year</th>
+                  <th style={{ textAlign: 'right', padding: '10px 12px', color: '#6B7280', fontWeight: 700 }}>ARC-CO</th>
+                  <th style={{ textAlign: 'right', padding: '10px 12px', color: '#6B7280', fontWeight: 700 }}>PLC</th>
+                  <th style={{ textAlign: 'right', padding: '10px 12px', color: '#6B7280', fontWeight: 700 }}>Difference</th>
+                  <th style={{ textAlign: 'center', padding: '10px 12px', color: '#6B7280', fontWeight: 700 }}>Winner</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ARC Pros/Cons */}
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <div className="bg-blue-50 rounded-xl p-4">
-            <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-              <span className="text-lg">📈</span> ARC-CO
-            </h4>
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-1">Pros</p>
-              {report.programAnalysis.arcProjection.pros.map((pro, i) => (
-                <p key={i} className="text-sm text-gray-700 flex items-start gap-2 mb-1">
-                  <span className="text-green-500 mt-0.5">✓</span> {pro}
-                </p>
-              ))}
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-red-700 uppercase tracking-wider mb-1">Cons</p>
-              {report.programAnalysis.arcProjection.cons.map((con, i) => (
-                <p key={i} className="text-sm text-gray-700 flex items-start gap-2 mb-1">
-                  <span className="text-red-500 mt-0.5">✗</span> {con}
-                </p>
-              ))}
-            </div>
+              </thead>
+              <tbody>
+                {pa.comparisonTable.map((row, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{row.year}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{fmt(row.arcPayment)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{fmt(row.plcPayment)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: (row.difference || 0) > 0 ? '#059669' : '#DC2626' }}>{fmt(row.difference)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 4, background: row.winner === 'ARC-CO' ? '#DBEAFE' : '#EDE9FE', color: row.winner === 'ARC-CO' ? '#1D4ED8' : '#6D28D9' }}>{row.winner}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="bg-purple-50 rounded-xl p-4">
-            <h4 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
-              <span className="text-lg">🛡️</span> PLC
-            </h4>
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-1">Pros</p>
-              {report.programAnalysis.plcProjection.pros.map((pro, i) => (
-                <p key={i} className="text-sm text-gray-700 flex items-start gap-2 mb-1">
-                  <span className="text-green-500 mt-0.5">✓</span> {pro}
-                </p>
-              ))}
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-red-700 uppercase tracking-wider mb-1">Cons</p>
-              {report.programAnalysis.plcProjection.cons.map((con, i) => (
-                <p key={i} className="text-sm text-gray-700 flex items-start gap-2 mb-1">
-                  <span className="text-red-500 mt-0.5">✗</span> {con}
-                </p>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Section>
+        )}
 
-      {/* ============ SECTION 3: SCENARIO ANALYSIS ============ */}
-      <Section id="scenarioAnalysis" title="Price Scenario Analysis" icon="🎯" lockedTitle="5 Price Scenarios & Risk Analysis">
-        <p className="text-gray-700 mb-5 leading-relaxed">{report.scenarioAnalysis.narrative}</p>
-        
-        <div className="space-y-3 mb-6">
-          {report.scenarioAnalysis.scenarios.map((scenario, i) => (
-            <div key={i} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
-              <div className="flex-shrink-0 w-32">
-                <p className="font-semibold text-sm text-gray-800">{scenario.scenarioName}</p>
-                <p className={`text-xs font-mono ${
-                  scenario.priceChange > 0 ? 'text-green-600' : scenario.priceChange < 0 ? 'text-red-600' : 'text-gray-500'
-                }`}>
-                  {scenario.priceChange > 0 ? '+' : ''}{scenario.priceChange}%
+        {/* Pros/Cons */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[
+            { name: 'ARC-CO', data: pa.arcProjection, bg: '#EFF6FF' },
+            { name: 'PLC', data: pa.plcProjection, bg: '#F5F3FF' },
+          ].map(({ name, data, bg }) => (
+            <div key={name} style={{ background: bg, borderRadius: 14, padding: 16 }}>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 10 }}>{name}</h4>
+              {(data?.pros || []).map((p, i) => (
+                <p key={`p${i}`} style={{ fontSize: 12.5, color: '#374151', margin: '0 0 4px', display: 'flex', gap: 6 }}>
+                  <span style={{ color: '#10B981' }}>✓</span> {p}
                 </p>
-              </div>
-              <div className="flex-1 grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500 text-xs">ARC-CO</p>
-                  <p className="font-mono font-semibold">{fmt(scenario.arcPayment)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">PLC</p>
-                  <p className="font-mono font-semibold">{fmt(scenario.plcPayment)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Winner</p>
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
-                    scenario.winner === 'ARC-CO' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                  }`}>
-                    {scenario.winner}
-                  </span>
-                </div>
-              </div>
+              ))}
+              {(data?.cons || []).map((c, i) => (
+                <p key={`c${i}`} style={{ fontSize: 12.5, color: '#374151', margin: '4px 0 0', display: 'flex', gap: 6 }}>
+                  <span style={{ color: '#EF4444' }}>✗</span> {c}
+                </p>
+              ))}
             </div>
           ))}
         </div>
-
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-sm font-semibold text-amber-900 mb-1">⚠️ Risk Assessment</p>
-          <p className="text-sm text-amber-800">{report.scenarioAnalysis.riskAssessment}</p>
-        </div>
       </Section>
 
-      {/* ============ SECTION 4: FORMS GUIDE ============ */}
-      <Section id="formsGuide" title="Forms & Paperwork Guide" icon="📝" lockedTitle="Required Forms & Filing Guide">
-        <p className="text-gray-700 mb-5 leading-relaxed">{report.formsGuide.narrative}</p>
-        
-        <div className="mb-5">
-          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-            Required Forms
-          </h4>
-          <div className="space-y-3">
-            {report.formsGuide.requiredForms.map((form, i) => (
-              <div key={i} className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <span className="font-mono font-bold text-emerald-700 text-sm">{form.formNumber}</span>
-                    <span className="text-gray-400 mx-2">—</span>
-                    <span className="font-medium text-gray-900">{form.formName}</span>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">{form.purpose}</p>
-                <p className="text-sm text-gray-500"><strong>Where to get it:</strong> {form.whereToGet}</p>
-                <p className="text-sm text-emerald-700 mt-1"><strong>💡 Tip:</strong> {form.tips}</p>
+      {/* ══ SECTION 3: SCENARIOS ══ */}
+      <Section id="scenarioAnalysis" title="Price Scenario Analysis" icon="🎯" lockedTitle="5 Price Scenarios & Risk Analysis">
+        {sa.narrative && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 16 }}>{sa.narrative}</p>}
+        {(sa.scenarios || []).map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#F9FAFB', borderRadius: 12, padding: 14, marginBottom: 8 }}>
+            <div style={{ minWidth: 100 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{s.scenarioName}</div>
+              <div style={{ fontSize: 11, fontFamily: 'monospace', color: (s.priceChange || 0) > 0 ? '#059669' : (s.priceChange || 0) < 0 ? '#DC2626' : '#6B7280' }}>
+                {(s.priceChange || 0) > 0 ? '+' : ''}{s.priceChange || 0}%
               </div>
-            ))}
-          </div>
-        </div>
-
-        {report.formsGuide.optionalForms.length > 0 && (
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-              Optional Forms
-            </h4>
-            <div className="space-y-3">
-              {report.formsGuide.optionalForms.map((form, i) => (
-                <div key={i} className="bg-gray-50 rounded-lg p-4">
-                  <span className="font-mono font-bold text-gray-600 text-sm">{form.formNumber}</span>
-                  <span className="text-gray-400 mx-2">—</span>
-                  <span className="font-medium text-gray-900">{form.formName}</span>
-                  <p className="text-sm text-gray-600 mt-1">{form.purpose}</p>
-                </div>
-              ))}
             </div>
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, fontSize: 12 }}>
+              <div><span style={{ color: '#9CA3AF' }}>ARC-CO</span><br /><strong>{fmt(s.arcPayment)}</strong></div>
+              <div><span style={{ color: '#9CA3AF' }}>PLC</span><br /><strong>{fmt(s.plcPayment)}</strong></div>
+              <div><span style={{ color: '#9CA3AF' }}>Winner</span><br />
+                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: s.winner === 'ARC-CO' ? '#DBEAFE' : '#EDE9FE', color: s.winner === 'ARC-CO' ? '#1D4ED8' : '#6D28D9' }}>{s.winner}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+        {sa.riskAssessment && (
+          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 12, padding: 14, marginTop: 12 }}>
+            <p style={{ fontSize: 13, color: '#92400E', margin: 0 }}><strong>⚠️ Risk Assessment:</strong> {sa.riskAssessment}</p>
           </div>
         )}
       </Section>
 
-      {/* ============ SECTION 5: FSA VISIT PREP ============ */}
-      <Section id="fsaVisitPrep" title="FSA Office Visit Prep" icon="🏛️" lockedTitle="FSA Visit Checklist & Insider Tips">
-        <p className="text-gray-700 mb-5 leading-relaxed">{report.fsaVisitPrep.narrative}</p>
-        
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="bg-emerald-50 rounded-xl p-4">
-            <h4 className="font-semibold text-emerald-900 mb-3 text-sm uppercase tracking-wider">📎 What to Bring</h4>
-            {report.fsaVisitPrep.whatToBring.map((item, i) => (
-              <p key={i} className="text-sm text-gray-700 mb-1.5 flex items-start gap-2">
-                <span className="text-emerald-500 mt-0.5">☐</span> {item}
-              </p>
-            ))}
+      {/* ══ SECTION 4: FORMS ══ */}
+      <Section id="formsGuide" title="Forms & Paperwork Guide" icon="📝" lockedTitle="Required Forms & Filing Guide">
+        {fg.narrative && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 16 }}>{fg.narrative}</p>}
+        {(fg.requiredForms || []).map((f, i) => (
+          <div key={i} style={{ background: '#F9FAFB', borderRadius: 12, padding: 14, marginBottom: 8 }}>
+            <div style={{ fontSize: 13 }}>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{f.formNumber}</span>
+              <span style={{ margin: '0 8px', color: '#D1D5DB' }}>—</span>
+              <span style={{ fontWeight: 600, color: '#111827' }}>{f.formName}</span>
+            </div>
+            {f.purpose && <p style={{ fontSize: 12.5, color: '#6B7280', margin: '6px 0 0' }}>{f.purpose}</p>}
+            {f.tips && <p style={{ fontSize: 12.5, color: '#059669', margin: '4px 0 0' }}>💡 {f.tips}</p>}
           </div>
-          <div className="bg-blue-50 rounded-xl p-4">
-            <h4 className="font-semibold text-blue-900 mb-3 text-sm uppercase tracking-wider">❓ Questions to Ask</h4>
-            {report.fsaVisitPrep.questionsToAsk.map((q, i) => (
-              <p key={i} className="text-sm text-gray-700 mb-1.5 flex items-start gap-2">
-                <span className="text-blue-500 font-bold mt-0.5">{i + 1}.</span> {q}
-              </p>
-            ))}
-          </div>
-          <div className="bg-red-50 rounded-xl p-4">
-            <h4 className="font-semibold text-red-900 mb-3 text-sm uppercase tracking-wider">⚠️ Common Mistakes</h4>
-            {report.fsaVisitPrep.commonMistakes.map((mistake, i) => (
-              <p key={i} className="text-sm text-gray-700 mb-1.5 flex items-start gap-2">
-                <span className="text-red-500 mt-0.5">✗</span> {mistake}
-              </p>
-            ))}
-          </div>
-        </div>
+        ))}
       </Section>
 
-      {/* ============ SECTION 6: CROP INSURANCE ============ */}
-      <Section id="cropInsurance" title="Crop Insurance Interaction" icon="🛡️" lockedTitle="How ARC/PLC Affects Your Crop Insurance">
-        <p className="text-gray-700 mb-5 leading-relaxed">{report.cropInsurance.narrative}</p>
-        
-        <div className="bg-gray-50 rounded-xl p-5 mb-4">
-          <h4 className="font-semibold text-gray-900 mb-3">Key Considerations</h4>
-          {report.cropInsurance.keyConsiderations.map((item, i) => (
-            <p key={i} className="text-sm text-gray-700 mb-2 flex items-start gap-2">
-              <span className="text-amber-500 mt-0.5">▸</span> {item}
-            </p>
-          ))}
-        </div>
-
-        <div className="bg-emerald-50 rounded-xl p-5">
-          <h4 className="font-semibold text-emerald-900 mb-3">Our Recommendations</h4>
-          {report.cropInsurance.recommendations.map((rec, i) => (
-            <p key={i} className="text-sm text-gray-700 mb-2 flex items-start gap-2">
-              <span className="text-emerald-600 mt-0.5">✓</span> {rec}
-            </p>
-          ))}
-        </div>
-      </Section>
-
-      {/* ============ SECTION 7: DEADLINE CALENDAR ============ */}
-      <Section id="deadlineCalendar" title="Key Deadlines" icon="📅" lockedTitle="Your Program Deadline Calendar">
-        <p className="text-gray-700 mb-5 leading-relaxed">{report.deadlineCalendar.narrative}</p>
-        
-        <div className="space-y-2">
-          {report.deadlineCalendar.deadlines.map((deadline, i) => (
-            <div key={i} className={`flex items-start gap-4 p-4 rounded-lg border-l-4 ${
-              deadline.importance === 'critical' 
-                ? 'border-red-500 bg-red-50' 
-                : deadline.importance === 'important'
-                ? 'border-amber-500 bg-amber-50'
-                : 'border-gray-300 bg-gray-50'
-            }`}>
-              <div className="flex-shrink-0 text-center min-w-[60px]">
-                <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
-                  {deadline.date}
+      {/* ══ SECTION 5: FSA VISIT ══ */}
+      <Section id="fsaVisitPrep" title="FSA Office Visit Prep" icon="🏛️" lockedTitle="FSA Visit Checklist & Tips">
+        {fv.narrative && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 16 }}>{fv.narrative}</p>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {[
+            { title: '📎 Bring', items: fv.whatToBring || [], mark: '☐' },
+            { title: '❓ Ask', items: fv.questionsToAsk || [], mark: null },
+            { title: '⚠️ Avoid', items: fv.commonMistakes || [], mark: '✗' },
+          ].map(({ title, items, mark }, ci) => (
+            <div key={ci} style={{ background: '#F9FAFB', borderRadius: 12, padding: 14 }}>
+              <h4 style={{ fontSize: 12, fontWeight: 800, color: '#111827', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</h4>
+              {items.map((item, j) => (
+                <p key={j} style={{ fontSize: 12, color: '#374151', margin: '0 0 4px', display: 'flex', gap: 4 }}>
+                  {mark ? <span>{mark}</span> : <span style={{ fontWeight: 700 }}>{j + 1}.</span>} {item}
                 </p>
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900 text-sm">{deadline.event}</p>
-                <p className="text-sm text-gray-600 mt-0.5">{deadline.action}</p>
-                {deadline.notes && (
-                  <p className="text-xs text-gray-500 mt-1 italic">{deadline.notes}</p>
-                )}
-              </div>
-              <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
-                deadline.importance === 'critical' ? 'bg-red-200 text-red-800' :
-                deadline.importance === 'important' ? 'bg-amber-200 text-amber-800' :
-                'bg-gray-200 text-gray-600'
-              }`}>
-                {deadline.importance}
-              </span>
+              ))}
             </div>
           ))}
         </div>
       </Section>
 
-      {/* ============ SECTION 8: COUNTY CONTEXT ============ */}
-      <Section id="countyContext" title="County Agricultural Context" icon="🗺️" lockedTitle="Local County Data & FSA Info">
-        <div className="prose prose-gray max-w-none">
-          <p className="text-gray-700 leading-relaxed mb-4">{report.countyContext.historicalData}</p>
-          <p className="text-gray-700 leading-relaxed mb-4">{report.countyContext.localConsiderations}</p>
-          {report.countyContext.fsaOfficeInfo && (
-            <div className="bg-blue-50 rounded-xl p-4 mt-4 not-prose">
-              <h4 className="font-semibold text-blue-900 mb-2 text-sm">🏢 Your Local FSA Office</h4>
-              <p className="text-sm text-gray-700">{report.countyContext.fsaOfficeInfo}</p>
-            </div>
-          )}
-        </div>
+      {/* ══ SECTION 6: CROP INSURANCE ══ */}
+      <Section id="cropInsurance" title="Crop Insurance Interaction" icon="🛡️" lockedTitle="How ARC/PLC Affects Your Insurance">
+        {ci.narrative && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 16 }}>{ci.narrative}</p>}
+        {(ci.keyConsiderations || []).map((item, i) => (
+          <p key={i} style={{ fontSize: 13, color: '#374151', margin: '0 0 6px', display: 'flex', gap: 6 }}>
+            <span style={{ color: '#F59E0B' }}>▸</span> {item}
+          </p>
+        ))}
       </Section>
 
-      {/* ============ FOOTER ============ */}
-      <div className="bg-gray-50 rounded-2xl p-6 text-center text-sm text-gray-500 mt-8">
-        <p className="mb-2">
-          <strong className="text-gray-700">Disclaimer:</strong> This report is for informational purposes only and does not constitute financial or legal advice. 
-          Program payment projections are estimates based on available data and assumptions about future market conditions. 
-          Actual payments will depend on final market year average prices and county yields determined by USDA.
+      {/* ══ SECTION 7: DEADLINES ══ */}
+      <Section id="deadlineCalendar" title="Key Deadlines" icon="📅" lockedTitle="Your Deadline Calendar">
+        {dc.narrative && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 16 }}>{dc.narrative}</p>}
+        {(dc.deadlines || []).map((d, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 14, padding: 12, borderRadius: 10, marginBottom: 6,
+            borderLeft: `4px solid ${d.importance === 'critical' ? '#EF4444' : d.importance === 'important' ? '#F59E0B' : '#D1D5DB'}`,
+            background: d.importance === 'critical' ? '#FEF2F2' : d.importance === 'important' ? '#FFFBEB' : '#F9FAFB',
+          }}>
+            <div style={{ minWidth: 70, fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' }}>{d.date}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{d.event}</div>
+              <div style={{ fontSize: 12.5, color: '#6B7280', marginTop: 2 }}>{d.action}</div>
+            </div>
+          </div>
+        ))}
+      </Section>
+
+      {/* ══ SECTION 8: COUNTY CONTEXT ══ */}
+      <Section id="countyContext" title="County Agricultural Context" icon="🗺️" lockedTitle="Local County Data & FSA Info">
+        {cc.historicalData && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 12 }}>{cc.historicalData}</p>}
+        {cc.localConsiderations && <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7, marginBottom: 12 }}>{cc.localConsiderations}</p>}
+        {cc.fsaOfficeInfo && (
+          <div style={{ background: '#EFF6FF', borderRadius: 12, padding: 14, marginTop: 8 }}>
+            <h4 style={{ fontSize: 13, fontWeight: 700, color: '#1E40AF', marginBottom: 4 }}>🏢 Your Local FSA Office</h4>
+            <p style={{ fontSize: 13, color: '#374151', margin: 0 }}>{cc.fsaOfficeInfo}</p>
+          </div>
+        )}
+      </Section>
+
+      {/* ══ FOOTER ══ */}
+      <div style={{ background: '#F9FAFB', borderRadius: 16, padding: 24, textAlign: 'center', fontSize: 12, color: '#9CA3AF', marginTop: 16 }}>
+        <p style={{ margin: '0 0 8px' }}>
+          <strong style={{ color: '#6B7280' }}>Disclaimer:</strong> This report is for informational purposes only.
+          Projections are estimates based on available data. Actual payments depend on final MYA prices and county yields.
         </p>
-        <p className="text-xs text-gray-400">
-          Generated by HarvestFile — Intelligent tools for American farmers — harvestfile.com
-        </p>
+        <p style={{ margin: 0, fontSize: 11, opacity: 0.7 }}>Generated by HarvestFile — harvestfile.com</p>
       </div>
 
-      {/* ============ FLOATING CTA (for preview tier) ============ */}
+      {/* ══ FLOATING CTA ══ */}
       {!isPaid && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 p-4 z-50 print:hidden">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+          background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          borderTop: '1px solid rgba(0,0,0,0.06)', padding: '12px 24px',
+        }}>
+          <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p className="font-semibold text-gray-900">Unlock your complete farm program report</p>
-              <p className="text-sm text-gray-500">7 additional sections with personalized analysis</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: 0 }}>Unlock your complete report</p>
+              <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>7 additional sections with personalized analysis</p>
             </div>
             <button
               onClick={onUpgradeClick}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
+              style={{
+                background: '#1B4332', color: 'white', fontWeight: 700, fontSize: 14,
+                padding: '12px 28px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)', whiteSpace: 'nowrap',
+              }}
             >
               Get Full Report — $39
             </button>

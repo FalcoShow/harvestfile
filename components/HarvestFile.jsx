@@ -226,6 +226,7 @@ export default function HarvestFile() {
       // Store report in sessionStorage and navigate to report page
       if (typeof window !== "undefined") {
         sessionStorage.setItem(`report-${data.reportId}`, JSON.stringify(data.report));
+        sessionStorage.setItem('harvestfile-latest-report', JSON.stringify(data.report));
         window.location.href = `/report?id=${data.reportId}`;
       }
     } catch (err) {
