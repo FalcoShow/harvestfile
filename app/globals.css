@@ -129,6 +129,72 @@ body {
   transform: translateY(0px);
 }
 
+/* ─── MOBILE RESPONSIVE ───────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Stack hero flex layout */
+  section > div[style*="display: flex"][style*="gap: 64px"] {
+    flex-direction: column !important;
+    gap: 40px !important;
+  }
+
+  /* Stats grid — 2 columns on mobile */
+  div[style*="grid-template-columns: repeat(4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 24px !important;
+  }
+
+  /* Feature cards — single column */
+  div[style*="grid-template-columns: repeat(auto-fit, minmax(300px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* How it works — single column */
+  div[style*="grid-template-columns: repeat(3, 1fr)"] {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
+
+  /* Hide the connecting line on mobile */
+  div[style*="position: absolute"][style*="top: 40"] {
+    display: none !important;
+  }
+
+  /* Results cards — single column */
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Nav — hide text links, keep CTA */
+  nav button[style*="background: none"] {
+    display: none !important;
+  }
+
+  /* Hero card — full width */
+  .hf-float {
+    max-width: 100% !important;
+  }
+
+  /* Footer — stack columns */
+  footer > div > div:first-child {
+    flex-direction: column !important;
+    gap: 32px !important;
+  }
+
+  /* Reduce section padding */
+  section {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Crop selector — keep 3 cols but smaller padding */
+  div[style*="grid-template-columns: repeat(3, 1fr)"] div[style*="padding: 18px"] {
+    padding: 14px 8px !important;
+  }
+}
+
 /* ─── SCROLLBAR ───────────────────────────────────────── */
 
 ::-webkit-scrollbar {

@@ -1,4 +1,4 @@
-import HarvestFile from "../components/HarvestFile";
+import HarvestFile from "@/components/HarvestFile";
 
 export default function Home() {
   return <HarvestFile />;

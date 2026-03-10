@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 const SB_URL = "https://fzduyjxjdcxbdwjlwrpu.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZHV5anhqZGN4YmR3amx3cnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzIwNzksImV4cCI6MjA4ODY0ODA3OX0.yVn6AN7ueY2cvVKIKcbR-pSNOT3aTyz5oGHfdQCN_0M";
@@ -87,6 +88,9 @@ export default function HarvestFile() {
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [view]);
+
+  const router = useRouter();
+  const goPage = (path) => router.push(path);
 
   // ─── NAVIGATION HELPERS ──────────────────────────────
   function scrollTo(id) {
@@ -182,8 +186,8 @@ export default function HarvestFile() {
             <span style={{ fontSize: 18, fontWeight: 800, color: isDark ? "#fff" : C.forest, letterSpacing: "-0.04em", transition: "color 0.3s" }}>Harvest<span style={{ color: C.gold }}>File</span></span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <button onClick={() => scrollTo("features")} className="hf-link-hover" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>Programs</button>
-            <button onClick={() => scrollTo("how-it-works")} className="hf-link-hover" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>Resources</button>
+            <button onClick={() => goPage("/programs/arc-co")} className="hf-link-hover" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>Programs</button>
+            <button onClick={() => goPage("/about")} className="hf-link-hover" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>About</button>
             <button onClick={goCalc} style={{ background: isDark ? "rgba(255,255,255,0.08)" : C.forest, color: "#fff", fontSize: 12.5, fontWeight: 700, padding: "8px 18px", borderRadius: 10, border: isDark ? "1px solid rgba(255,255,255,0.1)" : "none", cursor: "pointer", transition: "all 0.25s" }}>Get Started →</button>
           </div>
         </div>
@@ -516,15 +520,16 @@ export default function HarvestFile() {
             </div>
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>Learn</div>
-              <div onClick={() => scrollTo("how-it-works")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>How ARC-CO Works</div>
-              <div onClick={() => scrollTo("how-it-works")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>How PLC Works</div>
-              <div onClick={() => scrollTo("trust")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>2025 Bill Guide</div>
+              <div onClick={() => goPage("/programs/arc-co")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>How ARC-CO Works</div>
+              <div onClick={() => goPage("/programs/plc")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>How PLC Works</div>
+              <div onClick={() => goPage("/programs/eqip")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>EQIP Guide</div>
             </div>
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>Company</div>
-              <div onClick={goHome} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>About</div>
+              <div onClick={() => goPage("/about")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>About</div>
               <a href="mailto:hello@harvestfile.com" className="hf-link-hover" style={{ display: "block", fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer", textDecoration: "none" }}>Contact</a>
-              <div onClick={goHome} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>Privacy Policy</div>
+              <div onClick={() => goPage("/privacy")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>Privacy Policy</div>
+              <div onClick={() => goPage("/terms")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>Terms of Service</div>
             </div>
           </div>
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
