@@ -86,6 +86,12 @@ export default function HarvestFile() {
   const [liveEst, setLiveEst] = useState(0);
   const [mounted, setMounted] = useState(false);
 
+  // ─── REPORT STATE (Phase 3A) ─────────────────────────
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const [reportEmail, setReportEmail] = useState("");
+  const [showReportEmail, setShowReportEmail] = useState(true);
+
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [view]);
 
@@ -103,7 +109,7 @@ export default function HarvestFile() {
     else { setView("home"); setResults(null); }
   }
 
-  const goCalc = () => { setView("calculator"); setStep(1); setResults(null); setESt("idle"); setEmail(""); setNassD(null); };
+  const goCalc = () => { setView("calculator"); setStep(1); setResults(null); setESt("idle"); setEmail(""); setNassD(null); setReportLoading(false); setReportError(""); setReportEmail(""); };
 
   // ─── COUNTY FETCH (with fallback) ────────────────────
   const fetchC = useCallback(async (s) => {
@@ -162,6 +168,71 @@ export default function HarvestFile() {
 
     setResults({ arcT, plcT, rec: arcT >= plcT ? "ARC-CO" : "PLC", diff: Math.abs(arcT - plcT), by, bR: +(bR.toFixed(2)), gu: +(gu.toFixed(2)), aR: +(aR.toFixed(2)), arcR: +(arcR.toFixed(2)), erp: +(erp.toFixed(2)), plcR: +(plcR.toFixed(2)), plcY, yA, county: finalCounty, st, crop, acres, real: !!nassD });
     setLoading(false); setView("results");
+  }
+
+  // ─── GENERATE AI REPORT (Phase 3A) ──────────────────
+  async function generateReport() {
+    const rEmail = reportEmail || email;
+    if (!rEmail || !rEmail.includes("@")) {
+      setShowReportEmail(true);
+      setReportError("Please enter your email to receive your report.");
+      return;
+    }
+
+    setReportLoading(true);
+    setReportError("");
+
+    try {
+      const cropData = BENCH[results.crop];
+      const response = await fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          farmData: {
+            farmerName: "",
+            email: rEmail,
+            state: SN[results.st] || results.st,
+            county: results.county,
+            crops: [{
+              cropName: results.crop.charAt(0) + results.crop.slice(1).toLowerCase(),
+              plantedAcres: results.acres,
+              baseAcres: results.acres,
+              plcYield: results.plcY,
+              arcBenchmarkYield: results.by,
+              effectiveRefPrice: results.erp,
+              expectedPrice: cropData.mya,
+            }],
+            currentProgram: "unsure",
+            baseCropAcres: results.acres,
+            calculatorResults: {
+              arcEstimate: results.arcT,
+              plcEstimate: results.plcT,
+              recommendation: results.rec,
+              projectedPayments: [
+                { year: 2025, arc: results.arcT, plc: results.plcT },
+                { year: 2026, arc: Math.round(results.arcT * 0.92), plc: Math.round(results.plcT * 0.95) },
+              ],
+            },
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to generate report");
+      }
+
+      // Store report in sessionStorage and navigate to report page
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(`report-${data.reportId}`, JSON.stringify(data.report));
+        window.location.href = `/report?id=${data.reportId}`;
+      }
+    } catch (err) {
+      setReportError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setReportLoading(false);
+    }
   }
 
   async function subEmail() {
@@ -481,6 +552,149 @@ export default function HarvestFile() {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}><PulseDot color={C.emerald} size={5} /><span style={{ fontSize: 12, fontWeight: 700, color: C.emerald }}>Live NASS Data</span></div>
               {nassD.map((d) => (<span key={d.year} style={{ fontSize: 12, color: C.sage }}><b>{d.year}:</b> {d.y} bu/ac</span>))}
             </div></Reveal>}
+
+            {/* ═══════════════════════════════════════════════════════
+                 PHASE 3A: AI-POWERED REPORT CTA
+                 This is the money maker — converts free users to $39 paid
+                 ═══════════════════════════════════════════════════════ */}
+            <Reveal delay={350}>
+              <div style={{
+                background: `linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 30%, #FFFBEB 100%)`,
+                border: "2px solid rgba(5,150,105,0.15)",
+                borderRadius: 24,
+                padding: "36px 32px",
+                marginBottom: 24,
+                position: "relative",
+                overflow: "hidden",
+              }}>
+                {/* Subtle decorative glow */}
+                <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, background: "radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 60%)", pointerEvents: "none" }} />
+
+                <div style={{ position: "relative", zIndex: 2 }}>
+                  {/* Badge */}
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.15)", borderRadius: 100, padding: "4px 12px 4px 6px", marginBottom: 20 }}>
+                    <PulseDot color={C.emerald} size={6} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: C.emerald, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI-Powered Analysis</span>
+                  </div>
+
+                  {/* Headline */}
+                  <h3 style={{ fontSize: 22, fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 10 }}>
+                    Get Your Personalized Farm Program Report
+                  </h3>
+                  <p style={{ fontSize: 14, color: C.textSoft, lineHeight: 1.65, marginBottom: 24, maxWidth: 480 }}>
+                    Our AI analyzes your specific farm data to generate a detailed report with dollar projections,
+                    risk scenarios, exact forms needed, and an FSA office visit prep guide.
+                  </p>
+
+                  {/* What's included grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 24 }}>
+                    {[
+                      { icon: "📊", label: "ARC vs PLC\nBreakdown" },
+                      { icon: "🎯", label: "5 Price\nScenarios" },
+                      { icon: "📝", label: "Forms\nChecklist" },
+                      { icon: "📅", label: "Deadline\nCalendar" },
+                    ].map((item, i) => (
+                      <div key={i} style={{ textAlign: "center", background: "rgba(255,255,255,0.7)", borderRadius: 14, padding: "14px 6px", border: "1px solid rgba(0,0,0,0.03)" }}>
+                        <div style={{ fontSize: 24, marginBottom: 4 }}>{item.icon}</div>
+                        <div style={{ fontSize: 10.5, color: C.textSoft, fontWeight: 600, whiteSpace: "pre-line", lineHeight: 1.3 }}>{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Email input */}
+                  {showReportEmail && (
+                    <div style={{ marginBottom: 16 }}>
+                      <input
+                        type="email"
+                        placeholder="Enter your email to receive your report"
+                        value={reportEmail || email}
+                        onChange={(e) => setReportEmail(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "14px 18px",
+                          fontSize: 14,
+                          borderRadius: 14,
+                          border: "1.5px solid rgba(0,0,0,0.08)",
+                          background: C.white,
+                          color: C.text,
+                          fontFamily: "inherit",
+                          outline: "none",
+                          boxSizing: "border-box",
+                          textAlign: "center",
+                        }}
+                        className="hf-input-focus"
+                      />
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {reportError && (
+                    <div style={{ marginBottom: 12, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "#DC2626", fontSize: 13, borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
+                      {reportError}
+                    </div>
+                  )}
+
+                  {/* CTA Button */}
+                  <button
+                    onClick={generateReport}
+                    disabled={reportLoading}
+                    className="hf-btn-hover"
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      background: reportLoading ? C.sage : C.forest,
+                      color: "#fff",
+                      fontSize: 16,
+                      fontWeight: 700,
+                      padding: "16px 28px",
+                      borderRadius: 14,
+                      border: "none",
+                      cursor: reportLoading ? "wait" : "pointer",
+                      boxShadow: "0 4px 20px rgba(27,67,50,0.2)",
+                      transition: "all 0.3s",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {reportLoading ? (
+                      <>
+                        <svg style={{ animation: "spin 1s linear infinite", width: 18, height: 18 }} viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.25)" strokeWidth="3" />
+                          <path d="M12 2a10 10 0 019.5 6.8" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                        </svg>
+                        Generating Your Report...
+                      </>
+                    ) : (
+                      <>
+                        Generate My Free Preview
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Subtext */}
+                  <p style={{ fontSize: 11.5, color: C.textMuted, textAlign: "center", marginTop: 12 }}>
+                    Free preview includes executive summary · Full report: $39 one-time
+                  </p>
+
+                  {/* Trust badges */}
+                  <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
+                    {["AI-powered analysis", "County-specific data", "Take to your FSA office"].map((t) => (
+                      <span key={t} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: C.sage }}>
+                        <svg width="12" height="12" viewBox="0 0 20 20" fill={C.emerald}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Spin animation for loading */}
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            </Reveal>
+
             <Reveal delay={380}><div style={{ background: C.dark, borderRadius: 20, padding: 36, textAlign: "center", marginBottom: 24, position: "relative", overflow: "hidden" }}>
               <div style={{ ...noise, opacity: 0.12 }} />
               <div style={{ position: "relative", zIndex: 2 }}>
