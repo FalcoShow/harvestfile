@@ -165,8 +165,8 @@ body {
     grid-template-columns: 1fr !important;
   }
 
-  /* Nav — hide text links, keep CTA */
-  nav button[style*="background: none"] {
+  /* Nav — hide text links on mobile, keep CTA */
+  .hf-nav-link {
     display: none !important;
   }
 

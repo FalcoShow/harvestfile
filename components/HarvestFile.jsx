@@ -186,8 +186,8 @@ export default function HarvestFile() {
             <span style={{ fontSize: 18, fontWeight: 800, color: isDark ? "#fff" : C.forest, letterSpacing: "-0.04em", transition: "color 0.3s" }}>Harvest<span style={{ color: C.gold }}>File</span></span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <button onClick={() => goPage("/programs/arc-co")} className="hf-link-hover" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>Programs</button>
-            <button onClick={() => goPage("/about")} className="hf-link-hover" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>About</button>
+            <button onClick={() => goPage("/programs/arc-co")} className="hf-link-hover hf-nav-link" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>Programs</button>
+            <button onClick={() => goPage("/about")} className="hf-link-hover hf-nav-link" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>About</button>
             <button onClick={goCalc} style={{ background: isDark ? "rgba(255,255,255,0.08)" : C.forest, color: "#fff", fontSize: 12.5, fontWeight: 700, padding: "8px 18px", borderRadius: 10, border: isDark ? "1px solid rgba(255,255,255,0.1)" : "none", cursor: "pointer", transition: "all 0.25s" }}>Get Started →</button>
           </div>
         </div>

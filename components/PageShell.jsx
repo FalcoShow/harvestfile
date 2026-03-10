@@ -27,8 +27,8 @@ export default function PageShell({ children, title, subtitle }) {
             <Logo /><span style={{ fontSize: 18, fontWeight: 800, color: C.forest, letterSpacing: "-0.04em" }}>Harvest<span style={{ color: C.gold }}>File</span></span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <button onClick={() => go("/programs/arc-co")} style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: C.textSoft, cursor: "pointer" }}>Programs</button>
-            <button onClick={() => go("/about")} style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: C.textSoft, cursor: "pointer" }}>About</button>
+            <button onClick={() => go("/programs/arc-co")} className="hf-nav-link" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: C.textSoft, cursor: "pointer" }}>Programs</button>
+            <button onClick={() => go("/about")} className="hf-nav-link" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: C.textSoft, cursor: "pointer" }}>About</button>
             <button onClick={() => go("/")} style={{ background: C.forest, color: "#fff", fontSize: 12.5, fontWeight: 700, padding: "8px 18px", borderRadius: 10, border: "none", cursor: "pointer" }}>Get Started →</button>
           </div>
         </div>

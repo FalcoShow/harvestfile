@@ -1,21 +1,23 @@
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata = {
   title: "HarvestFile — ARC/PLC Decision Calculator for Farmers",
   description:
     "Compare ARC-CO and PLC payments for your exact county using live USDA data. Free, private, and covers all 50 states. Updated for 2025 OBBBA rules.",
   keywords: [
-    "ARC-CO",
-    "PLC",
-    "USDA",
-    "farm programs",
-    "ARC PLC calculator",
-    "farm payment estimator",
-    "USDA NASS",
-    "agriculture risk coverage",
-    "price loss coverage",
-    "farm bill 2025",
+    "ARC-CO", "PLC", "USDA", "farm programs", "ARC PLC calculator",
+    "farm payment estimator", "USDA NASS", "agriculture risk coverage",
+    "price loss coverage", "farm bill 2025",
   ],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "HarvestFile — Know Exactly What Your Farm Is Owed",
     description:
@@ -23,17 +25,16 @@ export const metadata = {
     url: "https://harvestfile.com",
     siteName: "HarvestFile",
     type: "website",
+    images: [{ url: "https://harvestfile.com/og-image.png", width: 1200, height: 630, alt: "HarvestFile — ARC/PLC Decision Calculator" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "HarvestFile — ARC/PLC Decision Calculator",
     description:
       "Compare ARC-CO and PLC payments for your county. Free, private, all 50 states.",
+    images: ["https://harvestfile.com/og-image.png"],
   },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }) {
@@ -59,6 +60,8 @@ export default function RootLayout({ children }) {
         }}
       >
         {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
