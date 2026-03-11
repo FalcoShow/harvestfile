@@ -1,6 +1,8 @@
-/* ═══════════════════════════════════════════════════════════
-   HARVESTFILE — Global Styles & Animations
-   ═══════════════════════════════════════════════════════════ */
+﻿@import "tailwindcss";
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   HARVESTFILE â€” Global Styles & Animations
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 *,
 *::before,
@@ -28,7 +30,7 @@ body {
   color: #1B4332;
 }
 
-/* ─── ANIMATIONS ──────────────────────────────────────── */
+/* â”€â”€â”€ ANIMATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @keyframes hf-float {
   0%, 100% { transform: translateY(0px); }
@@ -71,7 +73,7 @@ body {
   100% { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* ─── UTILITY CLASSES ─────────────────────────────────── */
+/* â”€â”€â”€ UTILITY CLASSES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .hf-float {
   animation: hf-float 5s ease-in-out infinite;
@@ -129,7 +131,7 @@ body {
   transform: translateY(0px);
 }
 
-/* ─── MOBILE RESPONSIVE ───────────────────────────────── */
+/* â”€â”€â”€ MOBILE RESPONSIVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @media (max-width: 768px) {
   /* Stack hero flex layout */
@@ -138,18 +140,18 @@ body {
     gap: 40px !important;
   }
 
-  /* Stats grid — 2 columns on mobile */
+  /* Stats grid â€” 2 columns on mobile */
   div[style*="grid-template-columns: repeat(4"] {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 24px !important;
   }
 
-  /* Feature cards — single column */
+  /* Feature cards â€” single column */
   div[style*="grid-template-columns: repeat(auto-fit, minmax(300px"] {
     grid-template-columns: 1fr !important;
   }
 
-  /* How it works — single column */
+  /* How it works â€” single column */
   div[style*="grid-template-columns: repeat(3, 1fr)"] {
     grid-template-columns: 1fr !important;
     gap: 40px !important;
@@ -160,22 +162,22 @@ body {
     display: none !important;
   }
 
-  /* Results cards — single column */
+  /* Results cards â€” single column */
   div[style*="grid-template-columns: 1fr 1fr"] {
     grid-template-columns: 1fr !important;
   }
 
-  /* Nav — hide text links on mobile, keep CTA */
+  /* Nav â€” hide text links on mobile, keep CTA */
   .hf-nav-link {
     display: none !important;
   }
 
-  /* Hero card — full width */
+  /* Hero card â€” full width */
   .hf-float {
     max-width: 100% !important;
   }
 
-  /* Footer — stack columns */
+  /* Footer â€” stack columns */
   footer > div > div:first-child {
     flex-direction: column !important;
     gap: 32px !important;
@@ -189,13 +191,13 @@ body {
 }
 
 @media (max-width: 480px) {
-  /* Crop selector — keep 3 cols but smaller padding */
+  /* Crop selector â€” keep 3 cols but smaller padding */
   div[style*="grid-template-columns: repeat(3, 1fr)"] div[style*="padding: 18px"] {
     padding: 14px 8px !important;
   }
 }
 
-/* ─── SCROLLBAR ───────────────────────────────────────── */
+/* â”€â”€â”€ SCROLLBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -213,3 +215,4 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
+
