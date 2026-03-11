@@ -18,10 +18,26 @@ const C = {
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 const SN = {AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DE:"Delaware",FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",ME:"Maine",MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",NJ:"New Jersey",NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming"};
 
+const CROPS = [
+  { k: "CORN", e: "🌽", n: "Corn" },
+  { k: "SOYBEANS", e: "🫘", n: "Soybeans" },
+  { k: "WHEAT", e: "🌾", n: "Wheat" },
+  { k: "SORGHUM", e: "🌿", n: "Sorghum" },
+  { k: "BARLEY", e: "🪴", n: "Barley" },
+  { k: "OATS", e: "🌱", n: "Oats" },
+  { k: "RICE", e: "🍚", n: "Rice" },
+  { k: "PEANUTS", e: "🥜", n: "Peanuts" },
+];
+
 const BENCH = {
-  CORN: { by: 178, bp: 5.03, mya: 3.90, lr: 2.20, ref: 4.10, pyf: 0.91 },
-  SOYBEANS: { by: 52, bp: 12.1, mya: 10.2, lr: 6.2, ref: 10.0, pyf: 0.9 },
-  WHEAT: { by: 48, bp: 6.8, mya: 5.4, lr: 3.38, ref: 6.35, pyf: 0.89 },
+  CORN:     { by: 178,  bp: 5.03,  mya: 3.90,  lr: 2.20,   ref: 4.10,   pyf: 0.91, nass: "CORN",       nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
+  SOYBEANS: { by: 52,   bp: 12.1,  mya: 10.2,  lr: 6.20,   ref: 10.0,   pyf: 0.90, nass: "SOYBEANS",   nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
+  WHEAT:    { by: 48,   bp: 6.80,  mya: 5.40,  lr: 3.38,   ref: 6.35,   pyf: 0.89, nass: "WHEAT",      nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
+  SORGHUM:  { by: 72,   bp: 4.35,  mya: 3.75,  lr: 2.20,   ref: 3.95,   pyf: 0.89, nass: "SORGHUM",    nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
+  BARLEY:   { by: 75,   bp: 5.25,  mya: 4.60,  lr: 2.50,   ref: 4.95,   pyf: 0.87, nass: "BARLEY",     nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
+  OATS:     { by: 68,   bp: 3.70,  mya: 3.20,  lr: 1.93,   ref: 2.40,   pyf: 0.85, nass: "OATS",       nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
+  RICE:     { by: 75,   bp: 14.50, mya: 12.50, lr: 7.00,   ref: 14.00,  pyf: 0.89, nass: "RICE",       nassUnit: "CWT / ACRE", yUnit: "cwt/ac", pUnit: "/cwt" },
+  PEANUTS:  { by: 4100, bp: 0.23,  mya: 0.21,  lr: 0.1775, ref: 0.2675, pyf: 0.88, nass: "PEANUTS",    nassUnit: "LB / ACRE",  yUnit: "lb/ac", pUnit: "/lb" },
 };
 
 // ─── HOOKS & HELPERS ─────────────────────────────────────
@@ -129,21 +145,29 @@ export default function HarvestFile() {
 
   const goCalc = () => { setView("calculator"); setStep(1); setResults(null); setESt("idle"); setEmail(""); setNassD(null); setReportLoading(false); setReportError(""); setReportEmail(""); setStepAnim(false); };
 
-  // ─── COUNTY FETCH (with fallback) ────────────────────
-  const fetchC = useCallback(async (s) => {
+  // ─── COUNTY FETCH (uses selected crop for better county matching) ─
+  const fetchC = useCallback(async (s, cropKey) => {
     if (!s) return setCtys([]);
     setLoadC(true);
+    const nassComm = BENCH[cropKey]?.nass || "CORN";
     try {
-      const r = await fetch(`https://quickstats.nass.usda.gov/api/get_param_values/?key=${NASS_KEY}&param=county_name&state_alpha=${s}&agg_level_desc=COUNTY&commodity_desc=CORN&statisticcat_desc=YIELD`);
+      const r = await fetch(`https://quickstats.nass.usda.gov/api/get_param_values/?key=${NASS_KEY}&param=county_name&state_alpha=${s}&agg_level_desc=COUNTY&commodity_desc=${encodeURIComponent(nassComm)}&statisticcat_desc=YIELD`);
       if (!r.ok) throw new Error("API error");
       const d = await r.json();
       if (d?.county_name) setCtys(d.county_name.map((c) => c.trim()).filter(Boolean).sort());
-      else setCtys([]);
+      else {
+        // Fallback: try CORN counties if selected crop has none
+        if (nassComm !== "CORN") {
+          const r2 = await fetch(`https://quickstats.nass.usda.gov/api/get_param_values/?key=${NASS_KEY}&param=county_name&state_alpha=${s}&agg_level_desc=COUNTY&commodity_desc=CORN&statisticcat_desc=YIELD`);
+          if (r2.ok) { const d2 = await r2.json(); if (d2?.county_name) setCtys(d2.county_name.map((c) => c.trim()).filter(Boolean).sort()); else setCtys([]); }
+          else setCtys([]);
+        } else setCtys([]);
+      }
     } catch { setCtys([]); }
     setLoadC(false);
   }, []);
 
-  useEffect(() => { if (st) fetchC(st); }, [st, fetchC]);
+  useEffect(() => { if (st) fetchC(st, crop); }, [st, crop, fetchC]);
 
   const filt = ctys.filter((c) => c.toLowerCase().includes((county || cS).toLowerCase()));
   const countyValue = county || cS;
@@ -164,7 +188,9 @@ export default function HarvestFile() {
     const finalCounty = county || cS.trim();
     const d = { ...BENCH[crop] }; let by = d.by;
     try {
-      const r = await fetch(`https://quickstats.nass.usda.gov/api/api_GET/?key=${NASS_KEY}&source_desc=SURVEY&commodity_desc=${crop}&statisticcat_desc=YIELD&unit_desc=BU%20/%20ACRE&agg_level_desc=COUNTY&state_alpha=${st}&county_name=${encodeURIComponent(finalCounty.toUpperCase())}&year__GE=2019&year__LE=2024&format=JSON`);
+      const nassComm = encodeURIComponent(d.nass);
+      const nassUnit = encodeURIComponent(d.nassUnit);
+      const r = await fetch(`https://quickstats.nass.usda.gov/api/api_GET/?key=${NASS_KEY}&source_desc=SURVEY&commodity_desc=${nassComm}&statisticcat_desc=YIELD&unit_desc=${nassUnit}&agg_level_desc=COUNTY&state_alpha=${st}&county_name=${encodeURIComponent(finalCounty.toUpperCase())}&year__GE=2019&year__LE=2024&format=JSON`);
       if (!r.ok) throw new Error("API error");
       const j = await r.json();
       if (j?.data?.length > 0) {
@@ -182,7 +208,7 @@ export default function HarvestFile() {
     const plcY = Math.round(by * d.pyf * 10) / 10;
     const plcT = Math.round(plcR * plcY * acres * 0.85 * 0.943);
 
-    setResults({ arcT, plcT, rec: arcT >= plcT ? "ARC-CO" : "PLC", diff: Math.abs(arcT - plcT), by, bR: +(bR.toFixed(2)), gu: +(gu.toFixed(2)), aR: +(aR.toFixed(2)), arcR: +(arcR.toFixed(2)), erp: +(erp.toFixed(2)), plcR: +(plcR.toFixed(2)), plcY, yA, county: finalCounty, st, crop, acres, real: !!nassD });
+    setResults({ arcT, plcT, rec: arcT >= plcT ? "ARC-CO" : "PLC", diff: Math.abs(arcT - plcT), by, bR: +(bR.toFixed(2)), gu: +(gu.toFixed(2)), aR: +(aR.toFixed(2)), arcR: +(arcR.toFixed(2)), erp: +(erp.toFixed(2)), plcR: +(plcR.toFixed(2)), plcY, yA, county: finalCounty, st, crop, acres, real: !!nassD, yUnit: d.yUnit, pUnit: d.pUnit });
     setLoading(false); setView("results");
   }
 
@@ -374,7 +400,7 @@ export default function HarvestFile() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
               {[
                 { icon: "📊", title: "ARC/PLC Decision Calculator", desc: "Side-by-side payment comparison using your county's real yield history. Updated for 2025 OBBBA rules.", acc: C.gold, action: goCalc },
-                { icon: "🗺️", title: "Nationwide Coverage", desc: "Every state and county in the US. Real-time NASS data for corn, soybeans, and wheat.", acc: C.emerald },
+                { icon: "🗺️", title: "Nationwide Coverage", desc: "Every state and county in the US. Real-time NASS data for corn, soybeans, wheat, sorghum, barley, oats, rice, and peanuts.", acc: C.emerald },
                 { icon: "🔔", title: "Price Alerts", desc: "Get notified when MYA prices finalize and your payment estimates change.", acc: C.gold },
                 { icon: "📋", title: "Eligibility Screener", desc: "Answer 7 questions to find which USDA programs you qualify for — ARC/PLC, EQIP, CRP, and more.", acc: C.sage },
                 { icon: "📱", title: "Mobile-First Design", desc: "Built for the field, the co-op, and the tractor cab. Fast on rural connections.", acc: C.forest },
@@ -533,18 +559,28 @@ export default function HarvestFile() {
                     <label style={lblDark}>County</label>
                     <div style={{ position: "relative" }}>
                       <input
-                        placeholder={loadC ? "Loading counties..." : "Type your county name..."}
+                        placeholder={loadC ? "Loading counties..." : ctys.length > 0 ? "Select or type your county..." : "Type your county name..."}
                         value={county || cS}
-                        onChange={(e) => { const val = e.target.value; setCS(val); setCounty(""); if (val.length > 0) setShowD(true); else setShowD(false); }}
-                        onFocus={() => { if ((cS || "").length > 0 || ctys.length > 0) setShowD(true); }}
+                        onChange={(e) => { const val = e.target.value; setCS(val); setCounty(""); setShowD(true); }}
+                        onFocus={() => setShowD(true)}
                         onBlur={() => setTimeout(() => setShowD(false), 200)}
                         className="hf-calc-input"
                         style={inpDark}
                       />
+                      {/* Dropdown arrow indicator */}
+                      {ctys.length > 0 && !county && (
+                        <div style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+                        </div>
+                      )}
                       {showD && ctys.length > 0 && (
-                        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: 200, overflowY: "auto", background: "rgba(12,31,23,0.95)", backdropFilter: "blur(20px)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 12px 48px rgba(0,0,0,0.4)", zIndex: 50 }}>
-                          {filt.slice(0, 10).map((c) => (
-                            <div key={c} onMouseDown={() => { setCounty(c); setCS(""); setShowD(false); }} style={{ padding: "12px 16px", fontSize: 14, cursor: "pointer", color: "rgba(255,255,255,0.7)", borderBottom: "1px solid rgba(255,255,255,0.04)", fontWeight: 500, transition: "all 0.15s" }} onMouseEnter={(e) => { e.target.style.background = "rgba(255,255,255,0.05)"; e.target.style.color = "#fff"; }} onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "rgba(255,255,255,0.7)"; }}>{c} County</div>
+                        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: 280, overflowY: "auto", background: "rgba(12,31,23,0.95)", backdropFilter: "blur(20px)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 12px 48px rgba(0,0,0,0.4)", zIndex: 50 }}>
+                          {/* County count header */}
+                          <div style={{ padding: "8px 16px 6px", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.15)", textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "1px solid rgba(255,255,255,0.04)", position: "sticky", top: 0, background: "rgba(12,31,23,0.98)", zIndex: 1 }}>
+                            {filt.length} {filt.length === 1 ? "county" : "counties"} {(county || cS) ? "matching" : `in ${SN[st] || st}`}
+                          </div>
+                          {filt.map((c) => (
+                            <div key={c} onMouseDown={() => { setCounty(c); setCS(""); setShowD(false); }} style={{ padding: "11px 16px", fontSize: 14, cursor: "pointer", color: "rgba(255,255,255,0.7)", borderBottom: "1px solid rgba(255,255,255,0.04)", fontWeight: 500, transition: "all 0.15s" }} onMouseEnter={(e) => { e.target.style.background = "rgba(255,255,255,0.05)"; e.target.style.color = "#fff"; }} onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "rgba(255,255,255,0.7)"; }}>{c} County</div>
                           ))}
                           {filt.length === 0 && <div style={{ padding: "12px 16px", fontSize: 13, color: "rgba(255,255,255,0.25)" }}>No matches — type your county name and continue</div>}
                         </div>
@@ -555,18 +591,18 @@ export default function HarvestFile() {
 
                   <div style={{ marginBottom: 28 }}>
                     <label style={lblDark}>Primary Crop</label>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                      {[{ k: "CORN", e: "🌽", n: "Corn" }, { k: "SOYBEANS", e: "🫘", n: "Soybeans" }, { k: "WHEAT", e: "🌾", n: "Wheat" }].map((c) => (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                      {CROPS.map((c) => (
                         <div key={c.k} onClick={() => setCrop(c.k)} style={{
-                          padding: "20px 10px", borderRadius: 16, textAlign: "center", cursor: "pointer",
+                          padding: "16px 6px", borderRadius: 14, textAlign: "center", cursor: "pointer",
                           border: crop === c.k ? `2px solid ${C.gold}` : "2px solid rgba(255,255,255,0.06)",
                           background: crop === c.k ? "rgba(201,168,76,0.06)" : "rgba(255,255,255,0.02)",
                           transition: "all 0.25s",
                           transform: crop === c.k ? "scale(1.03)" : "scale(1)",
                           boxShadow: crop === c.k ? "0 4px 20px rgba(201,168,76,0.1)" : "none",
                         }}>
-                          <div style={{ fontSize: 32, marginBottom: 6 }}>{c.e}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: crop === c.k ? C.gold : "rgba(255,255,255,0.35)" }}>{c.n}</div>
+                          <div style={{ fontSize: 26, marginBottom: 4 }}>{c.e}</div>
+                          <div style={{ fontSize: 11.5, fontWeight: 700, color: crop === c.k ? C.gold : "rgba(255,255,255,0.35)", lineHeight: 1.2 }}>{c.n}</div>
                         </div>
                       ))}
                     </div>
@@ -600,7 +636,7 @@ export default function HarvestFile() {
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 6 }}>Your FSA base acres (FSA-156EZ form)</div>
                   </div>
                   <div style={{ marginBottom: 28 }}>
-                    <label style={lblDark}>Actual County Yield <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.2)" }}>(bu/ac) — optional</span></label>
+                    <label style={lblDark}>Actual County Yield <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.2)" }}>({BENCH[crop].yUnit}) — optional</span></label>
                     <input
                       type="number"
                       value={yIn}
@@ -622,7 +658,7 @@ export default function HarvestFile() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                       {[
                         ["Location", `${county || cS} Co., ${st}`, "📍"],
-                        ["Crop", crop.charAt(0) + crop.slice(1).toLowerCase(), { CORN: "🌽", SOYBEANS: "🫘", WHEAT: "🌾" }[crop]],
+                        ["Crop", crop.charAt(0) + crop.slice(1).toLowerCase(), (CROPS.find(c => c.k === crop) || {}).e || "🌾"],
                         ["Base Acres", `${acres.toLocaleString()} ac`, "🌾"],
                         ["Program Year", "2025 (OBBBA)", "📅"],
                       ].map(([k, v, icon]) => (
@@ -764,14 +800,14 @@ export default function HarvestFile() {
               {/* NASS data badge */}
               {nassD && <Reveal delay={50}><div style={{ background: C.emeraldBg, borderRadius: 14, padding: "14px 20px", border: "1px solid rgba(5,150,105,0.1)", marginBottom: 20, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}><PulseDot color={C.emerald} size={5} /><span style={{ fontSize: 12, fontWeight: 700, color: C.emerald }}>Live NASS County Data</span></div>
-                {nassD.map((d) => (<span key={d.year} style={{ fontSize: 12, color: C.sage, fontVariantNumeric: "tabular-nums" }}><b>{d.year}:</b> {d.y} bu/ac</span>))}
+                {nassD.map((d) => (<span key={d.year} style={{ fontSize: 12, color: C.sage, fontVariantNumeric: "tabular-nums" }}><b>{d.year}:</b> {d.y} {results.yUnit}</span>))}
               </div></Reveal>}
 
               {/* Breakdown cards */}
               <Reveal delay={100}>
                 {[
-                  { t: "ARC-CO Breakdown", icon: "📊", rows: [["Benchmark Yield", `${results.by} bu/ac`], ["Benchmark Revenue", `$${results.bR.toFixed(2)}/ac`], ["Guarantee (90%)", `$${results.gu.toFixed(2)}/ac`], ["Actual Revenue", `$${results.aR.toFixed(2)}/ac`], ["Payment Rate (12% cap)", `$${results.arcR.toFixed(2)}/ac`]], total: `$${results.arcT.toLocaleString()}`, isRec: results.rec === "ARC-CO" },
-                  { t: "PLC Breakdown", icon: "📋", rows: [["Effective Ref Price", `$${results.erp.toFixed(2)}/bu`], ["MYA Price (2025)", `$${BENCH[results.crop].mya.toFixed(2)}/bu`], ["PLC Rate", `$${results.plcR.toFixed(2)}/bu`], ["Payment Yield", `${results.plcY} bu/ac`]], total: `$${results.plcT.toLocaleString()}`, isRec: results.rec === "PLC" },
+                  { t: "ARC-CO Breakdown", icon: "📊", rows: [["Benchmark Yield", `${results.by} ${results.yUnit}`], ["Benchmark Revenue", `$${results.bR.toFixed(2)}/ac`], ["Guarantee (90%)", `$${results.gu.toFixed(2)}/ac`], ["Actual Revenue", `$${results.aR.toFixed(2)}/ac`], ["Payment Rate (12% cap)", `$${results.arcR.toFixed(2)}/ac`]], total: `$${results.arcT.toLocaleString()}`, isRec: results.rec === "ARC-CO" },
+                  { t: "PLC Breakdown", icon: "📋", rows: [["Effective Ref Price", `$${results.erp.toFixed(2)}${results.pUnit}`], ["MYA Price (2025)", `$${BENCH[results.crop].mya.toFixed(2)}${results.pUnit}`], ["PLC Rate", `$${results.plcR.toFixed(2)}${results.pUnit}`], ["Payment Yield", `${results.plcY} ${results.yUnit}`]], total: `$${results.plcT.toLocaleString()}`, isRec: results.rec === "PLC" },
                 ].map((s, i) => (
                   <div key={i} style={{
                     background: C.white,
