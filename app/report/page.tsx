@@ -219,6 +219,44 @@ export default function ReportPage() {
           onUpgradeClick={handleUpgradeClick}
         />
       </div>
+
+      {/* Print / PDF Styles */}
+      <style>{`
+        @media print {
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+          body { background: white !important; margin: 0 !important; padding: 0 !important; font-size: 11pt !important; }
+          
+          /* Hide nav and floating CTA */
+          nav, [style*="position: fixed"], [style*="position: sticky"] { display: none !important; }
+          
+          /* Prevent sections from splitting across pages */
+          section { page-break-inside: avoid !important; break-inside: avoid !important; margin-bottom: 12pt !important; }
+          section > div { page-break-inside: avoid !important; break-inside: avoid !important; }
+          
+          /* Keep tables together */
+          table { page-break-inside: avoid !important; }
+          tr { page-break-inside: avoid !important; }
+          
+          /* Keep deadline items together */
+          [style*="paddingLeft: 24"] { page-break-inside: avoid !important; break-inside: avoid !important; }
+          
+          /* Reduce padding for print */
+          div[style*="padding: '32px 24px"] { padding: 0 !important; }
+          div[style*="padding: '24px 28px"] { padding: 16px 20px !important; }
+          div[style*="padding: '40px 36px"] { padding: 24px 20px !important; }
+          
+          /* Dark sections: ensure text contrast */
+          [style*="background: rgb(12, 31, 23)"], [style*="background: #0C1F17"] {
+            border: 2pt solid #1B4332 !important;
+          }
+          
+          /* Reduce gaps */
+          section { margin-bottom: 8pt !important; }
+          
+          /* Page setup */
+          @page { margin: 0.5in 0.6in; size: letter; }
+        }
+      `}</style>
     </div>
   );
 }
