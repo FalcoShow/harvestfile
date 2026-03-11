@@ -6,9 +6,9 @@ export async function POST(request) {
   try {
     const { reportId, email, county, state, crop } = await request.json();
 
-    if (!reportId || !email) {
+    if (!reportId) {
       return Response.json(
-        { error: "Missing reportId or email" },
+        { error: "Missing reportId" },
         { status: 400 }
       );
     }
@@ -19,10 +19,10 @@ export async function POST(request) {
       request.headers.get("origin") ||
       "https://harvestfile.com";
 
-    const session = await stripe.checkout.sessions.create({
+    // Build Stripe session config — email is optional (Stripe collects it if not provided)
+    const sessionConfig = {
       payment_method_types: ["card"],
       mode: "payment",
-      customer_email: email,
       line_items: [
         {
           price_data: {
@@ -39,7 +39,7 @@ export async function POST(request) {
       ],
       metadata: {
         reportId,
-        email,
+        email: email || "",
         county: county || "",
         state: state || "",
         crop: crop || "",
@@ -47,11 +47,15 @@ export async function POST(request) {
       },
       success_url: `${origin}/report?id=${reportId}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/report?id=${reportId}&payment=cancelled`,
-      // Auto-apply tax if configured in Stripe dashboard
       automatic_tax: { enabled: false },
-      // Founding Farmer discount — remove after first 100 sales
-      // discounts: [{ coupon: "FOUNDING_FARMER" }],
-    });
+    };
+
+    // Pre-fill email on Stripe checkout if we have it
+    if (email) {
+      sessionConfig.customer_email = email;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     return Response.json({
       success: true,
