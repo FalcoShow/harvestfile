@@ -74,12 +74,12 @@ export default function ReportPage() {
         const safeReport = {
           reportId: reportData.reportId || 'DRAFT',
           generatedAt: reportData.generatedAt || new Date().toISOString(),
-          executiveSummary: reportData.executiveSummary || {
-            headline: 'Your personalized farm program analysis',
-            recommendation: 'PLC',
-            confidenceLevel: 'medium',
-            estimatedBenefit: 0,
-            keyInsight: 'Report data is loading...',
+          executiveSummary: {
+            headline: reportData.executiveSummary?.headline || 'Your personalized farm program analysis',
+            recommendation: reportData.executiveSummary?.recommendation || 'PLC',
+            confidenceLevel: reportData.executiveSummary?.confidenceLevel || reportData.executiveSummary?.confidence_level || 'medium',
+            estimatedBenefit: reportData.executiveSummary?.estimatedBenefit || reportData.executiveSummary?.estimated_benefit || 0,
+            keyInsight: reportData.executiveSummary?.keyInsight || reportData.executiveSummary?.key_insight || '',
           },
           programAnalysis: reportData.programAnalysis || {
             arcProjection: { programName: 'ARC-CO', totalProjectedPayment: 0, yearlyBreakdown: [], pros: [], cons: [] },
@@ -113,11 +113,11 @@ export default function ReportPage() {
             deadlines: [],
             narrative: '',
           },
-          countyContext: reportData.countyContext || {
-            countyName: 'Your County',
-            state: 'Your State',
-            historicalData: '',
-            localConsiderations: '',
+          countyContext: {
+            countyName: reportData.countyContext?.countyName || reportData.countyContext?.county_name || reportData.county || 'Your County',
+            state: reportData.countyContext?.state || reportData.state || 'Your State',
+            historicalData: reportData.countyContext?.historicalData || reportData.countyContext?.historical_data || '',
+            localConsiderations: reportData.countyContext?.localConsiderations || reportData.countyContext?.local_considerations || '',
           },
         };
 

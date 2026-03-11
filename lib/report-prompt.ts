@@ -1,51 +1,100 @@
 // =============================================================================
-// HarvestFile - Claude Report Prompt Engine
-// Phase 3A: The AI brain that generates $39 personalized farm reports
-// =============================================================================
-// This is the most important file in your business. The quality of this prompt
-// is what makes farmers feel the report was worth every penny.
+// HarvestFile - Claude Report Prompt Engine (V2 - FULL DATA)
+// Phase 3A: Generates complete, data-rich reports in every section
 // =============================================================================
 
-import { FarmInputData, ReportData } from './types/report';
-
-/**
- * Builds the system prompt for Claude to act as a USDA farm program expert.
- * This prompt is carefully engineered to produce actionable, personalized advice.
- */
-export function buildSystemPrompt(): string {
-  return `You are an expert USDA farm program analyst with 20+ years of experience advising farmers on ARC (Agriculture Risk Coverage) and PLC (Price Loss Coverage) program elections. You have deep expertise in:
-
-- ARC-CO (County Option) and PLC program mechanics
-- USDA Farm Service Agency (FSA) procedures and forms
-- Crop insurance interactions with safety net programs
-- County-level agricultural economics
-- The 2018 Farm Bill safety net provisions and any subsequent updates
-
-Your job is to generate a comprehensive, personalized farm program report for an individual farmer. This report must be:
-
-1. ACTIONABLE: Every section should tell the farmer exactly what to do
-2. PERSONALIZED: Reference their specific crops, county, and acreage numbers
-3. PLAIN ENGLISH: Avoid jargon. When you must use a technical term, explain it immediately
-4. HONEST: If the recommendation is close or uncertain, say so. Farmers respect honesty over false confidence
-5. DOLLAR-SPECIFIC: Always show actual dollar projections, not just percentages
+export function buildSystemPrompt() {
+  return `You are an expert USDA farm program analyst. Generate a comprehensive, personalized farm program report as a single JSON object.
 
 CRITICAL RULES:
-- Always use the farmer's actual data in calculations. Never use placeholder numbers.
-- When projecting payments, show your math clearly so the farmer can verify.
-- If data is missing or uncertain, acknowledge it and explain your assumptions.
-- The ARC-CO guarantee = benchmark revenue × 86%. Payment = max(0, guarantee - actual county revenue) × coverage factor (85% of base acres)
-- PLC payment = max(0, effective reference price - higher of MYA price or national loan rate) × payment yield × 85% of base acres
-- For scenario analysis, use realistic price ranges based on current market conditions.
+1. Respond with ONLY valid JSON. No markdown, no code fences, no text outside the JSON.
+2. Every section must have real, substantive content. No empty arrays. No empty strings.
+3. All dollar amounts must be numbers, not strings.
+4. Use the farmer's actual data in all calculations.
+5. The countyContext must include the farmer's real county and state name.
+6. estimatedBenefit must be the dollar difference between the recommended program and the alternative.
 
-FORMAT: You must respond with ONLY valid JSON matching the ReportData schema. No markdown, no code fences, no explanation outside the JSON.`;
+JSON SCHEMA (follow EXACTLY):
+{
+  "reportId": "uuid-string",
+  "generatedAt": "ISO-date-string",
+  "executiveSummary": {
+    "headline": "string with dollar amounts",
+    "recommendation": "ARC-CO" or "PLC",
+    "confidenceLevel": "high" or "medium" or "low",
+    "estimatedBenefit": number (MUST be the dollar difference, NOT zero),
+    "keyInsight": "2-3 sentence plain English explanation"
+  },
+  "programAnalysis": {
+    "arcProjection": {
+      "programName": "ARC-CO",
+      "totalProjectedPayment": number,
+      "yearlyBreakdown": [{"year": number, "projectedPayment": number, "explanation": "string"}],
+      "pros": ["string", "string", "string"],
+      "cons": ["string", "string"]
+    },
+    "plcProjection": {
+      "programName": "PLC",
+      "totalProjectedPayment": number,
+      "yearlyBreakdown": [{"year": number, "projectedPayment": number, "explanation": "string"}],
+      "pros": ["string", "string", "string"],
+      "cons": ["string", "string"]
+    },
+    "comparisonTable": [
+      {"year": 2025, "arcPayment": number, "plcPayment": number, "difference": number, "winner": "ARC-CO" or "PLC"},
+      {"year": 2026, "arcPayment": number, "plcPayment": number, "difference": number, "winner": "ARC-CO" or "PLC"}
+    ],
+    "analysisNarrative": "string explaining why one program beats the other"
+  },
+  "scenarioAnalysis": {
+    "scenarios": [
+      {"scenarioName": "string", "priceChange": number, "arcPayment": number, "plcPayment": number, "winner": "ARC-CO" or "PLC", "explanation": "string"},
+      ... (MUST have exactly 5 scenarios)
+    ],
+    "narrative": "string overview",
+    "riskAssessment": "string"
+  },
+  "formsGuide": {
+    "requiredForms": [
+      {"formNumber": "string", "formName": "string", "purpose": "string", "whereToGet": "string", "tips": "string"},
+      ... (MUST have at least 3 forms)
+    ],
+    "optionalForms": [{"formNumber": "string", "formName": "string", "purpose": "string", "whereToGet": "string", "tips": "string"}],
+    "narrative": "string"
+  },
+  "fsaVisitPrep": {
+    "whatToBring": ["string", "string", "string", "string", "string"],
+    "questionsToAsk": ["string", "string", "string", "string"],
+    "commonMistakes": ["string", "string", "string"],
+    "narrative": "string"
+  },
+  "cropInsurance": {
+    "interactionSummary": "string",
+    "keyConsiderations": ["string", "string", "string"],
+    "recommendations": ["string", "string", "string"],
+    "narrative": "string explaining how ARC/PLC interacts with crop insurance"
+  },
+  "deadlineCalendar": {
+    "deadlines": [
+      {"date": "string", "event": "string", "importance": "critical" or "important" or "optional", "action": "string", "notes": "string"},
+      ... (MUST have at least 5 deadlines)
+    ],
+    "narrative": "string"
+  },
+  "countyContext": {
+    "countyName": "ACTUAL county name from farmer data",
+    "state": "ACTUAL full state name from farmer data",
+    "historicalData": "2-3 sentences about this county's agricultural history and typical yields",
+    "localConsiderations": "2-3 sentences about local factors affecting program choice",
+    "fsaOfficeInfo": "string with county FSA office details or how to find them"
+  }
 }
 
-/**
- * Builds the user prompt with the farmer's specific data.
- * This is where personalization happens.
- */
-export function buildUserPrompt(farmData: FarmInputData): string {
-  const cropsList = farmData.crops.map(c => 
+MANDATORY: Every array must have at least the minimum items shown. No empty arrays. No empty strings. estimatedBenefit MUST be a positive number showing the dollar advantage of your recommendation.`;
+}
+
+export function buildUserPrompt(farmData) {
+  const cropsList = farmData.crops.map(c =>
     `- ${c.cropName}: ${c.plantedAcres} planted acres` +
     (c.baseAcres ? `, ${c.baseAcres} base acres` : '') +
     (c.plcYield ? `, PLC yield: ${c.plcYield} bu/acre` : '') +
@@ -53,84 +102,55 @@ export function buildUserPrompt(farmData: FarmInputData): string {
     (c.expectedPrice ? `, expected MYA price: $${c.expectedPrice}/bu` : '')
   ).join('\n');
 
-  const calcResults = farmData.calculatorResults 
-    ? `\nCALCULATOR RESULTS (from free calculator - use as baseline):
+  const calcResults = farmData.calculatorResults
+    ? `\nCALCULATOR RESULTS (use these as your baseline):
 - ARC-CO Estimated Payment: $${farmData.calculatorResults.arcEstimate.toLocaleString()}
-- PLC Estimated Payment: $${farmData.calculatorResults.plcEstimate.toLocaleString()}  
-- Initial Recommendation: ${farmData.calculatorResults.recommendation}
-- Yearly Projections: ${JSON.stringify(farmData.calculatorResults.projectedPayments)}`
+- PLC Estimated Payment: $${farmData.calculatorResults.plcEstimate.toLocaleString()}
+- Difference: $${Math.abs(farmData.calculatorResults.arcEstimate - farmData.calculatorResults.plcEstimate).toLocaleString()}
+- Initial Recommendation: ${farmData.calculatorResults.recommendation}`
     : '';
 
-  return `Generate a complete personalized farm program report for this farmer.
+  return `Generate a COMPLETE farm program report for this farmer. EVERY section must have real content.
 
-FARMER INFORMATION:
-- Name: ${farmData.farmerName || 'Farmer'}
+FARMER DATA:
 - State: ${farmData.state}
 - County: ${farmData.county}
-- Current Program Election: ${farmData.currentProgram || 'Unknown'}
+- Current Program: ${farmData.currentProgram || 'Unknown'}
 - Total Base Acres: ${farmData.baseCropAcres || 'Not specified'}
 
 CROPS:
 ${cropsList}
 ${calcResults}
 
-Generate the complete ReportData JSON object with ALL sections filled out:
+REQUIREMENTS:
+1. executiveSummary.estimatedBenefit MUST equal the dollar difference between ARC-CO and PLC (use calculator results)
+2. countyContext.countyName MUST be "${farmData.county}"
+3. countyContext.state MUST be "${farmData.state}"
+4. programAnalysis.comparisonTable MUST have 2 rows (2025 and 2026)
+5. programAnalysis.arcProjection.pros MUST have at least 3 items
+6. programAnalysis.plcProjection.pros MUST have at least 3 items
+7. scenarioAnalysis.scenarios MUST have exactly 5 scenarios: flat, -10%, -20%, +10%, +20%
+8. formsGuide.requiredForms MUST have at least 3 forms
+9. fsaVisitPrep.whatToBring MUST have at least 5 items
+10. deadlineCalendar.deadlines MUST have at least 5 deadlines with real dates
+11. cropInsurance.keyConsiderations MUST have at least 3 items
+12. cropInsurance.narrative MUST explain SCO/ECO interaction with ARC/PLC
 
-1. executiveSummary - Clear headline with dollar amounts, recommendation, confidence level, and plain-English key insight
-2. programAnalysis - Detailed ARC vs PLC projections with yearly breakdowns, pros/cons, and comparison table for the next 2 crop years
-3. scenarioAnalysis - At minimum 5 price scenarios: prices stay flat, drop 10%, drop 20%, rise 10%, rise 20%. Show how each scenario affects ARC vs PLC payments
-4. formsGuide - Exact USDA forms needed (CCC-861, CCC-862, etc.) with tips for filling them out
-5. fsaVisitPrep - What to bring, questions to ask, common mistakes to avoid
-6. cropInsurance - How ARC/PLC interacts with crop insurance, what to consider
-7. deadlineCalendar - Key USDA program deadlines for the current and next crop year
-8. countyContext - County-specific agricultural context, historical patterns, local FSA info
-
-IMPORTANT: 
-- Use realistic numbers based on current USDA data and market conditions
-- The reportId should be a UUID format string
-- generatedAt should be the current ISO date string
-- All dollar amounts should be numbers (not strings)
-- Make the executiveSummary.headline punchy and specific with dollar amounts
-- The scenarioAnalysis should help the farmer understand their risk exposure
-- Include the farmer's name where appropriate to personalize the report
-
-Respond with ONLY the JSON object. No markdown formatting, no code fences.`;
+Respond with ONLY the JSON object. No other text.`;
 }
 
-/**
- * Parses and validates the Claude API response into a ReportData object.
- * Includes error handling for malformed responses.
- */
-export function parseReportResponse(responseText: string): ReportData {
-  // Strip any markdown code fences if Claude added them despite instructions
+export function parseReportResponse(responseText) {
   let cleaned = responseText.trim();
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.slice(7);
-  }
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.slice(3);
-  }
-  if (cleaned.endsWith('```')) {
-    cleaned = cleaned.slice(0, -3);
-  }
+  if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7);
+  if (cleaned.startsWith('```')) cleaned = cleaned.slice(3);
+  if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3);
   cleaned = cleaned.trim();
 
   try {
-    const report = JSON.parse(cleaned) as ReportData;
-    
-    // Validate required fields
-    if (!report.executiveSummary) throw new Error('Missing executiveSummary');
-    if (!report.programAnalysis) throw new Error('Missing programAnalysis');
-    if (!report.scenarioAnalysis) throw new Error('Missing scenarioAnalysis');
-    if (!report.formsGuide) throw new Error('Missing formsGuide');
-    if (!report.fsaVisitPrep) throw new Error('Missing fsaVisitPrep');
-    if (!report.cropInsurance) throw new Error('Missing cropInsurance');
-    if (!report.deadlineCalendar) throw new Error('Missing deadlineCalendar');
-    if (!report.countyContext) throw new Error('Missing countyContext');
+    const report = JSON.parse(cleaned);
 
-    // Ensure reportId exists
     if (!report.reportId) {
-      report.reportId = crypto.randomUUID();
+      report.reportId = 'rpt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
     }
     if (!report.generatedAt) {
       report.generatedAt = new Date().toISOString();
@@ -140,41 +160,14 @@ export function parseReportResponse(responseText: string): ReportData {
   } catch (error) {
     console.error('Failed to parse report response:', error);
     console.error('Raw response (first 500 chars):', cleaned.substring(0, 500));
-    throw new Error(`Failed to parse AI report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error('Failed to parse AI report: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
-/**
- * Determines which sections are available in the free preview.
- * This is key to the conversion funnel — show enough to prove value,
- * hold back enough to justify $39.
- */
-export function getPreviewSections(): string[] {
-  return [
-    'executiveSummary',    // FREE - The hook. Shows them the recommendation.
-    // Everything below is PAID:
-    // 'programAnalysis',  - The detailed numbers they need
-    // 'scenarioAnalysis', - What-if scenarios
-    // 'formsGuide',       - The paperwork guide
-    // 'fsaVisitPrep',     - FSA visit prep
-    // 'cropInsurance',    - Insurance interaction
-    // 'deadlineCalendar', - Deadlines
-    // 'countyContext',    - County data
-  ];
+export function getPreviewSections() {
+  return ['executiveSummary'];
 }
 
-/**
- * Returns the sections that are blurred/locked in the preview.
- * These are shown with a blurred overlay + "Unlock Full Report" CTA.
- */
-export function getLockedSections(): string[] {
-  return [
-    'programAnalysis',
-    'scenarioAnalysis',
-    'formsGuide',
-    'fsaVisitPrep',
-    'cropInsurance',
-    'deadlineCalendar',
-    'countyContext',
-  ];
+export function getLockedSections() {
+  return ['programAnalysis', 'scenarioAnalysis', 'formsGuide', 'fsaVisitPrep', 'cropInsurance', 'deadlineCalendar', 'countyContext'];
 }
