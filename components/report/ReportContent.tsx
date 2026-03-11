@@ -64,7 +64,7 @@ export default function ReportContent({ report, tier, onUpgradeClick }) {
   );
 
   // Section wrapper
-  const Section = ({ id, title, icon, lockedTitle, children }) => {
+  const Section = ({ id, title, icon, lockedTitle = '', children }) => {
     const isLocked = !isPaid && id !== 'executiveSummary';
     return (
       <section style={{ marginBottom: 28 }}>
