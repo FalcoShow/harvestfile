@@ -62,6 +62,17 @@ function Logo({ size = 32 }) {
 }
 
 const noise = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none", opacity: 0.22, mixBlendMode: "soft-light", backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` };
+
+// Dark-themed input styles for calculator
+const inpDark = {
+  width: "100%", padding: "15px 18px", fontSize: 15, borderRadius: 14,
+  border: "1.5px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)",
+  color: "#fff", fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+  transition: "border-color 0.25s, background 0.25s",
+};
+const lblDark = { display: "block", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.45)", marginBottom: 8, letterSpacing: "0.03em" };
+
+// Light input styles (for email etc)
 const inp = { width: "100%", padding: "15px 18px", fontSize: 15, borderRadius: 14, border: "1.5px solid rgba(0,0,0,0.08)", background: C.cream, color: C.text, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
 const lbl = { display: "block", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 };
 
@@ -85,6 +96,7 @@ export default function HarvestFile() {
   const [loading, setLoading] = useState(false);
   const [liveEst, setLiveEst] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [stepAnim, setStepAnim] = useState(false);
 
   // ─── REPORT STATE (Phase 3A) ─────────────────────────
   const [reportLoading, setReportLoading] = useState(false);
@@ -94,6 +106,12 @@ export default function HarvestFile() {
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [view]);
+
+  // Step transition animation
+  const changeStep = (newStep) => {
+    setStepAnim(true);
+    setTimeout(() => { setStep(newStep); setStepAnim(false); }, 200);
+  };
 
   const router = useRouter();
   const goPage = (path) => router.push(path);
@@ -109,7 +127,7 @@ export default function HarvestFile() {
     else { setView("home"); setResults(null); }
   }
 
-  const goCalc = () => { setView("calculator"); setStep(1); setResults(null); setESt("idle"); setEmail(""); setNassD(null); setReportLoading(false); setReportError(""); setReportEmail(""); };
+  const goCalc = () => { setView("calculator"); setStep(1); setResults(null); setESt("idle"); setEmail(""); setNassD(null); setReportLoading(false); setReportError(""); setReportEmail(""); setStepAnim(false); };
 
   // ─── COUNTY FETCH (with fallback) ────────────────────
   const fetchC = useCallback(async (s) => {
@@ -128,8 +146,6 @@ export default function HarvestFile() {
   useEffect(() => { if (st) fetchC(st); }, [st, fetchC]);
 
   const filt = ctys.filter((c) => c.toLowerCase().includes((county || cS).toLowerCase()));
-
-  // County value — either selected from dropdown or typed manually
   const countyValue = county || cS;
   const canProceed = st && countyValue.trim().length >= 2;
 
@@ -223,7 +239,6 @@ export default function HarvestFile() {
         throw new Error(data.error || "Failed to generate report");
       }
 
-      // Store report in sessionStorage and navigate to report page
       if (typeof window !== "undefined") {
         sessionStorage.setItem(`report-${data.reportId}`, JSON.stringify(data.report));
         sessionStorage.setItem('harvestfile-latest-report', JSON.stringify(data.report));
@@ -244,11 +259,30 @@ export default function HarvestFile() {
     } catch { setESt("error"); }
   }
 
-  const isDark = view === "home";
+  const isDark = view === "home" || view === "calculator" || view === "results";
 
   // ═══════════════════════════════════════════════════════
   return (
     <div style={{ minHeight: "100vh", overflowX: "hidden" }}>
+
+      {/* ═══ GLOBAL STYLES ═══ */}
+      <style>{`
+        @keyframes hf-calc-glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
+        @keyframes hf-step-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes hf-step-exit { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
+        @keyframes hf-result-scale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes hf-bar-grow { from { width: 0; } to { width: var(--target-width, 100%); } }
+        @keyframes hf-shine { from { left: -100%; } to { left: 200%; } }
+        @keyframes hf-float-subtle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hf-calc-input:focus { border-color: rgba(201,168,76,0.4) !important; background: rgba(255,255,255,0.07) !important; }
+        .hf-calc-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 16px center; }
+        .hf-calc-select option { background: #0C1F17; color: #fff; }
+        .hf-result-card { animation: hf-result-scale 0.5s cubic-bezier(0.25,0.1,0.25,1) both; }
+        .hf-result-card:nth-child(2) { animation-delay: 0.1s; }
+        .hf-breakdown-row { transition: background 0.15s; }
+        .hf-breakdown-row:hover { background: rgba(255,255,255,0.02); }
+      `}</style>
 
       {/* ═══ NAV ═══ */}
       <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: "0 24px" }}>
@@ -328,7 +362,7 @@ export default function HarvestFile() {
           </div>
         </section>
 
-        {/* FEATURES — Equal cards */}
+        {/* FEATURES */}
         <section id="features" style={{ padding: "108px 24px 100px", background: C.cream, scrollMarginTop: 80 }}>
           <div style={{ maxWidth: 1120, margin: "0 auto" }}>
             <Reveal>
@@ -413,307 +447,502 @@ export default function HarvestFile() {
         </section>
       </>)}
 
-      {/* ═══ CALCULATOR ═══ */}
+      {/* ══════════════════════════════════════════════════════
+           CALCULATOR — FULL DARK REDESIGN
+           ══════════════════════════════════════════════════════ */}
       {view === "calculator" && (
-        <section style={{ paddingTop: 100, paddingBottom: 96, background: `linear-gradient(180deg, ${C.cream}, ${C.warm})`, minHeight: "100vh" }}>
+        <section style={{ position: "relative", minHeight: "100vh", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 50%, #0F3525 100%)`, overflow: "hidden" }}>
+          <div style={noise} />
+          {/* Ambient glows */}
+          <div style={{ position: "absolute", top: "10%", right: "5%", width: 500, height: 500, background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 60%)", filter: "blur(80px)", pointerEvents: "none", animation: "hf-calc-glow 6s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", bottom: "15%", left: "0%", width: 400, height: 400, background: "radial-gradient(circle, rgba(5,150,105,0.05) 0%, transparent 55%)", filter: "blur(80px)", pointerEvents: "none" }} />
+
+          {/* Live estimate floating pill */}
           {acres > 0 && step > 1 && (
-            <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 100, background: C.forest, color: "#fff", borderRadius: 14, padding: "10px 24px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(255,255,255,0.06)", animation: "hf-slide-in-bottom 0.4s ease" }}>
+            <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 100, background: "rgba(12,31,23,0.85)", backdropFilter: "blur(20px)", color: "#fff", borderRadius: 16, padding: "12px 28px", boxShadow: "0 8px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: 14, border: "1px solid rgba(255,255,255,0.06)", animation: "hf-step-enter 0.4s ease" }}>
               <PulseDot color={C.gold} size={7} />
-              <span style={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.55)" }}>Estimated:</span>
-              <span style={{ fontSize: 18, fontWeight: 800, color: C.gold, fontVariantNumeric: "tabular-nums" }}>${liveEst.toLocaleString()}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "rgba(255,255,255,0.4)" }}>Est. Payment</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: C.gold, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em" }}>${liveEst.toLocaleString()}</span>
             </div>
           )}
-          <div style={{ maxWidth: 580, margin: "0 auto", padding: "0 24px" }}>
-            <Reveal><div style={{ textAlign: "center", marginBottom: 40 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 6 }}>ARC/PLC Calculator</div>
-              <h2 style={{ fontSize: 28, fontWeight: 800, color: C.forest, letterSpacing: "-0.03em" }}>Find your best program</h2>
-            </div></Reveal>
-            <div style={{ background: C.white, borderRadius: 24, padding: "36px 36px 40px", boxShadow: "0 4px 32px rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.04)" }}>
-              <div style={{ display: "flex", gap: 4, marginBottom: 32 }}>
-                {[1, 2, 3].map((n) => (<div key={n} style={{ flex: 1, height: 3, borderRadius: 100, background: n <= step ? C.forest : "rgba(0,0,0,0.06)", transition: "background 0.4s" }} />))}
+
+          <div style={{ maxWidth: 620, margin: "0 auto", padding: "120px 24px 140px", position: "relative", zIndex: 2 }}>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 44, animation: "hf-step-enter 0.5s ease" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.12)", borderRadius: 100, padding: "5px 14px 5px 6px", marginBottom: 20 }}>
+                <PulseDot color={C.emerald} size={6} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.gold }}>Live USDA NASS Data</span>
               </div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Step {step} of 3</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: C.forest, marginBottom: 28, letterSpacing: "-0.03em" }}>
-                {["Where is your farm?", "Tell us about your operation", "Review & calculate"][step - 1]}
+              <h2 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.035em", lineHeight: 1.1 }}>
+                Find your <span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic", color: C.gold }}>best program</span>
+              </h2>
+              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.3)", marginTop: 10 }}>ARC-CO vs PLC · All 50 states · 2025 OBBBA rules</p>
+            </div>
+
+            {/* Glass card */}
+            <div style={{
+              background: "rgba(255,255,255,0.03)",
+              backdropFilter: "blur(40px)",
+              WebkitBackdropFilter: "blur(40px)",
+              borderRadius: 28,
+              padding: "40px 36px 44px",
+              border: "1px solid rgba(255,255,255,0.06)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 24px 80px rgba(0,0,0,0.25)",
+            }}>
+              {/* Step progress */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 32 }}>
+                {[1, 2, 3].map((n) => (
+                  <div key={n} style={{ flex: 1, height: 3, borderRadius: 100, background: n <= step ? C.gold : "rgba(255,255,255,0.06)", transition: "background 0.5s ease", position: "relative", overflow: "hidden" }}>
+                    {n === step && <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: `linear-gradient(90deg, transparent, ${C.goldBright}, transparent)`, animation: "hf-shine 2s ease-in-out infinite" }} />}
+                  </div>
+                ))}
               </div>
 
-              {/* STEP 1 — Fixed county: freeform typing allowed */}
-              {step === 1 && (<div>
-                <div style={{ marginBottom: 22 }}>
-                  <label style={lbl}>State</label>
-                  <select value={st} onChange={(e) => { setSt(e.target.value); setCounty(""); setCS(""); }} className="hf-input-focus" style={{ ...inp, cursor: "pointer", appearance: "none" }}>
-                    <option value="">Select your state...</option>
-                    {STATES.map((s) => (<option key={s} value={s}>{SN[s]}</option>))}
-                  </select>
+              {/* Step label */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <div style={{ width: 24, height: 24, borderRadius: 8, background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: C.gold }}>{step}</span>
                 </div>
-                {st && (<div style={{ marginBottom: 22 }}>
-                  <label style={lbl}>County</label>
-                  <div style={{ position: "relative" }}>
-                    <input
-                      placeholder={loadC ? "Loading counties..." : "Type your county name..."}
-                      value={county || cS}
-                      onChange={(e) => { const val = e.target.value; setCS(val); setCounty(""); if (val.length > 0) setShowD(true); else setShowD(false); }}
-                      onFocus={() => { if ((cS || "").length > 0 || ctys.length > 0) setShowD(true); }}
-                      onBlur={() => setTimeout(() => setShowD(false), 200)}
-                      className="hf-input-focus" style={inp}
-                    />
-                    {showD && ctys.length > 0 && (
-                      <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: 200, overflowY: "auto", background: C.white, borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 12px 40px rgba(0,0,0,0.08)", zIndex: 50 }}>
-                        {filt.slice(0, 10).map((c) => (
-                          <div key={c} onMouseDown={() => { setCounty(c); setCS(""); setShowD(false); }} style={{ padding: "11px 16px", fontSize: 14, cursor: "pointer", borderBottom: "1px solid rgba(0,0,0,0.03)", fontWeight: 500, transition: "background 0.15s" }} onMouseEnter={(e) => (e.target.style.background = C.cream)} onMouseLeave={(e) => (e.target.style.background = "transparent")}>{c} County</div>
-                        ))}
-                        {filt.length === 0 && <div style={{ padding: "11px 16px", fontSize: 13, color: C.textMuted }}>No matches — type your county name and continue</div>}
-                      </div>
-                    )}
+                <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Step {step} of 3</span>
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 32, letterSpacing: "-0.03em" }}>
+                {["Where is your farm?", "Your operation details", "Review & calculate"][step - 1]}
+              </div>
+
+              {/* Step content with animation */}
+              <div style={{
+                animation: stepAnim ? "hf-step-exit 0.2s ease forwards" : "hf-step-enter 0.35s ease",
+              }}>
+
+                {/* ──── STEP 1 ──── */}
+                {step === 1 && (<div>
+                  <div style={{ marginBottom: 24 }}>
+                    <label style={lblDark}>State</label>
+                    <select
+                      value={st}
+                      onChange={(e) => { setSt(e.target.value); setCounty(""); setCS(""); }}
+                      className="hf-calc-input hf-calc-select"
+                      style={{ ...inpDark, cursor: "pointer" }}
+                    >
+                      <option value="">Select your state...</option>
+                      {STATES.map((s) => (<option key={s} value={s}>{SN[s]}</option>))}
+                    </select>
                   </div>
-                  {ctys.length === 0 && !loadC && st && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 5 }}>Type your county name to continue</div>}
+
+                  {st && (<div style={{ marginBottom: 24 }}>
+                    <label style={lblDark}>County</label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        placeholder={loadC ? "Loading counties..." : "Type your county name..."}
+                        value={county || cS}
+                        onChange={(e) => { const val = e.target.value; setCS(val); setCounty(""); if (val.length > 0) setShowD(true); else setShowD(false); }}
+                        onFocus={() => { if ((cS || "").length > 0 || ctys.length > 0) setShowD(true); }}
+                        onBlur={() => setTimeout(() => setShowD(false), 200)}
+                        className="hf-calc-input"
+                        style={inpDark}
+                      />
+                      {showD && ctys.length > 0 && (
+                        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: 200, overflowY: "auto", background: "rgba(12,31,23,0.95)", backdropFilter: "blur(20px)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 12px 48px rgba(0,0,0,0.4)", zIndex: 50 }}>
+                          {filt.slice(0, 10).map((c) => (
+                            <div key={c} onMouseDown={() => { setCounty(c); setCS(""); setShowD(false); }} style={{ padding: "12px 16px", fontSize: 14, cursor: "pointer", color: "rgba(255,255,255,0.7)", borderBottom: "1px solid rgba(255,255,255,0.04)", fontWeight: 500, transition: "all 0.15s" }} onMouseEnter={(e) => { e.target.style.background = "rgba(255,255,255,0.05)"; e.target.style.color = "#fff"; }} onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "rgba(255,255,255,0.7)"; }}>{c} County</div>
+                          ))}
+                          {filt.length === 0 && <div style={{ padding: "12px 16px", fontSize: 13, color: "rgba(255,255,255,0.25)" }}>No matches — type your county name and continue</div>}
+                        </div>
+                      )}
+                    </div>
+                    {ctys.length === 0 && !loadC && st && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 6 }}>Type your county name to continue</div>}
+                  </div>)}
+
+                  <div style={{ marginBottom: 28 }}>
+                    <label style={lblDark}>Primary Crop</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                      {[{ k: "CORN", e: "🌽", n: "Corn" }, { k: "SOYBEANS", e: "🫘", n: "Soybeans" }, { k: "WHEAT", e: "🌾", n: "Wheat" }].map((c) => (
+                        <div key={c.k} onClick={() => setCrop(c.k)} style={{
+                          padding: "20px 10px", borderRadius: 16, textAlign: "center", cursor: "pointer",
+                          border: crop === c.k ? `2px solid ${C.gold}` : "2px solid rgba(255,255,255,0.06)",
+                          background: crop === c.k ? "rgba(201,168,76,0.06)" : "rgba(255,255,255,0.02)",
+                          transition: "all 0.25s",
+                          transform: crop === c.k ? "scale(1.03)" : "scale(1)",
+                          boxShadow: crop === c.k ? "0 4px 20px rgba(201,168,76,0.1)" : "none",
+                        }}>
+                          <div style={{ fontSize: 32, marginBottom: 6 }}>{c.e}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: crop === c.k ? C.gold : "rgba(255,255,255,0.35)" }}>{c.n}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    disabled={!canProceed}
+                    onClick={() => changeStep(2)}
+                    style={{
+                      width: "100%", padding: "16px", fontSize: 15, fontWeight: 700, borderRadius: 14, border: "none",
+                      background: canProceed ? `linear-gradient(135deg, ${C.gold}, ${C.goldDim})` : "rgba(255,255,255,0.04)",
+                      color: canProceed ? C.dark : "rgba(255,255,255,0.15)",
+                      cursor: canProceed ? "pointer" : "not-allowed",
+                      boxShadow: canProceed ? "0 4px 24px rgba(201,168,76,0.2)" : "none",
+                      transition: "all 0.3s",
+                    }}
+                  >Continue →</button>
                 </div>)}
-                <div style={{ marginBottom: 22 }}>
-                  <label style={lbl}>Primary Crop</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                    {[{ k: "CORN", e: "🌽", n: "Corn" }, { k: "SOYBEANS", e: "🫘", n: "Soybeans" }, { k: "WHEAT", e: "🌾", n: "Wheat" }].map((c) => (
-                      <div key={c.k} onClick={() => setCrop(c.k)} style={{ padding: "18px 10px", borderRadius: 14, textAlign: "center", cursor: "pointer", border: crop === c.k ? `2px solid ${C.forest}` : "2px solid rgba(0,0,0,0.05)", background: crop === c.k ? "rgba(27,67,50,0.03)" : C.cream, transition: "all 0.2s", transform: crop === c.k ? "scale(1.02)" : "scale(1)" }}>
-                        <div style={{ fontSize: 30, marginBottom: 4 }}>{c.e}</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: crop === c.k ? C.forest : C.textSoft }}>{c.n}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <button disabled={!canProceed} onClick={() => setStep(2)} style={{ width: "100%", padding: "16px", fontSize: 15, fontWeight: 700, borderRadius: 14, border: "none", background: C.forest, color: "#fff", cursor: canProceed ? "pointer" : "not-allowed", opacity: canProceed ? 1 : 0.35, transition: "all 0.25s" }}>Continue →</button>
-              </div>)}
 
-              {step === 2 && (<div>
-                <div style={{ marginBottom: 22 }}>
-                  <label style={lbl}>Base Acres</label>
-                  <input type="number" value={acres} onChange={(e) => setAcres(parseInt(e.target.value) || 0)} className="hf-input-focus" style={inp} />
-                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>Your FSA base acres (FSA-156EZ form)</div>
-                </div>
-                <div style={{ marginBottom: 22 }}>
-                  <label style={lbl}>Actual County Yield <span style={{ fontWeight: 400, color: C.textMuted }}>(bu/ac) — optional</span></label>
-                  <input type="number" value={yIn} onChange={(e) => setYIn(e.target.value)} placeholder="Leave blank — we'll pull from USDA" className="hf-input-focus" style={inp} />
-                </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setStep(1)} style={{ padding: "16px 22px", fontSize: 14, fontWeight: 600, borderRadius: 14, border: "1.5px solid rgba(0,0,0,0.07)", background: "transparent", color: C.textSoft, cursor: "pointer" }}>← Back</button>
-                  <button onClick={() => setStep(3)} style={{ flex: 1, padding: "16px", fontSize: 15, fontWeight: 700, borderRadius: 14, border: "none", background: C.forest, color: "#fff", cursor: "pointer" }}>Review →</button>
-                </div>
-              </div>)}
-
-              {step === 3 && (<div>
-                <div style={{ background: C.cream, borderRadius: 16, padding: 22, marginBottom: 20 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                    {[["Location", `${county || cS} Co., ${st}`], ["Crop", crop.charAt(0) + crop.slice(1).toLowerCase()], ["Base Acres", `${acres.toLocaleString()}`], ["Program Year", "2025 (OBBBA)"]].map(([k, v]) => (<div key={k}><div style={{ fontSize: 10, fontWeight: 800, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>{k}</div><div style={{ fontSize: 15, fontWeight: 700, color: C.forest }}>{v}</div></div>))}
+                {/* ──── STEP 2 ──── */}
+                {step === 2 && (<div>
+                  <div style={{ marginBottom: 24 }}>
+                    <label style={lblDark}>Base Acres</label>
+                    <input
+                      type="number"
+                      value={acres}
+                      onChange={(e) => setAcres(parseInt(e.target.value) || 0)}
+                      className="hf-calc-input"
+                      style={inpDark}
+                    />
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 6 }}>Your FSA base acres (FSA-156EZ form)</div>
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={() => setStep(2)} style={{ padding: "16px 22px", fontSize: 14, fontWeight: 600, borderRadius: 14, border: "1.5px solid rgba(0,0,0,0.07)", background: "transparent", color: C.textSoft, cursor: "pointer" }}>← Back</button>
-                  <button onClick={calc} disabled={loading} className="hf-btn-hover" style={{ flex: 1, padding: "16px", fontSize: 15, fontWeight: 700, borderRadius: 14, border: "none", background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`, color: C.dark, cursor: "pointer", boxShadow: "0 4px 20px rgba(201,168,76,0.25)", opacity: loading ? 0.6 : 1 }}>{loading ? "⏳ Pulling USDA data..." : "Calculate My Payment"}</button>
-                </div>
-              </div>)}
+                  <div style={{ marginBottom: 28 }}>
+                    <label style={lblDark}>Actual County Yield <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.2)" }}>(bu/ac) — optional</span></label>
+                    <input
+                      type="number"
+                      value={yIn}
+                      onChange={(e) => setYIn(e.target.value)}
+                      placeholder="Leave blank — we'll pull from USDA"
+                      className="hf-calc-input"
+                      style={{ ...inpDark, "::placeholder": { color: "rgba(255,255,255,0.15)" } }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => changeStep(1)} style={{ padding: "16px 24px", fontSize: 14, fontWeight: 600, borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.2s" }}>← Back</button>
+                    <button onClick={() => changeStep(3)} style={{ flex: 1, padding: "16px", fontSize: 15, fontWeight: 700, borderRadius: 14, border: "none", background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`, color: C.dark, cursor: "pointer", boxShadow: "0 4px 24px rgba(201,168,76,0.2)" }}>Review →</button>
+                  </div>
+                </div>)}
+
+                {/* ──── STEP 3: REVIEW ──── */}
+                {step === 3 && (<div>
+                  <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 18, padding: 24, marginBottom: 24, border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                      {[
+                        ["Location", `${county || cS} Co., ${st}`, "📍"],
+                        ["Crop", crop.charAt(0) + crop.slice(1).toLowerCase(), { CORN: "🌽", SOYBEANS: "🫘", WHEAT: "🌾" }[crop]],
+                        ["Base Acres", `${acres.toLocaleString()} ac`, "🌾"],
+                        ["Program Year", "2025 (OBBBA)", "📅"],
+                      ].map(([k, v, icon]) => (
+                        <div key={k} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <div style={{ fontSize: 18, lineHeight: 1 }}>{icon}</div>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>{k}</div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{v}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => changeStep(2)} style={{ padding: "16px 24px", fontSize: 14, fontWeight: 600, borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>← Back</button>
+                    <button
+                      onClick={calc}
+                      disabled={loading}
+                      className="hf-shimmer-btn"
+                      style={{
+                        flex: 1, padding: "16px", fontSize: 16, fontWeight: 700, borderRadius: 14, border: "none",
+                        background: loading ? "rgba(255,255,255,0.06)" : `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldBright}, ${C.gold}, ${C.goldDim})`,
+                        backgroundSize: "200% auto",
+                        color: loading ? "rgba(255,255,255,0.4)" : C.dark,
+                        cursor: loading ? "wait" : "pointer",
+                        boxShadow: loading ? "none" : "0 6px 28px rgba(201,168,76,0.25)",
+                        transition: "all 0.3s",
+                      }}
+                    >{loading ? "⏳ Pulling USDA data..." : "Calculate My Payment →"}</button>
+                  </div>
+                </div>)}
+              </div>
+            </div>
+
+            {/* Data source badge */}
+            <div style={{ textAlign: "center", marginTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
+              {["USDA NASS API", "FSA Rules", "2025 OBBBA"].map((t) => (
+                <span key={t} style={{ fontSize: 11, color: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ width: 3, height: 3, borderRadius: 100, background: "rgba(255,255,255,0.2)" }} />
+                  {t}
+                </span>
+              ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ═══ RESULTS ═══ */}
+      {/* ══════════════════════════════════════════════════════
+           RESULTS — FULL DARK REDESIGN
+           ══════════════════════════════════════════════════════ */}
       {view === "results" && results && (
-        <section style={{ paddingTop: 100, paddingBottom: 96, background: C.cream }}>
-          <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 24px" }}>
-            <Reveal><div style={{ textAlign: "center", marginBottom: 40 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 6 }}>Your Results</div>
-              <h2 style={{ fontSize: 28, fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", marginBottom: 4 }}>{results.county} County, {results.st}</h2>
-              <p style={{ fontSize: 13, color: C.textMuted }}>{results.crop.charAt(0) + results.crop.slice(1).toLowerCase()} · {results.acres.toLocaleString()} acres · 2025 OBBBA{nassD && <span style={{ color: C.emerald, fontWeight: 700 }}> · Live data ✓</span>}</p>
-            </div></Reveal>
-            <Reveal delay={100}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-              {[{ n: "ARC-CO", f: "Agriculture Risk Coverage", v: results.arcT, r: results.rec === "ARC-CO" }, { n: "PLC", f: "Price Loss Coverage", v: results.plcT, r: results.rec === "PLC" }].map((p) => (
-                <div key={p.n} style={{ background: C.white, borderRadius: 20, padding: 28, position: "relative", overflow: "hidden", border: p.r ? `2px solid ${C.emerald}` : "1px solid rgba(0,0,0,0.05)", boxShadow: p.r ? "0 8px 32px rgba(5,150,105,0.08)" : "0 1px 4px rgba(0,0,0,0.02)" }}>
-                  {p.r && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: C.emerald }} />}
-                  {p.r && <div style={{ display: "inline-block", background: C.emeraldBg, color: C.emerald, fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 6, marginBottom: 10 }}>✓ BEST CHOICE</div>}
-                  <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 2 }}>{p.f}</div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: C.forest, marginBottom: 14 }}>{p.n}</div>
-                  <div style={{ fontSize: 38, fontWeight: 800, color: p.r ? C.emerald : C.text, letterSpacing: "-0.04em" }}><AnimNum value={p.v} /></div>
-                  <div style={{ marginTop: 14, height: 4, borderRadius: 100, background: "rgba(0,0,0,0.04)" }}><div className="hf-bar-animate" style={{ "--target-width": `${(p.v / Math.max(results.arcT, results.plcT)) * 100}%`, height: "100%", borderRadius: 100, background: p.r ? C.emerald : C.textMuted }} /></div>
-                </div>
-              ))}
-            </div></Reveal>
-            <Reveal delay={180}><div style={{ background: C.forest, borderRadius: 16, padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 8 }}>
-              <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{results.rec} saves you</span>
-              <span style={{ fontSize: 28, fontWeight: 800, color: C.gold, letterSpacing: "-0.03em" }}><AnimNum value={results.diff} /> more</span>
-            </div></Reveal>
-            <Reveal delay={260}>{[
-              { t: "ARC-CO Breakdown", rows: [["Benchmark Yield", `${results.by} bu/ac`], ["Benchmark Revenue", `$${results.bR.toFixed(2)}/ac`], ["Guarantee (90%)", `$${results.gu.toFixed(2)}/ac`], ["Actual Revenue", `$${results.aR.toFixed(2)}/ac`], ["Payment Rate (12% cap)", `$${results.arcR.toFixed(2)}/ac`]], total: `$${results.arcT.toLocaleString()}` },
-              { t: "PLC Breakdown", rows: [["Effective Ref Price", `$${results.erp.toFixed(2)}/bu`], ["MYA Price (2025)", `$${BENCH[results.crop].mya.toFixed(2)}/bu`], ["PLC Rate", `$${results.plcR.toFixed(2)}/bu`], ["Payment Yield", `${results.plcY} bu/ac`]], total: `$${results.plcT.toLocaleString()}` },
-            ].map((s, i) => (
-              <div key={i} style={{ background: C.white, borderRadius: 18, padding: "24px 28px", border: "1px solid rgba(0,0,0,0.04)", marginBottom: 14 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: C.forest, marginBottom: 14 }}>{s.t}</div>
-                {s.rows.map(([k, v], j) => (<div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid rgba(0,0,0,0.03)", fontSize: 13.5 }}><span style={{ color: C.textSoft }}>{k}</span><span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{v}</span></div>))}
-                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 12, fontSize: 15, fontWeight: 800 }}><span style={{ color: C.forest }}>Total</span><span style={{ color: i === 0 ? C.emerald : C.text }}>{s.total}</span></div>
-              </div>
-            ))}</Reveal>
-            {nassD && <Reveal delay={320}><div style={{ background: C.emeraldBg, borderRadius: 14, padding: "14px 20px", border: "1px solid rgba(5,150,105,0.1)", marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}><PulseDot color={C.emerald} size={5} /><span style={{ fontSize: 12, fontWeight: 700, color: C.emerald }}>Live NASS Data</span></div>
-              {nassD.map((d) => (<span key={d.year} style={{ fontSize: 12, color: C.sage }}><b>{d.year}:</b> {d.y} bu/ac</span>))}
-            </div></Reveal>}
+        <>
+          {/* ──── Dark Hero Header ──── */}
+          <section style={{ position: "relative", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 50%, #0F3525 100%)`, padding: "120px 24px 80px", overflow: "hidden" }}>
+            <div style={noise} />
+            <div style={{ position: "absolute", top: "10%", left: "10%", width: 500, height: 500, background: "radial-gradient(circle, rgba(5,150,105,0.08) 0%, transparent 60%)", filter: "blur(80px)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", bottom: "5%", right: "5%", width: 400, height: 400, background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 55%)", filter: "blur(80px)", pointerEvents: "none" }} />
 
-            {/* ═══════════════════════════════════════════════════════
-                 PHASE 3A: AI-POWERED REPORT CTA
-                 This is the money maker — converts free users to $39 paid
-                 ═══════════════════════════════════════════════════════ */}
-            <Reveal delay={350}>
-              <div style={{
-                background: `linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 30%, #FFFBEB 100%)`,
-                border: "2px solid rgba(5,150,105,0.15)",
-                borderRadius: 24,
-                padding: "36px 32px",
-                marginBottom: 24,
-                position: "relative",
-                overflow: "hidden",
-              }}>
-                {/* Subtle decorative glow */}
-                <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, background: "radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 60%)", pointerEvents: "none" }} />
-
-                <div style={{ position: "relative", zIndex: 2 }}>
-                  {/* Badge */}
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.15)", borderRadius: 100, padding: "4px 12px 4px 6px", marginBottom: 20 }}>
+            <div style={{ maxWidth: 720, margin: "0 auto", position: "relative", zIndex: 2 }}>
+              {/* Badge */}
+              <Reveal>
+                <div style={{ textAlign: "center", marginBottom: 36 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.15)", borderRadius: 100, padding: "5px 14px 5px 6px", marginBottom: 20 }}>
                     <PulseDot color={C.emerald} size={6} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.emerald, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI-Powered Analysis</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: C.emerald }}>Analysis Complete</span>
+                    {nassD && <span style={{ fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.25)", marginLeft: 4 }}>· Live NASS Data</span>}
                   </div>
+                  <h2 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.035em", lineHeight: 1.1, marginBottom: 6 }}>
+                    {results.county} County, {SN[results.st] || results.st}
+                  </h2>
+                  <p style={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}>{results.crop.charAt(0) + results.crop.slice(1).toLowerCase()} · {results.acres.toLocaleString()} base acres · 2025 OBBBA</p>
+                </div>
+              </Reveal>
 
-                  {/* Headline */}
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 10 }}>
-                    Get Your Personalized Farm Program Report
-                  </h3>
-                  <p style={{ fontSize: 14, color: C.textSoft, lineHeight: 1.65, marginBottom: 24, maxWidth: 480 }}>
-                    Our AI analyzes your specific farm data to generate a detailed report with dollar projections,
-                    risk scenarios, exact forms needed, and an FSA office visit prep guide.
-                  </p>
+              {/* ──── Program Comparison Cards ──── */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+                {[
+                  { n: "ARC-CO", f: "Agriculture Risk Coverage", v: results.arcT, r: results.rec === "ARC-CO" },
+                  { n: "PLC", f: "Price Loss Coverage", v: results.plcT, r: results.rec === "PLC" },
+                ].map((p, idx) => (
+                  <div key={p.n} className="hf-result-card" style={{
+                    background: p.r ? "rgba(5,150,105,0.06)" : "rgba(255,255,255,0.02)",
+                    backdropFilter: "blur(20px)",
+                    borderRadius: 22,
+                    padding: "28px 24px",
+                    position: "relative",
+                    overflow: "hidden",
+                    border: p.r ? "1.5px solid rgba(5,150,105,0.25)" : "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: p.r ? "0 8px 40px rgba(5,150,105,0.1), inset 0 1px 0 rgba(255,255,255,0.04)" : "inset 0 1px 0 rgba(255,255,255,0.03)",
+                    animationDelay: `${idx * 0.12}s`,
+                  }}>
+                    {p.r && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.emerald}, transparent)` }} />}
+                    {p.r && (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(5,150,105,0.12)", border: "1px solid rgba(5,150,105,0.2)", color: C.emerald, fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 8, marginBottom: 12, letterSpacing: "0.04em" }}>
+                        <svg width="10" height="10" viewBox="0 0 20 20" fill={C.emerald}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                        BEST CHOICE
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600, marginBottom: 2, letterSpacing: "0.02em" }}>{p.f}</div>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: "rgba(255,255,255,0.6)", marginBottom: 16 }}>{p.n}</div>
+                    <div style={{ fontSize: "clamp(34px, 5vw, 44px)", fontWeight: 800, color: p.r ? "#fff" : "rgba(255,255,255,0.5)", letterSpacing: "-0.04em", lineHeight: 1 }}>
+                      <AnimNum value={p.v} />
+                    </div>
+                    {/* Bar */}
+                    <div style={{ marginTop: 18, height: 4, borderRadius: 100, background: "rgba(255,255,255,0.04)" }}>
+                      <div style={{
+                        width: `${(p.v / Math.max(results.arcT, results.plcT)) * 100}%`,
+                        height: "100%", borderRadius: 100,
+                        background: p.r ? C.emerald : "rgba(255,255,255,0.12)",
+                        animation: "hf-bar-grow 1s cubic-bezier(0.25,0.1,0.25,1) 0.3s both",
+                        "--target-width": `${(p.v / Math.max(results.arcT, results.plcT)) * 100}%`,
+                      }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-                  {/* What's included grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 24 }}>
-                    {[
-                      { icon: "📊", label: "ARC vs PLC\nBreakdown" },
-                      { icon: "🎯", label: "5 Price\nScenarios" },
-                      { icon: "📝", label: "Forms\nChecklist" },
-                      { icon: "📅", label: "Deadline\nCalendar" },
-                    ].map((item, i) => (
-                      <div key={i} style={{ textAlign: "center", background: "rgba(255,255,255,0.7)", borderRadius: 14, padding: "14px 6px", border: "1px solid rgba(0,0,0,0.03)" }}>
-                        <div style={{ fontSize: 24, marginBottom: 4 }}>{item.icon}</div>
-                        <div style={{ fontSize: 10.5, color: C.textSoft, fontWeight: 600, whiteSpace: "pre-line", lineHeight: 1.3 }}>{item.label}</div>
+              {/* Savings banner */}
+              <Reveal delay={200}>
+                <div style={{
+                  background: "rgba(201,168,76,0.06)",
+                  border: "1px solid rgba(201,168,76,0.12)",
+                  borderRadius: 16,
+                  padding: "18px 28px",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  flexWrap: "wrap", gap: 8,
+                }}>
+                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>Choosing {results.rec} saves you</span>
+                  <span style={{ fontSize: 30, fontWeight: 800, color: C.gold, letterSpacing: "-0.03em" }}><AnimNum value={results.diff} duration={2000} /> more</span>
+                </div>
+              </Reveal>
+            </div>
+          </section>
+
+          {/* ──── Breakdowns + Report CTA (light section) ──── */}
+          <section style={{ background: C.cream, padding: "56px 24px 96px" }}>
+            <div style={{ maxWidth: 720, margin: "0 auto" }}>
+
+              {/* NASS data badge */}
+              {nassD && <Reveal delay={50}><div style={{ background: C.emeraldBg, borderRadius: 14, padding: "14px 20px", border: "1px solid rgba(5,150,105,0.1)", marginBottom: 20, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}><PulseDot color={C.emerald} size={5} /><span style={{ fontSize: 12, fontWeight: 700, color: C.emerald }}>Live NASS County Data</span></div>
+                {nassD.map((d) => (<span key={d.year} style={{ fontSize: 12, color: C.sage, fontVariantNumeric: "tabular-nums" }}><b>{d.year}:</b> {d.y} bu/ac</span>))}
+              </div></Reveal>}
+
+              {/* Breakdown cards */}
+              <Reveal delay={100}>
+                {[
+                  { t: "ARC-CO Breakdown", icon: "📊", rows: [["Benchmark Yield", `${results.by} bu/ac`], ["Benchmark Revenue", `$${results.bR.toFixed(2)}/ac`], ["Guarantee (90%)", `$${results.gu.toFixed(2)}/ac`], ["Actual Revenue", `$${results.aR.toFixed(2)}/ac`], ["Payment Rate (12% cap)", `$${results.arcR.toFixed(2)}/ac`]], total: `$${results.arcT.toLocaleString()}`, isRec: results.rec === "ARC-CO" },
+                  { t: "PLC Breakdown", icon: "📋", rows: [["Effective Ref Price", `$${results.erp.toFixed(2)}/bu`], ["MYA Price (2025)", `$${BENCH[results.crop].mya.toFixed(2)}/bu`], ["PLC Rate", `$${results.plcR.toFixed(2)}/bu`], ["Payment Yield", `${results.plcY} bu/ac`]], total: `$${results.plcT.toLocaleString()}`, isRec: results.rec === "PLC" },
+                ].map((s, i) => (
+                  <div key={i} style={{
+                    background: C.white,
+                    borderRadius: 20,
+                    padding: "28px 28px 24px",
+                    border: s.isRec ? `1.5px solid rgba(5,150,105,0.15)` : "1px solid rgba(0,0,0,0.04)",
+                    marginBottom: 14,
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.02)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+                      <span style={{ fontSize: 18 }}>{s.icon}</span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: C.forest, letterSpacing: "-0.01em" }}>{s.t}</span>
+                      {s.isRec && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.emerald, background: C.emeraldBg, padding: "2px 8px", borderRadius: 6 }}>RECOMMENDED</span>}
+                    </div>
+                    {s.rows.map(([k, v], j) => (
+                      <div key={j} className="hf-breakdown-row" style={{ display: "flex", justifyContent: "space-between", padding: "11px 8px", borderBottom: "1px solid rgba(0,0,0,0.03)", fontSize: 14, borderRadius: 6, margin: "0 -8px" }}>
+                        <span style={{ color: C.textSoft }}>{k}</span>
+                        <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: C.text }}>{v}</span>
                       </div>
                     ))}
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "14px 0 0", fontSize: 16, fontWeight: 800, borderTop: "2px solid rgba(0,0,0,0.04)", marginTop: 4 }}>
+                      <span style={{ color: C.forest }}>Total Estimated Payment</span>
+                      <span style={{ color: s.isRec ? C.emerald : C.text }}>{s.total}</span>
+                    </div>
                   </div>
+                ))}
+              </Reveal>
 
-                  {/* Email input */}
-                  {showReportEmail && (
-                    <div style={{ marginBottom: 16 }}>
-                      <input
-                        type="email"
-                        placeholder="Enter your email to receive your report"
-                        value={reportEmail || email}
-                        onChange={(e) => setReportEmail(e.target.value)}
-                        style={{
-                          width: "100%",
-                          padding: "14px 18px",
-                          fontSize: 14,
-                          borderRadius: 14,
-                          border: "1.5px solid rgba(0,0,0,0.08)",
-                          background: C.white,
-                          color: C.text,
-                          fontFamily: "inherit",
-                          outline: "none",
-                          boxSizing: "border-box",
-                          textAlign: "center",
-                        }}
-                        className="hf-input-focus"
-                      />
+              {/* ═════════════════════════════════════════════════
+                   PHASE 3A: AI-POWERED REPORT CTA
+                   ═════════════════════════════════════════════════ */}
+              <Reveal delay={200}>
+                <div style={{
+                  background: C.white,
+                  border: "2px solid rgba(5,150,105,0.12)",
+                  borderRadius: 24,
+                  padding: "40px 32px",
+                  marginTop: 8, marginBottom: 24,
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 32px rgba(5,150,105,0.06)",
+                }}>
+                  {/* Decorative gradient strip at top */}
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${C.emerald}, ${C.gold}, ${C.emerald})` }} />
+                  <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 60%)", pointerEvents: "none" }} />
+
+                  <div style={{ position: "relative", zIndex: 2 }}>
+                    {/* Badge */}
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(5,150,105,0.06)", border: "1px solid rgba(5,150,105,0.12)", borderRadius: 100, padding: "4px 12px 4px 6px", marginBottom: 20 }}>
+                      <PulseDot color={C.emerald} size={6} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.emerald, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI-Powered Analysis</span>
                     </div>
-                  )}
 
-                  {/* Error */}
-                  {reportError && (
-                    <div style={{ marginBottom: 12, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "#DC2626", fontSize: 13, borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
-                      {reportError}
+                    {/* Headline */}
+                    <h3 style={{ fontSize: 24, fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 10 }}>
+                      Get Your Personalized<br />Farm Program Report
+                    </h3>
+                    <p style={{ fontSize: 14, color: C.textSoft, lineHeight: 1.65, marginBottom: 24, maxWidth: 480 }}>
+                      Our AI analyzes your specific farm data to generate a detailed report with dollar projections,
+                      risk scenarios, exact forms needed, and an FSA office visit prep guide.
+                    </p>
+
+                    {/* What's included */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 24 }}>
+                      {[
+                        { icon: "📊", label: "ARC vs PLC\nBreakdown" },
+                        { icon: "🎯", label: "5 Price\nScenarios" },
+                        { icon: "📝", label: "Forms\nChecklist" },
+                        { icon: "📅", label: "Deadline\nCalendar" },
+                      ].map((item, i) => (
+                        <div key={i} style={{ textAlign: "center", background: C.cream, borderRadius: 14, padding: "14px 6px", border: "1px solid rgba(0,0,0,0.03)" }}>
+                          <div style={{ fontSize: 24, marginBottom: 4 }}>{item.icon}</div>
+                          <div style={{ fontSize: 10.5, color: C.textSoft, fontWeight: 600, whiteSpace: "pre-line", lineHeight: 1.3 }}>{item.label}</div>
+                        </div>
+                      ))}
                     </div>
-                  )}
 
-                  {/* CTA Button */}
-                  <button
-                    onClick={generateReport}
-                    disabled={reportLoading}
-                    className="hf-btn-hover"
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 10,
-                      background: reportLoading ? C.sage : C.forest,
-                      color: "#fff",
-                      fontSize: 16,
-                      fontWeight: 700,
-                      padding: "16px 28px",
-                      borderRadius: 14,
-                      border: "none",
-                      cursor: reportLoading ? "wait" : "pointer",
-                      boxShadow: "0 4px 20px rgba(27,67,50,0.2)",
-                      transition: "all 0.3s",
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
-                    {reportLoading ? (
-                      <>
-                        <svg style={{ animation: "spin 1s linear infinite", width: 18, height: 18 }} viewBox="0 0 24 24" fill="none">
-                          <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.25)" strokeWidth="3" />
-                          <path d="M12 2a10 10 0 019.5 6.8" stroke="white" strokeWidth="3" strokeLinecap="round" />
-                        </svg>
-                        Generating Your Report...
-                      </>
-                    ) : (
-                      <>
-                        Generate My Free Preview
-                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                      </>
+                    {/* Email input */}
+                    {showReportEmail && (
+                      <div style={{ marginBottom: 16 }}>
+                        <input
+                          type="email"
+                          placeholder="Enter your email to receive your report"
+                          value={reportEmail || email}
+                          onChange={(e) => setReportEmail(e.target.value)}
+                          style={{ ...inp, textAlign: "center" }}
+                          className="hf-input-focus"
+                        />
+                      </div>
                     )}
-                  </button>
 
-                  {/* Subtext */}
-                  <p style={{ fontSize: 11.5, color: C.textMuted, textAlign: "center", marginTop: 12 }}>
-                    Free preview includes executive summary · Full report: $39 one-time
-                  </p>
+                    {/* Error */}
+                    {reportError && (
+                      <div style={{ marginBottom: 12, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "#DC2626", fontSize: 13, borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
+                        {reportError}
+                      </div>
+                    )}
 
-                  {/* Trust badges */}
-                  <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-                    {["AI-powered analysis", "County-specific data", "Take to your FSA office"].map((t) => (
-                      <span key={t} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: C.sage }}>
-                        <svg width="12" height="12" viewBox="0 0 20 20" fill={C.emerald}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                        {t}
-                      </span>
-                    ))}
+                    {/* CTA Button */}
+                    <button
+                      onClick={generateReport}
+                      disabled={reportLoading}
+                      className="hf-btn-hover"
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                        background: reportLoading ? C.sage : C.forest,
+                        color: "#fff", fontSize: 16, fontWeight: 700, padding: "16px 28px", borderRadius: 14,
+                        border: "none", cursor: reportLoading ? "wait" : "pointer",
+                        boxShadow: "0 4px 20px rgba(27,67,50,0.2)", transition: "all 0.3s", letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {reportLoading ? (
+                        <>
+                          <svg style={{ animation: "spin 1s linear infinite", width: 18, height: 18 }} viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.25)" strokeWidth="3" />
+                            <path d="M12 2a10 10 0 019.5 6.8" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                          </svg>
+                          Generating Your Report...
+                        </>
+                      ) : (
+                        <>
+                          Generate My Free Preview
+                          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                        </>
+                      )}
+                    </button>
+
+                    <p style={{ fontSize: 11.5, color: C.textMuted, textAlign: "center", marginTop: 12 }}>
+                      Free preview includes executive summary · Full report: $39 one-time
+                    </p>
+
+                    {/* Trust badges */}
+                    <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
+                      {["AI-powered analysis", "County-specific data", "Take to your FSA office"].map((t) => (
+                        <span key={t} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: C.sage }}>
+                          <svg width="12" height="12" viewBox="0 0 20 20" fill={C.emerald}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                          {t}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              </Reveal>
 
-                {/* Spin animation for loading */}
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              </div>
-            </Reveal>
-
-            <Reveal delay={380}><div style={{ background: C.dark, borderRadius: 20, padding: 36, textAlign: "center", marginBottom: 24, position: "relative", overflow: "hidden" }}>
-              <div style={{ ...noise, opacity: 0.12 }} />
-              <div style={{ position: "relative", zIndex: 2 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Save results & get price alerts</div>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", marginBottom: 20 }}>We&apos;ll notify you when final MYA prices update your estimates.</div>
-                {eSt === "saved" ? (<div style={{ fontSize: 14, color: C.gold, fontWeight: 700 }}>✓ Saved! Updates → {email}</div>) : (
-                  <div style={{ display: "flex", gap: 8, maxWidth: 380, margin: "0 auto" }}>
-                    <input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ flex: 1, padding: "13px 16px", fontSize: 14, borderRadius: 12, border: "1.5px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.05)", color: "#fff", fontFamily: "inherit", outline: "none" }} />
-                    <button onClick={subEmail} disabled={eSt === "saving"} className="hf-btn-hover" style={{ padding: "13px 22px", fontSize: 13, fontWeight: 700, borderRadius: 12, border: "none", background: C.gold, color: C.dark, cursor: "pointer", whiteSpace: "nowrap" }}>{eSt === "saving" ? "..." : "Save"}</button>
+              {/* Email capture / alerts */}
+              <Reveal delay={280}>
+                <div style={{ background: C.dark, borderRadius: 20, padding: 36, textAlign: "center", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+                  <div style={{ ...noise, opacity: 0.12 }} />
+                  <div style={{ position: "relative", zIndex: 2 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Save results & get price alerts</div>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", marginBottom: 20 }}>We&apos;ll notify you when final MYA prices update your estimates.</div>
+                    {eSt === "saved" ? (<div style={{ fontSize: 14, color: C.gold, fontWeight: 700 }}>✓ Saved! Updates → {email}</div>) : (
+                      <div style={{ display: "flex", gap: 8, maxWidth: 380, margin: "0 auto" }}>
+                        <input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ flex: 1, padding: "13px 16px", fontSize: 14, borderRadius: 12, border: "1.5px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.05)", color: "#fff", fontFamily: "inherit", outline: "none" }} />
+                        <button onClick={subEmail} disabled={eSt === "saving"} className="hf-btn-hover" style={{ padding: "13px 22px", fontSize: 13, fontWeight: 700, borderRadius: 12, border: "none", background: C.gold, color: C.dark, cursor: "pointer", whiteSpace: "nowrap" }}>{eSt === "saving" ? "..." : "Save"}</button>
+                      </div>
+                    )}
+                    {eSt === "error" && <div style={{ fontSize: 12, color: "#FCA5A5", marginTop: 8 }}>Error — try hello@harvestfile.com</div>}
                   </div>
-                )}
-                {eSt === "error" && <div style={{ fontSize: 12, color: "#FCA5A5", marginTop: 8 }}>Error — try hello@harvestfile.com</div>}
+                </div>
+              </Reveal>
+
+              <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.65, textAlign: "center", maxWidth: 520, margin: "0 auto 32px" }}>
+                <strong>Disclaimer:</strong> Estimates use USDA data and 2025 OBBBA rules. Actual payments may differ. Consult your local FSA office for official calculations.
               </div>
-            </div></Reveal>
-            <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.65, textAlign: "center", maxWidth: 520, margin: "0 auto 32px" }}><strong>Disclaimer:</strong> Estimates use USDA data and 2025 OBBBA rules. Actual payments may differ. Consult your local FSA office for official calculations.</div>
-            <div style={{ textAlign: "center" }}><button onClick={goCalc} style={{ padding: "14px 28px", fontSize: 13, fontWeight: 700, borderRadius: 12, border: "1.5px solid rgba(0,0,0,0.07)", background: "transparent", color: C.sage, cursor: "pointer" }}>← Calculate Another</button></div>
-          </div>
-        </section>
+              <div style={{ textAlign: "center" }}>
+                <button onClick={goCalc} style={{ padding: "14px 28px", fontSize: 13, fontWeight: 700, borderRadius: 12, border: "1.5px solid rgba(0,0,0,0.07)", background: "transparent", color: C.sage, cursor: "pointer" }}>← Calculate Another</button>
+              </div>
+            </div>
+          </section>
+        </>
       )}
 
       {/* ═══ FOOTER ═══ */}
