@@ -18,6 +18,7 @@ const C = {
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 const SN = {AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DE:"Delaware",FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",ME:"Maine",MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",NJ:"New Jersey",NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming"};
 
+// All ARC/PLC covered commodities · yc = yield conversion factor (cotton lint→seed cotton)
 const CROPS = [
   { k: "CORN", e: "🌽", n: "Corn" },
   { k: "SOYBEANS", e: "🫘", n: "Soybeans" },
@@ -27,17 +28,33 @@ const CROPS = [
   { k: "OATS", e: "🌱", n: "Oats" },
   { k: "RICE", e: "🍚", n: "Rice" },
   { k: "PEANUTS", e: "🥜", n: "Peanuts" },
+  { k: "COTTON", e: "☁️", n: "Cotton" },
+  { k: "SUNFLOWER", e: "🌻", n: "Sunflowers" },
+  { k: "CANOLA", e: "🌼", n: "Canola" },
+  { k: "FLAXSEED", e: "🫛", n: "Flaxseed" },
+  { k: "DRY_PEAS", e: "🟢", n: "Dry Peas" },
+  { k: "LENTILS", e: "🔴", n: "Lentils" },
+  { k: "CHICKPEAS", e: "🟡", n: "Chickpeas" },
+  { k: "SAFFLOWER", e: "🌸", n: "Safflower" },
 ];
 
 const BENCH = {
-  CORN:     { by: 178,  bp: 5.03,  mya: 3.90,  lr: 2.20,   ref: 4.10,   pyf: 0.91, nass: "CORN",       nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
-  SOYBEANS: { by: 52,   bp: 12.1,  mya: 10.2,  lr: 6.20,   ref: 10.0,   pyf: 0.90, nass: "SOYBEANS",   nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
-  WHEAT:    { by: 48,   bp: 6.80,  mya: 5.40,  lr: 3.38,   ref: 6.35,   pyf: 0.89, nass: "WHEAT",      nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
-  SORGHUM:  { by: 72,   bp: 4.35,  mya: 3.75,  lr: 2.20,   ref: 3.95,   pyf: 0.89, nass: "SORGHUM",    nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
-  BARLEY:   { by: 75,   bp: 5.25,  mya: 4.60,  lr: 2.50,   ref: 4.95,   pyf: 0.87, nass: "BARLEY",     nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
-  OATS:     { by: 68,   bp: 3.70,  mya: 3.20,  lr: 1.93,   ref: 2.40,   pyf: 0.85, nass: "OATS",       nassUnit: "BU / ACRE",  yUnit: "bu/ac", pUnit: "/bu" },
-  RICE:     { by: 75,   bp: 14.50, mya: 12.50, lr: 7.00,   ref: 14.00,  pyf: 0.89, nass: "RICE",       nassUnit: "CWT / ACRE", yUnit: "cwt/ac", pUnit: "/cwt" },
-  PEANUTS:  { by: 4100, bp: 0.23,  mya: 0.21,  lr: 0.1775, ref: 0.2675, pyf: 0.88, nass: "PEANUTS",    nassUnit: "LB / ACRE",  yUnit: "lb/ac", pUnit: "/lb" },
+  CORN:      { by: 178,  bp: 5.03,  mya: 3.90,  lr: 2.20,   ref: 4.10,   pyf: 0.91, nass: "CORN",             nassUnit: "BU / ACRE",  yUnit: "bu/ac",  pUnit: "/bu",  yc: 1 },
+  SOYBEANS:  { by: 52,   bp: 12.1,  mya: 10.2,  lr: 6.20,   ref: 10.0,   pyf: 0.90, nass: "SOYBEANS",         nassUnit: "BU / ACRE",  yUnit: "bu/ac",  pUnit: "/bu",  yc: 1 },
+  WHEAT:     { by: 48,   bp: 6.80,  mya: 5.40,  lr: 3.38,   ref: 6.35,   pyf: 0.89, nass: "WHEAT",            nassUnit: "BU / ACRE",  yUnit: "bu/ac",  pUnit: "/bu",  yc: 1 },
+  SORGHUM:   { by: 72,   bp: 4.35,  mya: 3.75,  lr: 2.20,   ref: 3.95,   pyf: 0.89, nass: "SORGHUM",          nassUnit: "BU / ACRE",  yUnit: "bu/ac",  pUnit: "/bu",  yc: 1 },
+  BARLEY:    { by: 75,   bp: 5.25,  mya: 4.60,  lr: 2.50,   ref: 4.95,   pyf: 0.87, nass: "BARLEY",           nassUnit: "BU / ACRE",  yUnit: "bu/ac",  pUnit: "/bu",  yc: 1 },
+  OATS:      { by: 68,   bp: 3.70,  mya: 3.20,  lr: 1.93,   ref: 2.40,   pyf: 0.85, nass: "OATS",             nassUnit: "BU / ACRE",  yUnit: "bu/ac",  pUnit: "/bu",  yc: 1 },
+  RICE:      { by: 75,   bp: 14.50, mya: 12.50, lr: 7.00,   ref: 14.00,  pyf: 0.89, nass: "RICE",             nassUnit: "CWT / ACRE", yUnit: "cwt/ac", pUnit: "/cwt", yc: 1 },
+  PEANUTS:   { by: 4100, bp: 0.23,  mya: 0.21,  lr: 0.1775, ref: 0.2675, pyf: 0.88, nass: "PEANUTS",          nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 1 },
+  COTTON:    { by: 2400, bp: 0.32,  mya: 0.28,  lr: 0.25,   ref: 0.367,  pyf: 0.88, nass: "COTTON, UPLAND",   nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 2.8 },
+  SUNFLOWER: { by: 1600, bp: 0.23,  mya: 0.22,  lr: 0.1009, ref: 0.2015, pyf: 0.87, nass: "SUNFLOWER",        nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 1 },
+  CANOLA:    { by: 1800, bp: 0.20,  mya: 0.18,  lr: 0.1009, ref: 0.2015, pyf: 0.87, nass: "CANOLA",           nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 1 },
+  FLAXSEED:  { by: 22,   bp: 11.50, mya: 10.00, lr: 7.33,   ref: 11.28,  pyf: 0.86, nass: "FLAXSEED",         nassUnit: "BU / ACRE",  yUnit: "bu/ac",  pUnit: "/bu",  yc: 1 },
+  DRY_PEAS:  { by: 2000, bp: 0.13,  mya: 0.12,  lr: 0.0611, ref: 0.11,   pyf: 0.86, nass: "PEAS, DRY EDIBLE", nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 1 },
+  LENTILS:   { by: 1300, bp: 0.24,  mya: 0.25,  lr: 0.1166, ref: 0.1997, pyf: 0.86, nass: "LENTILS",          nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 1 },
+  CHICKPEAS: { by: 1500, bp: 0.26,  mya: 0.28,  lr: 0.1166, ref: 0.2154, pyf: 0.86, nass: "CHICKPEAS",        nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 1 },
+  SAFFLOWER: { by: 1400, bp: 0.21,  mya: 0.19,  lr: 0.1009, ref: 0.2015, pyf: 0.86, nass: "SAFFLOWER",        nassUnit: "LB / ACRE",  yUnit: "lb/ac",  pUnit: "/lb",  yc: 1 },
 };
 
 // ─── HOOKS & HELPERS ─────────────────────────────────────
@@ -145,16 +162,15 @@ export default function HarvestFile() {
 
   const goCalc = () => { setView("calculator"); setStep(1); setResults(null); setESt("idle"); setEmail(""); setNassD(null); setReportLoading(false); setReportError(""); setReportEmail(""); setStepAnim(false); };
 
-  // ─── COUNTY FETCH (always uses CORN — best NASS coverage for county lists) ─
+  // ─── COUNTY FETCH (server-side via /api/counties — no CORS issues) ─
   const fetchC = useCallback(async (s) => {
     if (!s) return setCtys([]);
     setLoadC(true);
     try {
-      const r = await fetch(`https://quickstats.nass.usda.gov/api/get_param_values/?key=${NASS_KEY}&param=county_name&state_alpha=${s}&agg_level_desc=COUNTY&commodity_desc=CORN&statisticcat_desc=YIELD`);
+      const r = await fetch(`/api/counties?state=${s}`);
       if (!r.ok) throw new Error("API error");
       const d = await r.json();
-      const list = (d?.county_name || []).map((c) => c.trim()).filter(Boolean).sort();
-      setCtys(list);
+      setCtys(d.counties || []);
     } catch { setCtys([]); }
     setLoadC(false);
   }, []);
@@ -186,7 +202,8 @@ export default function HarvestFile() {
       if (!r.ok) throw new Error("API error");
       const j = await r.json();
       if (j?.data?.length > 0) {
-        const ys = j.data.filter((x) => !["(D)","(Z)","(NA)","(S)"].includes(x.Value)).map((x) => ({ year: +x.year, y: parseFloat(x.Value.replace(",", "")) })).sort((a, b) => a.year - b.year);
+        const yc = d.yc || 1;
+        const ys = j.data.filter((x) => !["(D)","(Z)","(NA)","(S)"].includes(x.Value)).map((x) => ({ year: +x.year, y: Math.round(parseFloat(x.Value.replace(",", "")) * yc * 10) / 10 })).sort((a, b) => a.year - b.year);
         if (ys.length >= 3) { by = Math.round(oAvg(ys.map((x) => x.y)) * 10) / 10; setNassD(ys); } else setNassD(null);
       } else setNassD(null);
     } catch { setNassD(null); }
@@ -392,7 +409,7 @@ export default function HarvestFile() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
               {[
                 { icon: "📊", title: "ARC/PLC Decision Calculator", desc: "Side-by-side payment comparison using your county's real yield history. Updated for 2025 OBBBA rules.", acc: C.gold, action: goCalc },
-                { icon: "🗺️", title: "Nationwide Coverage", desc: "Every state and county in the US. Real-time NASS data for corn, soybeans, wheat, sorghum, barley, oats, rice, and peanuts.", acc: C.emerald },
+                { icon: "🗺️", title: "Nationwide Coverage", desc: "Every state and county in the US. Real-time NASS data for all 16 ARC/PLC covered commodities — grains, oilseeds, cotton, rice, and more.", acc: C.emerald },
                 { icon: "🔔", title: "Price Alerts", desc: "Get notified when MYA prices finalize and your payment estimates change.", acc: C.gold },
                 { icon: "📋", title: "Eligibility Screener", desc: "Answer 7 questions to find which USDA programs you qualify for — ARC/PLC, EQIP, CRP, and more.", acc: C.sage },
                 { icon: "📱", title: "Mobile-First Design", desc: "Built for the field, the co-op, and the tractor cab. Fast on rural connections.", acc: C.forest },
@@ -551,7 +568,7 @@ export default function HarvestFile() {
                     <label style={lblDark}>County</label>
                     <div style={{ position: "relative" }}>
                       <input
-                        placeholder={loadC ? "Loading counties..." : ctys.length > 0 ? "Select or type your county..." : "Type your county name..."}
+                        placeholder={loadC ? "Loading counties from USDA..." : ctys.length > 0 ? `Select county (${ctys.length} found)...` : "Type your county name..."}
                         value={county || cS}
                         onChange={(e) => { const val = e.target.value; setCS(val); setCounty(""); setShowD(true); }}
                         onFocus={() => setShowD(true)}
@@ -559,12 +576,19 @@ export default function HarvestFile() {
                         className="hf-calc-input"
                         style={inpDark}
                       />
-                      {/* Dropdown arrow indicator */}
-                      {ctys.length > 0 && !county && (
+                      {/* Loading spinner or dropdown arrow indicator */}
+                      {loadC ? (
+                        <div style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                          <svg style={{ animation: "spin 1s linear infinite", width: 14, height: 14 }} viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+                            <path d="M12 2a10 10 0 019.5 6.8" stroke="rgba(201,168,76,0.6)" strokeWidth="2.5" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                      ) : ctys.length > 0 && !county ? (
                         <div style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
                         </div>
-                      )}
+                      ) : null}
                       {showD && ctys.length > 0 && (
                         <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: 280, overflowY: "auto", background: "rgba(12,31,23,0.95)", backdropFilter: "blur(20px)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 12px 48px rgba(0,0,0,0.4)", zIndex: 50 }}>
                           {/* County count header */}
