@@ -27,7 +27,7 @@ export async function POST(request) {
     const session = event.data.object;
 
     const reportId = session.metadata?.reportId;
-    const email = session.metadata?.email || session.customer_email;
+    const email = session.customer_details?.email || session.metadata?.email || session.customer_email || "";
     const county = session.metadata?.county || "";
     const state = session.metadata?.state || "";
     const crop = session.metadata?.crop || "";
