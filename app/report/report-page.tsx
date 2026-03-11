@@ -1,7 +1,7 @@
 // =============================================================================
-// HarvestFile - Report Display Page (FIXED)
+// HarvestFile - Report Display Page
 // /app/report/page.tsx
-// Fixed: Better error handling, null safety, no Suspense issues
+// Phase 3B: Stripe integration — real $39 payments
 // =============================================================================
 
 'use client';
@@ -37,20 +37,62 @@ export default function ReportPage() {
   const [tier, setTier] = useState('preview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [unlockLoading, setUnlockLoading] = useState(false);
+  const [unlockError, setUnlockError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [customerName, setCustomerName] = useState('');
 
   useEffect(() => {
-    try {
-      // Try multiple storage keys for resilience
-      let reportData = null;
-      let reportId = null;
+    let reportData = null;
+    let reportId = null;
 
-      // Check URL for report ID
+    try {
+      // Check URL for report ID and payment status
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
         reportId = params.get('id');
+        const payment = params.get('payment');
+        const sessionId = params.get('session_id');
+
+        // ─── STRIPE PAYMENT VERIFICATION ────────────────────
+        // If returning from successful Stripe checkout, verify payment
+        if (payment === 'success' && sessionId) {
+          fetch(`/api/verify-payment?session_id=${sessionId}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.paid) {
+                setTier('full');
+                setPaymentSuccess(true);
+                setCustomerName(data.customerName || '');
+                // Persist payment status so refreshes keep it unlocked
+                if (reportId) {
+                  sessionStorage.setItem(`report-paid-${reportId}`, 'true');
+                }
+                // Clean up URL params (remove payment/session_id)
+                const cleanUrl = `${window.location.pathname}?id=${reportId}`;
+                window.history.replaceState({}, '', cleanUrl);
+              }
+            })
+            .catch(() => {
+              // Payment might still be processing — unlock optimistically
+              setTier('full');
+              setPaymentSuccess(true);
+              if (reportId) {
+                sessionStorage.setItem(`report-paid-${reportId}`, 'true');
+              }
+            });
+        }
+
+        // If payment was cancelled, show a message
+        if (payment === 'cancelled') {
+          setUnlockError('Payment was cancelled. You can try again anytime.');
+          // Clean up URL
+          const cleanUrl = `${window.location.pathname}?id=${reportId}`;
+          window.history.replaceState({}, '', cleanUrl);
+        }
       }
 
-      // Try to load from sessionStorage
+      // Try to load report from sessionStorage
       if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
         // Try report-specific key first
         if (reportId) {
@@ -123,7 +165,7 @@ export default function ReportPage() {
 
         setReport(safeReport);
 
-        // Check payment status
+        // Check if already paid (from previous session)
         if (reportId) {
           const paymentStatus = sessionStorage.getItem(`report-paid-${reportId}`);
           if (paymentStatus === 'true') {
@@ -141,12 +183,38 @@ export default function ReportPage() {
     setLoading(false);
   }, []);
 
-  const handleUpgradeClick = () => {
-    // For founding farmers / testing: unlock immediately
-    // Replace with Stripe in Phase 3B
-    setTier('full');
-    if (typeof window !== 'undefined' && report?.reportId) {
-      sessionStorage.setItem(`report-paid-${report.reportId}`, 'true');
+  // ─── STRIPE CHECKOUT ──────────────────────────────────
+  const handleUpgradeClick = async () => {
+    if (!report) return;
+
+    setUnlockLoading(true);
+    setUnlockError('');
+
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportId: report.reportId,
+          email: report.email || '',
+          county: report.countyContext?.countyName || '',
+          state: report.countyContext?.state || '',
+          crop: report.programAnalysis?.arcProjection?.programName || 'ARC-CO',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        setUnlockError(data.error || 'Something went wrong. Please try again.');
+      }
+    } catch (err) {
+      setUnlockError('Payment failed to initialize. Please try again.');
+    } finally {
+      setUnlockLoading(false);
     }
   };
 
@@ -188,6 +256,48 @@ export default function ReportPage() {
   // Report view
   return (
     <div style={{ minHeight: '100vh', background: '#FAFAF6' }}>
+      {/* ─── Payment Success Banner ─── */}
+      {paymentSuccess && (
+        <div style={{
+          background: 'linear-gradient(90deg, #059669, #10B981)',
+          color: 'white',
+          padding: '12px 24px',
+          textAlign: 'center',
+          fontSize: 14,
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+        }}>
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="white"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+          Payment successful{customerName ? `, ${customerName}` : ''}! Your full report is now unlocked.
+        </div>
+      )}
+
+      {/* ─── Unlock Error Banner ─── */}
+      {unlockError && (
+        <div style={{
+          background: '#FEF2F2',
+          borderBottom: '1px solid rgba(239,68,68,0.15)',
+          color: '#DC2626',
+          padding: '12px 24px',
+          textAlign: 'center',
+          fontSize: 13,
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+        }}>
+          {unlockError}
+          <button
+            onClick={() => setUnlockError('')}
+            style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', fontWeight: 800, fontSize: 16, marginLeft: 8 }}
+          >×</button>
+        </div>
+      )}
+
       {/* Top Bar */}
       <div style={{ background: 'white', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -202,6 +312,25 @@ export default function ReportPage() {
                 style={{ fontSize: 13, color: '#6B7280', background: 'none', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
               >
                 🖨️ Print / Save PDF
+              </button>
+            )}
+            {tier !== 'full' && (
+              <button
+                onClick={handleUpgradeClick}
+                disabled={unlockLoading}
+                style={{
+                  fontSize: 13,
+                  color: 'white',
+                  background: unlockLoading ? '#6B8F71' : '#1B4332',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '8px 16px',
+                  cursor: unlockLoading ? 'wait' : 'pointer',
+                  fontWeight: 700,
+                  transition: 'background 0.2s',
+                }}
+              >
+                {unlockLoading ? '⏳ Redirecting...' : '🔓 Unlock Full Report — $39'}
               </button>
             )}
             <a href="/" style={{ fontSize: 13, color: '#059669', fontWeight: 600, textDecoration: 'none' }}>
@@ -226,7 +355,7 @@ export default function ReportPage() {
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
           body { background: white !important; margin: 0 !important; padding: 0 !important; font-size: 11pt !important; }
           
-          /* Hide nav and floating CTA */
+          /* Hide nav, banners, and floating CTA */
           nav, [style*="position: fixed"], [style*="position: sticky"] { display: none !important; }
           
           /* Prevent sections from splitting across pages */
