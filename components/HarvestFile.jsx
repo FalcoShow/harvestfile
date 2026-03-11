@@ -145,29 +145,21 @@ export default function HarvestFile() {
 
   const goCalc = () => { setView("calculator"); setStep(1); setResults(null); setESt("idle"); setEmail(""); setNassD(null); setReportLoading(false); setReportError(""); setReportEmail(""); setStepAnim(false); };
 
-  // ─── COUNTY FETCH (uses selected crop for better county matching) ─
-  const fetchC = useCallback(async (s, cropKey) => {
+  // ─── COUNTY FETCH (always uses CORN — best NASS coverage for county lists) ─
+  const fetchC = useCallback(async (s) => {
     if (!s) return setCtys([]);
     setLoadC(true);
-    const nassComm = BENCH[cropKey]?.nass || "CORN";
     try {
-      const r = await fetch(`https://quickstats.nass.usda.gov/api/get_param_values/?key=${NASS_KEY}&param=county_name&state_alpha=${s}&agg_level_desc=COUNTY&commodity_desc=${encodeURIComponent(nassComm)}&statisticcat_desc=YIELD`);
+      const r = await fetch(`https://quickstats.nass.usda.gov/api/get_param_values/?key=${NASS_KEY}&param=county_name&state_alpha=${s}&agg_level_desc=COUNTY&commodity_desc=CORN&statisticcat_desc=YIELD`);
       if (!r.ok) throw new Error("API error");
       const d = await r.json();
-      if (d?.county_name) setCtys(d.county_name.map((c) => c.trim()).filter(Boolean).sort());
-      else {
-        // Fallback: try CORN counties if selected crop has none
-        if (nassComm !== "CORN") {
-          const r2 = await fetch(`https://quickstats.nass.usda.gov/api/get_param_values/?key=${NASS_KEY}&param=county_name&state_alpha=${s}&agg_level_desc=COUNTY&commodity_desc=CORN&statisticcat_desc=YIELD`);
-          if (r2.ok) { const d2 = await r2.json(); if (d2?.county_name) setCtys(d2.county_name.map((c) => c.trim()).filter(Boolean).sort()); else setCtys([]); }
-          else setCtys([]);
-        } else setCtys([]);
-      }
+      const list = (d?.county_name || []).map((c) => c.trim()).filter(Boolean).sort();
+      setCtys(list);
     } catch { setCtys([]); }
     setLoadC(false);
   }, []);
 
-  useEffect(() => { if (st) fetchC(st, crop); }, [st, crop, fetchC]);
+  useEffect(() => { if (st) fetchC(st); }, [st, fetchC]);
 
   const filt = ctys.filter((c) => c.toLowerCase().includes((county || cS).toLowerCase()));
   const countyValue = county || cS;
