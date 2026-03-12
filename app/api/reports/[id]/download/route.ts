@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
+function formatNum(n: any): string {
+  if (n === null || n === undefined) return "0.00";
+  return Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -58,14 +63,14 @@ export async function GET(
     const darkGray = rgb(0.2, 0.2, 0.2);
     const medGray = rgb(0.4, 0.4, 0.4);
 
-    function addNewPageIfNeeded(spaceNeeded: number = 80) {
+    const addNewPageIfNeeded = (spaceNeeded: number = 80) => {
       if (y < margin + spaceNeeded) {
         currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
         y = pageHeight - margin;
       }
-    }
+    };
 
-    function drawText(
+    const drawText = (
       text: string,
       options: {
         font?: typeof helvetica;
@@ -74,7 +79,7 @@ export async function GET(
         x?: number;
         maxLineWidth?: number;
       } = {}
-    ) {
+    ) => {
       const font = options.font || helvetica;
       const size = options.size || 10;
       const color = options.color || darkGray;
@@ -104,7 +109,7 @@ export async function GET(
       }
 
       return y;
-    }
+    };
 
     drawText("HarvestFile", { font: helveticaBold, size: 24, color: green });
     y -= 4;
@@ -123,11 +128,11 @@ export async function GET(
     if (summary) {
       drawText("Farmer Overview", { font: helveticaBold, size: 14, color: darkGray });
       y -= 4;
-      drawText(`Name: ${summary.name}`, { color: medGray });
-      drawText(`Operation: ${summary.operation || "N/A"}`, { color: medGray });
-      drawText(`Location: ${summary.county}, ${summary.state}`, { color: medGray });
-      drawText(`Total Base Acres: ${summary.total_base_acres}`, { color: medGray });
-      drawText(`Report Date: ${content.generated_date}`, { color: medGray });
+      drawText("Name: " + summary.name, { color: medGray });
+      drawText("Operation: " + (summary.operation || "N/A"), { color: medGray });
+      drawText("Location: " + summary.county + ", " + summary.state, { color: medGray });
+      drawText("Total Base Acres: " + summary.total_base_acres, { color: medGray });
+      drawText("Report Date: " + content.generated_date, { color: medGray });
       y -= 12;
     }
 
@@ -147,7 +152,7 @@ export async function GET(
         drawText(crop.commodity, { font: helveticaBold, size: 13, color: green });
         y -= 2;
         drawText(
-          `Base Acres: ${crop.base_acres} | Planted: ${crop.planted_acres} | Current Election: ${crop.current_election}`,
+          "Base Acres: " + crop.base_acres + " | Planted: " + crop.planted_acres + " | Current Election: " + crop.current_election,
           { size: 9, color: medGray }
         );
         y -= 6;
@@ -155,26 +160,26 @@ export async function GET(
         if (crop.arc_co_analysis) {
           drawText("ARC-CO Analysis:", { font: helveticaBold, size: 11, color: darkGray });
           const arc = crop.arc_co_analysis;
-          drawText(`  Benchmark Revenue: $${formatNum(arc.benchmark_revenue)}/ac  |  Guarantee: $${formatNum(arc.guarantee_level)}/ac`, { size: 9, color: medGray });
-          drawText(`  Est. Payment: $${formatNum(arc.estimated_payment_per_acre)}/ac  |  Total: $${formatNum(arc.estimated_total_payment)}`, { size: 9, color: medGray });
-          drawText(arc.explanation, { size: 9, color: medGray });
+          drawText("  Benchmark Revenue: $" + formatNum(arc.benchmark_revenue) + "/ac  |  Guarantee: $" + formatNum(arc.guarantee_level) + "/ac", { size: 9, color: medGray });
+          drawText("  Est. Payment: $" + formatNum(arc.estimated_payment_per_acre) + "/ac  |  Total: $" + formatNum(arc.estimated_total_payment), { size: 9, color: medGray });
+          if (arc.explanation) drawText(arc.explanation, { size: 9, color: medGray });
           y -= 6;
         }
 
         if (crop.plc_analysis) {
           drawText("PLC Analysis:", { font: helveticaBold, size: 11, color: darkGray });
           const plc = crop.plc_analysis;
-          drawText(`  Reference Price: $${formatNum(plc.reference_price)}/bu  |  Market Price: $${formatNum(plc.estimated_market_price)}/bu`, { size: 9, color: medGray });
-          drawText(`  Est. Payment: $${formatNum(plc.estimated_payment_per_acre)}/ac  |  Total: $${formatNum(plc.estimated_total_payment)}`, { size: 9, color: medGray });
-          drawText(plc.explanation, { size: 9, color: medGray });
+          drawText("  Reference Price: $" + formatNum(plc.reference_price) + "/bu  |  Market Price: $" + formatNum(plc.estimated_market_price) + "/bu", { size: 9, color: medGray });
+          drawText("  Est. Payment: $" + formatNum(plc.estimated_payment_per_acre) + "/ac  |  Total: $" + formatNum(plc.estimated_total_payment), { size: 9, color: medGray });
+          if (plc.explanation) drawText(plc.explanation, { size: 9, color: medGray });
           y -= 6;
         }
 
         addNewPageIfNeeded(60);
-        drawText(`RECOMMENDATION: ${crop.recommendation}`, { font: helveticaBold, size: 11, color: green });
-        drawText(crop.recommendation_reasoning, { size: 9, color: medGray });
+        drawText("RECOMMENDATION: " + crop.recommendation, { font: helveticaBold, size: 11, color: green });
+        if (crop.recommendation_reasoning) drawText(crop.recommendation_reasoning, { size: 9, color: medGray });
         if (crop.potential_savings > 0) {
-          drawText(`Potential additional revenue: $${formatNum(crop.potential_savings)}`, { font: helveticaBold, size: 10, color: green });
+          drawText("Potential additional revenue: $" + formatNum(crop.potential_savings), { font: helveticaBold, size: 10, color: green });
         }
         y -= 16;
       }
@@ -189,9 +194,9 @@ export async function GET(
       });
       y -= 5;
       drawText("Payment Summary", { font: helveticaBold, size: 13, color: darkGray, x: margin + 10 });
-      drawText(`Current Elections Est. Payment: $${formatNum(totals.current_elections)}`, { size: 10, color: medGray, x: margin + 10 });
-      drawText(`Optimized Elections Est. Payment: $${formatNum(totals.optimized_elections)}`, { size: 10, color: medGray, x: margin + 10 });
-      drawText(`Additional Revenue Opportunity: $${formatNum(totals.additional_revenue_opportunity)}`, { font: helveticaBold, size: 11, color: green, x: margin + 10 });
+      drawText("Current Elections Est. Payment: $" + formatNum(totals.current_elections), { size: 10, color: medGray, x: margin + 10 });
+      drawText("Optimized Elections Est. Payment: $" + formatNum(totals.optimized_elections), { size: 10, color: medGray, x: margin + 10 });
+      drawText("Additional Revenue Opportunity: $" + formatNum(totals.additional_revenue_opportunity), { font: helveticaBold, size: 11, color: green, x: margin + 10 });
       y -= 16;
     }
 
@@ -208,7 +213,7 @@ export async function GET(
       drawText("Important Dates", { font: helveticaBold, size: 14, color: darkGray });
       y -= 4;
       for (const d of content.important_dates) {
-        drawText(`${d.date}: ${d.description}`, { size: 9, color: medGray });
+        drawText(d.date + ": " + d.description, { size: 9, color: medGray });
       }
       y -= 12;
     }
@@ -222,7 +227,7 @@ export async function GET(
 
     const pages = pdfDoc.getPages();
     for (let i = 0; i < pages.length; i++) {
-      pages[i].drawText(`HarvestFile.com  |  Page ${i + 1} of ${pages.length}`, {
+      pages[i].drawText("HarvestFile.com  |  Page " + (i + 1) + " of " + pages.length, {
         x: margin, y: 25, size: 8, font: helvetica, color: rgb(0.6, 0.6, 0.6),
       });
     }
@@ -234,16 +239,11 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="HarvestFile_Report_${farmerName}_${content.generated_date || "report"}.pdf"`,
+        "Content-Disposition": "attachment; filename=\"HarvestFile_Report_" + farmerName + "_" + (content.generated_date || "report") + ".pdf\"",
       },
     });
   } catch (error: any) {
     console.error("PDF generation error:", error);
     return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 });
   }
-}
-
-function formatNum(n: any): string {
-  if (n === null || n === undefined) return "0.00";
-  return Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
