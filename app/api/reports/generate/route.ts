@@ -1,300 +1,118 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { createClient } from "@supabase/supabase-js";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function updateReportStatus(reportId: string, status: string, errorMessage?: string) {
+  await supabaseAdmin
+    .from("reports")
+    .update({
+      status,
+      content: errorMessage ? { error: errorMessage } : null,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", reportId);
+}
+
+function buildReportPrompt(farmer: any, crops: any[]): string {
+  const cropDetails = crops
+    .map(
+      (c) =>
+        "- " + c.crop_type + ": " + c.base_acres + " base acres, " + c.planted_acres + " planted acres, " + c.payment_yield + " bu/ac, Program: " + (c.arc_county_elected ? "ARC-CO" : c.plc_elected ? "PLC" : "None") + ", Year: " + c.program_year
+    )
+    .join("\n");
+
+  const totalBaseAcres = crops.reduce(function(sum: number, c: any) { return sum + (c.base_acres || 0); }, 0);
+
+  return "You are an expert USDA farm program analyst. Generate a comprehensive ARC/PLC optimization report for the following farmer. Respond ONLY with a JSON object (no markdown, no backticks, no extra text).\n\nFARMER DETAILS:\n- Name: " + farmer.full_name + "\n- Farm Operation: " + (farmer.business_name || "N/A") + "\n- County: " + farmer.county + ", " + farmer.state + "\n- FSA Farm #: " + (farmer.fsa_farm_number || "N/A") + "\n- FSA Tract #: " + (farmer.fsa_tract_number || "N/A") + "\n- Total Base Acres: " + totalBaseAcres + "\n\nCROPS & ELECTIONS:\n" + cropDetails + '\n\nGenerate a JSON report with this exact structure:\n{\n  "report_title": "ARC/PLC Optimization Report",\n  "generated_date": "' + new Date().toISOString().split("T")[0] + '",\n  "farmer_summary": {\n    "name": "' + farmer.full_name + '",\n    "operation": "' + (farmer.business_name || "N/A") + '",\n    "county": "' + farmer.county + '",\n    "state": "' + farmer.state + '",\n    "total_base_acres": ' + totalBaseAcres + '\n  },\n  "executive_summary": "A 2-3 paragraph executive summary of findings and key recommendations",\n  "crop_analyses": [\n    {\n      "commodity": "Corn",\n      "base_acres": 200,\n      "planted_acres": 200,\n      "current_election": "ARC-CO or PLC",\n      "arc_co_analysis": {\n        "benchmark_revenue": 0,\n        "estimated_actual_revenue": 0,\n        "guarantee_level": 0,\n        "estimated_payment_per_acre": 0,\n        "estimated_total_payment": 0,\n        "explanation": "Detailed explanation of ARC-CO calculation and factors"\n      },\n      "plc_analysis": {\n        "reference_price": 0,\n        "effective_reference_price": 0,\n        "estimated_market_price": 0,\n        "payment_rate": 0,\n        "payment_yield": 0,\n        "estimated_payment_per_acre": 0,\n        "estimated_total_payment": 0,\n        "explanation": "Detailed explanation of PLC calculation and factors"\n      },\n      "recommendation": "ARC-CO or PLC",\n      "recommendation_reasoning": "Why this program is better for this crop",\n      "potential_savings": 0\n    }\n  ],\n  "total_estimated_payments": {\n    "current_elections": 0,\n    "optimized_elections": 0,\n    "additional_revenue_opportunity": 0\n  },\n  "market_outlook": "Brief market outlook for the relevant commodities",\n  "important_dates": [\n    {"date": "...", "description": "..."}\n  ],\n  "disclaimers": "Standard disclaimers about estimates vs actual payments"\n}\n\nUse current USDA reference prices: Corn $3.70/bu, Soybeans $8.40/bu, Wheat $5.50/bu, Sorghum $3.95/bu.\nUse realistic county yield estimates for ' + farmer.county + " County, " + farmer.state + ".\nProvide realistic, well-reasoned payment estimates. When in doubt, be conservative.\nAll dollar amounts should be numbers (not strings).";
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const { id: reportId } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const authHeader = req.headers.get("authorization");
+    if (authHeader !== "Bearer " + process.env.INTERNAL_API_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get org_id
-    const { data: professional } = await supabase
-      .from("professionals")
-      .select("org_id")
-      .eq("user_id", user.id)
+    const { report_id, farmer_id, org_id } = await req.json();
+
+    const { data: farmer, error: farmerError } = await supabaseAdmin
+      .from("farmers")
+      .select("*")
+      .eq("id", farmer_id)
+      .eq("org_id", org_id)
       .single();
 
-    if (!professional) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (farmerError || !farmer) {
+      await updateReportStatus(report_id, "failed", "Farmer not found");
+      return NextResponse.json({ error: "Farmer not found" }, { status: 404 });
     }
 
-    // Fetch report
-    const { data: report, error } = await supabase
-      .from("reports")
-      .select("*, farmers(full_name, county, state)")
-      .eq("id", reportId)
-      .eq("org_id", professional.org_id)
-      .single();
+    const { data: crops, error: cropsError } = await supabaseAdmin
+      .from("crops")
+      .select("*")
+      .eq("farmer_id", farmer_id);
 
-    if (error || !report) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    if (cropsError) {
+      await updateReportStatus(report_id, "failed", "Failed to fetch crops");
+      return NextResponse.json({ error: "Failed to fetch crops" }, { status: 500 });
     }
 
-    if (report.status !== "complete") {
-      return NextResponse.json(
-        { error: "Report not ready" },
-        { status: 400 }
-      );
-    }
+    const prompt = buildReportPrompt(farmer, crops);
 
-    const content = report.content;
-    const pdfDoc = await PDFDocument.create();
-    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    const pageWidth = 612;
-    const pageHeight = 792;
-    const margin = 50;
-    const maxWidth = pageWidth - margin * 2;
-    let currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
-    let y = pageHeight - margin;
-
-    const green = rgb(0.18, 0.74, 0.36);
-    const darkGray = rgb(0.2, 0.2, 0.2);
-    const medGray = rgb(0.4, 0.4, 0.4);
-
-    function addNewPageIfNeeded(spaceNeeded: number = 80) {
-      if (y < margin + spaceNeeded) {
-        currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
-        y = pageHeight - margin;
-      }
-    }
-
-    function drawText(
-      text: string,
-      options: {
-        font?: typeof helvetica;
-        size?: number;
-        color?: typeof darkGray;
-        x?: number;
-        maxLineWidth?: number;
-      } = {}
-    ) {
-      const font = options.font || helvetica;
-      const size = options.size || 10;
-      const color = options.color || darkGray;
-      const x = options.x || margin;
-      const lineMaxWidth = options.maxLineWidth || maxWidth;
-
-      const words = text.split(" ");
-      let line = "";
-      const lines: string[] = [];
-
-      for (const word of words) {
-        const testLine = line ? `${line} ${word}` : word;
-        const testWidth = font.widthOfTextAtSize(testLine, size);
-        if (testWidth > lineMaxWidth && line) {
-          lines.push(line);
-          line = word;
-        } else {
-          line = testLine;
-        }
-      }
-      if (line) lines.push(line);
-
-      for (const l of lines) {
-        addNewPageIfNeeded(size + 4);
-        currentPage.drawText(l, { x, y, size, font, color });
-        y -= size + 4;
-      }
-
-      return y;
-    }
-
-    // === HEADER ===
-    drawText("HarvestFile", { font: helveticaBold, size: 24, color: green });
-    y -= 4;
-    drawText("AI-Powered ARC/PLC Optimization Report", { font: helveticaBold, size: 14, color: darkGray });
-    y -= 8;
-
-    currentPage.drawLine({
-      start: { x: margin, y },
-      end: { x: pageWidth - margin, y },
-      thickness: 2,
-      color: green,
-    });
-    y -= 20;
-
-    // === FARMER SUMMARY ===
-    const summary = content.farmer_summary;
-    if (summary) {
-      drawText("Farmer Overview", { font: helveticaBold, size: 14, color: darkGray });
-      y -= 4;
-      drawText(`Name: ${summary.name}`, { color: medGray });
-      drawText(`Operation: ${summary.operation || "N/A"}`, { color: medGray });
-      drawText(`Location: ${summary.county}, ${summary.state}`, { color: medGray });
-      drawText(`Total Base Acres: ${summary.total_base_acres}`, { color: medGray });
-      drawText(`Report Date: ${content.generated_date}`, { color: medGray });
-      y -= 12;
-    }
-
-    // === EXECUTIVE SUMMARY ===
-    if (content.executive_summary) {
-      drawText("Executive Summary", { font: helveticaBold, size: 14, color: darkGray });
-      y -= 4;
-      drawText(content.executive_summary, { size: 10, color: medGray });
-      y -= 12;
-    }
-
-    // === CROP ANALYSES ===
-    if (content.crop_analyses && content.crop_analyses.length > 0) {
-      drawText("Crop-by-Crop Analysis", { font: helveticaBold, size: 14, color: darkGray });
-      y -= 8;
-
-      for (const crop of content.crop_analyses) {
-        addNewPageIfNeeded(200);
-
-        drawText(crop.commodity, { font: helveticaBold, size: 13, color: green });
-        y -= 2;
-        drawText(
-          `Base Acres: ${crop.base_acres} | Planted: ${crop.planted_acres} | Current Election: ${crop.current_election}`,
-          { size: 9, color: medGray }
-        );
-        y -= 6;
-
-        if (crop.arc_co_analysis) {
-          drawText("ARC-CO Analysis:", { font: helveticaBold, size: 11, color: darkGray });
-          const arc = crop.arc_co_analysis;
-          drawText(
-            `  Benchmark Revenue: $${formatNum(arc.benchmark_revenue)}/ac  |  Guarantee: $${formatNum(arc.guarantee_level)}/ac`,
-            { size: 9, color: medGray }
-          );
-          drawText(
-            `  Est. Payment: $${formatNum(arc.estimated_payment_per_acre)}/ac  |  Total: $${formatNum(arc.estimated_total_payment)}`,
-            { size: 9, color: medGray }
-          );
-          drawText(arc.explanation, { size: 9, color: medGray });
-          y -= 6;
-        }
-
-        if (crop.plc_analysis) {
-          drawText("PLC Analysis:", { font: helveticaBold, size: 11, color: darkGray });
-          const plc = crop.plc_analysis;
-          drawText(
-            `  Reference Price: $${formatNum(plc.reference_price)}/bu  |  Market Price: $${formatNum(plc.estimated_market_price)}/bu`,
-            { size: 9, color: medGray }
-          );
-          drawText(
-            `  Est. Payment: $${formatNum(plc.estimated_payment_per_acre)}/ac  |  Total: $${formatNum(plc.estimated_total_payment)}`,
-            { size: 9, color: medGray }
-          );
-          drawText(plc.explanation, { size: 9, color: medGray });
-          y -= 6;
-        }
-
-        addNewPageIfNeeded(60);
-        drawText(`RECOMMENDATION: ${crop.recommendation}`, { font: helveticaBold, size: 11, color: green });
-        drawText(crop.recommendation_reasoning, { size: 9, color: medGray });
-        if (crop.potential_savings > 0) {
-          drawText(
-            `Potential additional revenue: $${formatNum(crop.potential_savings)}`,
-            { font: helveticaBold, size: 10, color: green }
-          );
-        }
-        y -= 16;
-      }
-    }
-
-    // === TOTALS ===
-    if (content.total_estimated_payments) {
-      addNewPageIfNeeded(100);
-      const totals = content.total_estimated_payments;
-
-      currentPage.drawRectangle({
-        x: margin,
-        y: y - 60,
-        width: maxWidth,
-        height: 70,
-        color: rgb(0.95, 0.98, 0.95),
-        borderColor: green,
-        borderWidth: 1,
-      });
-
-      y -= 5;
-      drawText("Payment Summary", { font: helveticaBold, size: 13, color: darkGray, x: margin + 10 });
-      drawText(`Current Elections Est. Payment: $${formatNum(totals.current_elections)}`, { size: 10, color: medGray, x: margin + 10 });
-      drawText(`Optimized Elections Est. Payment: $${formatNum(totals.optimized_elections)}`, { size: 10, color: medGray, x: margin + 10 });
-      drawText(
-        `Additional Revenue Opportunity: $${formatNum(totals.additional_revenue_opportunity)}`,
-        { font: helveticaBold, size: 11, color: green, x: margin + 10 }
-      );
-      y -= 16;
-    }
-
-    // === MARKET OUTLOOK ===
-    if (content.market_outlook) {
-      addNewPageIfNeeded(80);
-      drawText("Market Outlook", { font: helveticaBold, size: 14, color: darkGray });
-      y -= 4;
-      drawText(content.market_outlook, { size: 9, color: medGray });
-      y -= 12;
-    }
-
-    // === IMPORTANT DATES ===
-    if (content.important_dates && content.important_dates.length > 0) {
-      addNewPageIfNeeded(60);
-      drawText("Important Dates", { font: helveticaBold, size: 14, color: darkGray });
-      y -= 4;
-      for (const d of content.important_dates) {
-        drawText(`${d.date}: ${d.description}`, { size: 9, color: medGray });
-      }
-      y -= 12;
-    }
-
-    // === DISCLAIMERS ===
-    if (content.disclaimers) {
-      addNewPageIfNeeded(60);
-      drawText("Disclaimers", { font: helveticaBold, size: 10, color: medGray });
-      y -= 2;
-      drawText(content.disclaimers, { size: 8, color: rgb(0.5, 0.5, 0.5) });
-    }
-
-    // === FOOTER ===
-    const pages = pdfDoc.getPages();
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i];
-      page.drawText(`HarvestFile.com  |  Page ${i + 1} of ${pages.length}`, {
-        x: margin,
-        y: 25,
-        size: 8,
-        font: helvetica,
-        color: rgb(0.6, 0.6, 0.6),
-      });
-    }
-
-    const pdfBytes = await pdfDoc.save();
-    const farmerName = (report.farmers?.full_name || "farmer").replace(/[^a-zA-Z0-9]/g, "_");
-
-    return new NextResponse(pdfBytes, {
-      status: 200,
+    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
       headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="HarvestFile_Report_${farmerName}_${content.generated_date || "report"}.pdf"`,
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
       },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }],
+      }),
     });
-  } catch (error: any) {
-    console.error("PDF generation error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate PDF" },
-      { status: 500 }
-    );
-  }
-}
 
-function formatNum(n: any): string {
-  if (n === null || n === undefined) return "0.00";
-  return Number(n).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+    if (!claudeResponse.ok) {
+      const errText = await claudeResponse.text();
+      console.error("Claude API error:", errText);
+      await updateReportStatus(report_id, "failed", "AI generation failed");
+      return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
+    }
+
+    const claudeData = await claudeResponse.json();
+    const aiContent = claudeData.content && claudeData.content[0] ? claudeData.content[0].text : "Report generation failed";
+
+    var reportContent;
+    try {
+      var jsonMatch = aiContent.match(/```json\n?([\s\S]*?)\n?```/);
+      var jsonStr = jsonMatch ? jsonMatch[1] : aiContent;
+      reportContent = JSON.parse(jsonStr);
+    } catch (e) {
+      reportContent = { raw_analysis: aiContent, parse_error: true };
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("reports")
+      .update({
+        status: "complete",
+        content: reportContent,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", report_id);
+
+    if (updateError) {
+      console.error("Report update error:", updateError);
+      return NextResponse.json({ error: "Failed to save report" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, report_id: report_id });
+  } catch (error: any) {
+    console.error("Report generation error:", error);
+    return NextResponse.json({ error: error.message || "Generation failed" }, { status: 500 });
+  }
 }
