@@ -7,6 +7,7 @@ import { getFarmerById, updateFarmer, deleteFarmer } from "@/lib/actions/farmers
 import { createCrop, updateCrop, deleteCrop } from "@/lib/actions/crops";
 import { US_STATES, CROP_TYPES } from "@/types/database";
 import type { Crop } from "@/types/database";
+import GenerateReportButton from "@/components/GenerateReportButton";
 
 export default function FarmerDetailPage() {
   const router = useRouter();
@@ -742,12 +743,7 @@ export default function FarmerDetailPage() {
                 Generate an AI-powered ARC/PLC optimization report for {farmer.full_name}
               </p>
             </div>
-            <Link
-              href={`/dashboard/reports/new?farmer=${farmerId}`}
-              className="px-5 py-2.5 bg-white text-green-700 text-sm font-semibold rounded-lg hover:bg-green-50 transition-colors shadow-sm"
-            >
-              Generate Report — $39
-            </Link>
+            <GenerateReportButton farmerId={farmerId} />
           </div>
         </div>
       )}
