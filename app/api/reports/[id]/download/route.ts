@@ -235,7 +235,7 @@ export async function GET(
     const pdfBytes = await pdfDoc.save();
     const farmerName = (report.farmers?.full_name || "farmer").replace(/[^a-zA-Z0-9]/g, "_");
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
