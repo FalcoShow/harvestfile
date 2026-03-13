@@ -201,7 +201,7 @@ export default function PriceDashboard({
     if (Object.keys(priceData).length === 0) return [];
     const years = new Set<number>();
     Object.values(priceData).forEach(d => d.prices.forEach(p => years.add(p.year)));
-    return [...years].sort().map(year => {
+    return Array.from(years).sort().map(year => {
       const point: any = { year };
       Object.entries(priceData).forEach(([commodity, data]) => {
         const match = data.prices.find(p => p.year === year);
