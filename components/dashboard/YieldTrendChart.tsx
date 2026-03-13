@@ -248,7 +248,7 @@ export function MultiCropYieldChart({
   // Build unified dataset
   const years = new Set<number>();
   crops.forEach(c => c.yields.forEach(y => years.add(y.year)));
-  const chartData = [...years].sort().map(year => {
+  const chartData = Array.from(years).sort().map(year => {
     const point: any = { year };
     crops.forEach(c => {
       const match = c.yields.find(y => y.year === year);
