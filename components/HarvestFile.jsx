@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import IntelligenceHero from './homepage/IntelligenceHero';
 
 const SB_URL = "https://fzduyjxjdcxbdwjlwrpu.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZHV5anhqZGN4YmR3amx3cnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzIwNzksImV4cCI6MjA4ODY0ODA3OX0.yVn6AN7ueY2cvVKIKcbR-pSNOT3aTyz5oGHfdQCN_0M";
@@ -399,6 +400,9 @@ export default function HarvestFile() {
             </div>
           </div>
         </section>
+
+        {/* ──── INTELLIGENCE HUB ──── */}
+        <IntelligenceHero />
 
         {/* ──── STATS BAR ──── */}
         <section style={{ background: C.white, padding: "56px 24px", borderBottom: "1px solid rgba(0,0,0,0.04)" }}>

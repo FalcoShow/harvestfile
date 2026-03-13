@@ -1,718 +1,457 @@
 // =============================================================================
-// app/dashboard/intelligence/page.tsx
-// HarvestFile Intelligence Hub — The Revolutionary Dashboard
-// This is the core product differentiator. Make it unforgettable.
+// HarvestFile - Intelligence Hub (Phase 3C: Upgraded)
+// Features: Price Dashboard + County Autocomplete + Recharts + Enhanced UI
+// Replace: app/dashboard/intelligence/page.tsx
 // =============================================================================
 
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import PriceDashboard from '@/components/dashboard/PriceDashboard';
+import CountyAutocomplete from '@/components/CountyAutocomplete';
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ─── Brand Colors ────────────────────────────────────────────────────────────
+const C = {
+  dark: '#0C1F17', forest: '#1B4332', sage: '#40624D', muted: '#6B8F71',
+  gold: '#C9A84C', goldBright: '#E2C366', goldDim: '#9E7E30',
+  cream: '#FAFAF6', white: '#FFFFFF',
+  text: '#111827', textSoft: '#6B7280', textMuted: '#9CA3AF',
+  emerald: '#059669', emeraldLight: '#34D399', emeraldBg: '#ECFDF5',
+  red: '#EF4444',
+};
 
-interface ReportSection {
-  id: string;
-  title: string;
-  icon: string;
-  content: string;
-  priority: number;
-}
+const STATES: Record<string, string> = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
+};
 
-interface DataSource {
-  source: string;
-  endpoint: string;
-  fetched_at: string;
-  records: number;
-}
+// Major ag states sorted first
+const AG_STATES = ['IA','IL','NE','MN','IN','OH','SD','KS','ND','WI','MO','MI','TX','GA','AR','MS','NC','AL','KY','TN','OK','CO','MT','WA','OR','CA','ID','WY','PA','NY','VA','SC','LA','FL'];
+const OTHER_STATES = Object.keys(STATES).filter(s => !AG_STATES.includes(s)).sort();
+const ALL_STATES = [...AG_STATES, ...OTHER_STATES];
+
+const REPORT_TYPES = [
+  { id: 'market', name: 'Market Intelligence', emoji: '📊', desc: 'Commodity prices, trends, and market outlook' },
+  { id: 'weather', name: 'Weather & Yield Impact', emoji: '🌦️', desc: '7-day forecast, growing conditions, yield risk' },
+  { id: 'program', name: 'Program Optimization', emoji: '🏛️', desc: 'ARC vs PLC analysis with payment projections' },
+  { id: 'seasonal', name: 'Seasonal Advisory', emoji: '📅', desc: 'Deadlines, planting windows, and action items' },
+];
+
+const CROPS = [
+  { id: 'CORN', name: 'Corn', emoji: '🌽' },
+  { id: 'SOYBEANS', name: 'Soybeans', emoji: '🫘' },
+  { id: 'WHEAT', name: 'Wheat', emoji: '🌾' },
+  { id: 'SORGHUM', name: 'Sorghum', emoji: '🌿' },
+  { id: 'COTTON', name: 'Cotton', emoji: '☁️' },
+  { id: 'RICE', name: 'Rice', emoji: '🍚' },
+  { id: 'BARLEY', name: 'Barley', emoji: '🪴' },
+  { id: 'OATS', name: 'Oats', emoji: '🌱' },
+];
 
 interface Report {
   id: string;
-  type: string;
-  title: string;
-  summary: string;
-  sections: ReportSection[];
-  data_sources: DataSource[];
-  generated_at: string;
-  generation_time_ms: number;
-}
-
-interface SavedReport {
-  id: string;
   report_type: string;
-  title: string;
-  summary: string;
+  state: string;
+  county: string;
+  crops: string[];
   status: string;
   created_at: string;
-  generation_time_ms: number;
-  parameters: any;
+  content?: any;
 }
 
-// ── US States for dropdown ──────────────────────────────────────────────────
-const US_STATES = [
-  { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" },
-  { value: "AZ", label: "Arizona" }, { value: "AR", label: "Arkansas" },
-  { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
-  { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" },
-  { value: "FL", label: "Florida" }, { value: "GA", label: "Georgia" },
-  { value: "HI", label: "Hawaii" }, { value: "ID", label: "Idaho" },
-  { value: "IL", label: "Illinois" }, { value: "IN", label: "Indiana" },
-  { value: "IA", label: "Iowa" }, { value: "KS", label: "Kansas" },
-  { value: "KY", label: "Kentucky" }, { value: "LA", label: "Louisiana" },
-  { value: "ME", label: "Maine" }, { value: "MD", label: "Maryland" },
-  { value: "MA", label: "Massachusetts" }, { value: "MI", label: "Michigan" },
-  { value: "MN", label: "Minnesota" }, { value: "MS", label: "Mississippi" },
-  { value: "MO", label: "Missouri" }, { value: "MT", label: "Montana" },
-  { value: "NE", label: "Nebraska" }, { value: "NV", label: "Nevada" },
-  { value: "NH", label: "New Hampshire" }, { value: "NJ", label: "New Jersey" },
-  { value: "NM", label: "New Mexico" }, { value: "NY", label: "New York" },
-  { value: "NC", label: "North Carolina" }, { value: "ND", label: "North Dakota" },
-  { value: "OH", label: "Ohio" }, { value: "OK", label: "Oklahoma" },
-  { value: "OR", label: "Oregon" }, { value: "PA", label: "Pennsylvania" },
-  { value: "RI", label: "Rhode Island" }, { value: "SC", label: "South Carolina" },
-  { value: "SD", label: "South Dakota" }, { value: "TN", label: "Tennessee" },
-  { value: "TX", label: "Texas" }, { value: "UT", label: "Utah" },
-  { value: "VT", label: "Vermont" }, { value: "VA", label: "Virginia" },
-  { value: "WA", label: "Washington" }, { value: "WV", label: "West Virginia" },
-  { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" },
-];
+export default function IntelligencePage() {
+  // ─── State ───────────────────────────────────────────────────────
+  const [selectedType, setSelectedType] = useState('market');
+  const [state, setState] = useState('OH');
+  const [county, setCounty] = useState('');
+  const [selectedCrops, setSelectedCrops] = useState<string[]>(['CORN', 'SOYBEANS']);
+  const [recentReports, setRecentReports] = useState<Report[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [showGenerator, setShowGenerator] = useState(false);
 
-const COMMON_CROPS = [
-  "CORN", "SOYBEANS", "WHEAT", "COTTON", "RICE", "SORGHUM",
-  "OATS", "BARLEY", "SUNFLOWER", "HAY", "ALFALFA",
-];
-
-const REPORT_TYPES = [
-  {
-    id: "market_intelligence",
-    name: "Market Intelligence",
-    icon: "📈",
-    description: "Price trends, breakeven analysis, marketing strategy",
-    color: "emerald",
-    gradient: "from-emerald-500/20 to-emerald-600/5",
-    borderColor: "border-emerald-500/30",
-    features: ["Price history & trends", "Breakeven calculator", "Revenue projections", "Marketing timing"],
-  },
-  {
-    id: "crop_planner",
-    name: "Crop Planner",
-    icon: "🌱",
-    description: "Planting windows, crop mix optimization, yield forecasts",
-    color: "blue",
-    gradient: "from-blue-500/20 to-blue-600/5",
-    borderColor: "border-blue-500/30",
-    features: ["Planting window analysis", "Soil temp monitoring", "Crop rotation", "Acreage optimization"],
-  },
-  {
-    id: "weather_risk",
-    name: "Weather Risk",
-    icon: "⛈️",
-    description: "16-day forecast, frost alerts, drought risk, GDD tracking",
-    color: "amber",
-    gradient: "from-amber-500/20 to-amber-600/5",
-    borderColor: "border-amber-500/30",
-    features: ["16-day ag forecast", "Frost/freeze alerts", "Soil moisture", "GDD accumulation"],
-  },
-  {
-    id: "full_analysis",
-    name: "Complete Analysis",
-    icon: "🧠",
-    description: "Everything combined — the ultimate farm intelligence brief",
-    color: "purple",
-    gradient: "from-purple-500/20 to-purple-600/5",
-    borderColor: "border-purple-500/30",
-    features: ["All reports combined", "30/60/90-day plan", "Risk matrix", "Financial projections"],
-    isPremium: true,
-  },
-];
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═════════════════════════════════════════════════════════════════════════════
-
-export default function IntelligenceHub() {
-  // ── State ─────────────────────────────────────────────────────────────
-  const [view, setView] = useState<"hub" | "generate" | "report">("hub");
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-
-  // Form state
-  const [state, setState] = useState("OH");
-  const [county, setCounty] = useState("");
-  const [selectedCrops, setSelectedCrops] = useState<string[]>(["CORN", "SOYBEANS"]);
-  const [acres, setAcres] = useState("");
-  const [additionalContext, setAdditionalContext] = useState("");
-
-  // Report state
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationStage, setGenerationStage] = useState("");
-  const [currentReport, setCurrentReport] = useState<Report | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // History
-  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-
-  // ── Load report history ───────────────────────────────────────────────
+  // ─── Fetch recent reports ────────────────────────────────────────
   useEffect(() => {
     async function loadReports() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      const { data: pro } = await supabase
-        .from("professionals")
-        .select("org_id")
-        .eq("auth_id", user.id)
-        .single();
+        const { data } = await supabase
+          .from('intelligence_reports')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
 
-      if (!pro) return;
+        if (data) setRecentReports(data);
+      } catch (err) {
+        console.error('Failed to load reports:', err);
+      }
+    }
+    loadReports();
+  }, []);
 
-      const { data } = await supabase
-        .from("intelligence_reports")
-        .select("id, report_type, title, summary, status, created_at, generation_time_ms, parameters")
-        .eq("org_id", pro.org_id)
-        .order("created_at", { ascending: false })
-        .limit(20);
+  // ─── Toggle crop selection ───────────────────────────────────────
+  const toggleCrop = (cropId: string) => {
+    setSelectedCrops(prev =>
+      prev.includes(cropId)
+        ? prev.filter(c => c !== cropId)
+        : [...prev, cropId]
+    );
+  };
 
-      if (data) setSavedReports(data);
-      setLoadingHistory(false);
+  // ─── Generate report ────────────────────────────────────────────
+  const generateReport = async () => {
+    if (!state || !county || selectedCrops.length === 0) {
+      setError('Please select state, county, and at least one crop.');
+      return;
     }
 
-    loadReports();
-  }, [currentReport]); // Refresh after generating
-
-  // ── Generate report ───────────────────────────────────────────────────
-  async function handleGenerate() {
-    if (!county || !selectedType) return;
-
-    setIsGenerating(true);
-    setError(null);
-    setGenerationStage("Connecting to USDA databases...");
-
-    const stages = [
-      "Connecting to USDA databases...",
-      "Fetching crop prices & yields...",
-      "Pulling 16-day weather forecast...",
-      "Analyzing 10-year climate history...",
-      "Running AI analysis engine...",
-      "Building your intelligence report...",
-    ];
-
-    let stageIdx = 0;
-    const stageInterval = setInterval(() => {
-      stageIdx++;
-      if (stageIdx < stages.length) {
-        setGenerationStage(stages[stageIdx]);
-      }
-    }, 3000);
+    setGenerating(true);
+    setError('');
 
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const res = await fetch("/api/intelligence/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
+      const res = await fetch('/api/intelligence/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           report_type: selectedType,
           state,
           county,
           crops: selectedCrops,
-          acres: acres ? parseInt(acres) : undefined,
-          additional_context: additionalContext || undefined,
         }),
       });
 
-      clearInterval(stageInterval);
-
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Report generation failed");
+      if (!data.success) {
+        throw new Error(data.error || 'Generation failed');
       }
 
-      setCurrentReport(data.report);
-      setView("report");
-      setGenerationStage("");
-    } catch (err) {
-      clearInterval(stageInterval);
-      setError(err instanceof Error ? err.message : "Failed to generate report");
-      setGenerationStage("");
+      // Add to recent reports
+      if (data.report) {
+        setRecentReports(prev => [data.report, ...prev].slice(0, 5));
+      }
+
+      setShowGenerator(false);
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
     } finally {
-      setIsGenerating(false);
+      setGenerating(false);
     }
-  }
-
-  // ── Toggle crop selection ─────────────────────────────────────────────
-  function toggleCrop(crop: string) {
-    setSelectedCrops(prev =>
-      prev.includes(crop) ? prev.filter(c => c !== crop) : [...prev, crop]
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // RENDER: Hub View (main landing)
-  // ═══════════════════════════════════════════════════════════════════════
-  if (view === "hub") {
-    return (
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Hero section */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-900/40 via-emerald-800/20 to-transparent border border-emerald-500/20 p-8">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl -mr-48 -mt-48" />
-          <div className="relative">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">🧠</span>
-              <h1 className="text-3xl font-bold text-white">Intelligence Hub</h1>
-              <span className="px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30">
-                AI-POWERED
-              </span>
-            </div>
-            <p className="text-gray-400 text-lg max-w-2xl mt-2">
-              Real-time market intelligence, crop planning, and weather risk analysis — 
-              powered by USDA data and advanced AI. Every report tells you exactly what to do.
-            </p>
-            <button
-              onClick={() => setView("generate")}
-              className="mt-6 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-xl transition-all hover:shadow-lg hover:shadow-emerald-500/25 active:scale-[0.98]"
-            >
-              Generate New Report →
-            </button>
-          </div>
-        </div>
-
-        {/* Report type cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {REPORT_TYPES.map((type) => (
-            <button
-              key={type.id}
-              onClick={() => {
-                setSelectedType(type.id);
-                setView("generate");
-              }}
-              className={`group relative text-left rounded-xl bg-gradient-to-br ${type.gradient} border ${type.borderColor} p-6 hover:border-opacity-60 transition-all hover:shadow-lg`}
-            >
-              {type.isPremium && (
-                <span className="absolute top-4 right-4 px-2 py-0.5 text-[10px] font-bold bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30 uppercase">
-                  Pro
-                </span>
-              )}
-              <div className="flex items-start gap-4">
-                <span className="text-3xl">{type.icon}</span>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white group-hover:text-emerald-300 transition-colors">
-                    {type.name}
-                  </h3>
-                  <p className="text-sm text-gray-400 mt-1">{type.description}</p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {type.features.map((f) => (
-                      <span key={f} className="text-xs px-2 py-1 rounded-md bg-white/[0.05] text-gray-400">
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Recent reports */}
-        <div>
-          <h2 className="text-lg font-semibold text-white mb-4">Recent Reports</h2>
-          {loadingHistory ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin h-6 w-6 border-2 border-emerald-400 border-t-transparent rounded-full" />
-            </div>
-          ) : savedReports.length === 0 ? (
-            <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-12 text-center">
-              <span className="text-4xl mb-4 block">📊</span>
-              <p className="text-gray-400">No reports yet. Generate your first intelligence report above.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {savedReports.map((r) => {
-                const typeInfo = REPORT_TYPES.find(t => t.id === r.report_type);
-                return (
-                  <div
-                    key={r.id}
-                    className="flex items-center gap-4 rounded-xl bg-white/[0.03] border border-white/[0.06] p-4 hover:bg-white/[0.05] transition-colors cursor-pointer"
-                  >
-                    <span className="text-2xl">{typeInfo?.icon || "📄"}</span>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-white truncate">
-                        {r.title || `${typeInfo?.name} Report`}
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">
-                        {r.summary || `${r.parameters?.county} County, ${r.parameters?.state}`}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className={`text-xs font-medium ${
-                        r.status === "complete" ? "text-emerald-400" : 
-                        r.status === "failed" ? "text-red-400" : "text-yellow-400"
-                      }`}>
-                        {r.status === "complete" ? "✓ Complete" : r.status}
-                      </div>
-                      <div className="text-xs text-gray-600 mt-0.5">
-                        {new Date(r.created_at).toLocaleDateString("en-US", {
-                          month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // RENDER: Generate View (form)
-  // ═══════════════════════════════════════════════════════════════════════
-  if (view === "generate") {
-    return (
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Back button */}
-        <button
-          onClick={() => { setView("hub"); setError(null); }}
-          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
-        >
-          ← Back to Intelligence Hub
-        </button>
-
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-white">Generate Intelligence Report</h1>
-          <p className="text-gray-400 mt-1">
-            Select your report type, location, and crops — our AI will pull real-time USDA data and weather
-            forecasts to build your personalized analysis.
-          </p>
-        </div>
-
-        {/* Report type selector */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-3">Report Type</label>
-          <div className="grid grid-cols-2 gap-3">
-            {REPORT_TYPES.map((type) => (
-              <button
-                key={type.id}
-                onClick={() => setSelectedType(type.id)}
-                className={`text-left p-4 rounded-xl border transition-all ${
-                  selectedType === type.id
-                    ? `bg-${type.color}-500/10 border-${type.color}-500/40 ring-1 ring-${type.color}-500/20`
-                    : "bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{type.icon}</span>
-                  <span className={`text-sm font-medium ${
-                    selectedType === type.id ? "text-white" : "text-gray-300"
-                  }`}>
-                    {type.name}
-                  </span>
-                  {type.isPremium && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded-full font-bold">
-                      PRO
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">State</label>
-            <select
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
-            >
-              {US_STATES.map((s) => (
-                <option key={s.value} value={s.value} className="bg-[#1a1f1c]">
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">County</label>
-            <input
-              type="text"
-              value={county}
-              onChange={(e) => setCounty(e.target.value)}
-              placeholder="e.g. Summit, Wayne, Champaign"
-              className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
-            />
-          </div>
-        </div>
-
-        {/* Crops */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Crops <span className="text-gray-500">(select all that apply)</span>
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {COMMON_CROPS.map((crop) => (
-              <button
-                key={crop}
-                onClick={() => toggleCrop(crop)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  selectedCrops.includes(crop)
-                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                    : "bg-white/[0.04] text-gray-400 border border-white/[0.06] hover:border-white/[0.12]"
-                }`}
-              >
-                {crop.charAt(0) + crop.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Acres */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Total Acres <span className="text-gray-500">(optional — enables revenue projections)</span>
-          </label>
-          <input
-            type="number"
-            value={acres}
-            onChange={(e) => setAcres(e.target.value)}
-            placeholder="e.g. 500"
-            className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
-          />
-        </div>
-
-        {/* Additional context */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Specific Questions <span className="text-gray-500">(optional)</span>
-          </label>
-          <textarea
-            value={additionalContext}
-            onChange={(e) => setAdditionalContext(e.target.value)}
-            rows={3}
-            placeholder="e.g. Should I switch 100 acres from corn to soybeans? When should I market my grain?"
-            className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 resize-none"
-          />
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Generate button */}
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating || !county || !selectedType || selectedCrops.length === 0}
-          className={`w-full py-4 rounded-xl font-semibold text-lg transition-all ${
-            isGenerating
-              ? "bg-emerald-500/20 text-emerald-400 cursor-wait"
-              : "bg-emerald-500 hover:bg-emerald-400 text-black hover:shadow-lg hover:shadow-emerald-500/25 active:scale-[0.99]"
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
-        >
-          {isGenerating ? (
-            <span className="flex items-center justify-center gap-3">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              {generationStage}
-            </span>
-          ) : (
-            "🧠 Generate Intelligence Report"
-          )}
-        </button>
-
-        {/* Data sources notice */}
-        <p className="text-xs text-gray-600 text-center">
-          Powered by USDA NASS QuickStats, Open-Meteo Weather, National Weather Service, and Claude AI.
-          All data is sourced from official government databases.
-        </p>
-      </div>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // RENDER: Report View (the generated report)
-  // ═══════════════════════════════════════════════════════════════════════
-  if (view === "report" && currentReport) {
-    const typeInfo = REPORT_TYPES.find(t => t.id === currentReport.type);
-
-    return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Back button */}
-        <button
-          onClick={() => { setView("hub"); setCurrentReport(null); }}
-          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
-        >
-          ← Back to Intelligence Hub
-        </button>
-
-        {/* Report header */}
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-900/30 via-transparent to-transparent border border-emerald-500/15 p-8">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">{typeInfo?.icon || "📊"}</span>
-                <div>
-                  <h1 className="text-2xl font-bold text-white">{currentReport.title}</h1>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Generated {new Date(currentReport.generated_at).toLocaleString("en-US", {
-                      weekday: "long", year: "numeric", month: "long", day: "numeric",
-                      hour: "numeric", minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-              </div>
-              {/* Executive summary */}
-              <div className="mt-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                <p className="text-emerald-300 text-sm leading-relaxed">{currentReport.summary}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Metadata bar */}
-          <div className="flex items-center gap-6 mt-6 pt-4 border-t border-white/[0.06]">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span>⚡</span>
-              <span>{(currentReport.generation_time_ms / 1000).toFixed(1)}s generation time</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span>📡</span>
-              <span>{currentReport.data_sources.length} data sources</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span>📊</span>
-              <span>{currentReport.sections.length} sections</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Report sections */}
-        <div className="space-y-4">
-          {currentReport.sections.map((section) => (
-            <ReportSectionCard key={section.id} section={section} />
-          ))}
-        </div>
-
-        {/* Data sources */}
-        <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-6">
-          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-            Data Sources
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {currentReport.data_sources.map((ds, i) => (
-              <div key={i} className="flex items-center gap-3 text-xs text-gray-500">
-                <span className="w-2 h-2 rounded-full bg-emerald-500/40" />
-                <span className="text-gray-400 font-medium">{ds.source}</span>
-                <span>·</span>
-                <span>{ds.records} records</span>
-                <span>·</span>
-                <span>{new Date(ds.fetched_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => { setView("generate"); setCurrentReport(null); }}
-            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-xl transition-all text-sm"
-          >
-            Generate Another Report
-          </button>
-          <button
-            onClick={() => { setView("hub"); setCurrentReport(null); }}
-            className="px-5 py-2.5 bg-white/[0.06] hover:bg-white/[0.1] text-gray-300 font-medium rounded-xl transition-all text-sm border border-white/[0.06]"
-          >
-            Back to Hub
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-
-// ── Report Section Card ─────────────────────────────────────────────────────
-
-function ReportSectionCard({ section }: { section: ReportSection }) {
-  const [expanded, setExpanded] = useState(true);
+  };
 
   return (
-    <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-colors"
-      >
-        <span className="text-xl">{section.icon}</span>
-        <h3 className="flex-1 text-base font-semibold text-white">{section.title}</h3>
-        <svg
-          className={`w-5 h-5 text-gray-500 transition-transform ${expanded ? "rotate-180" : ""}`}
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+      {/* ═══ HERO HEADER ═══ */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'rgba(5,150,105,0.1)', border: '1px solid rgba(5,150,105,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18,
+          }}>
+            🧠
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', margin: 0 }}>
+                Intelligence Hub
+              </h1>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                background: 'rgba(201,168,76,0.12)', color: C.gold,
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
+                Live
+              </span>
+            </div>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: 0 }}>
+              AI-powered market intelligence, weather analysis, and program optimization
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ PRICE DASHBOARD ═══ */}
+      <div style={{ marginBottom: 32 }}>
+        <PriceDashboard state={state} commodities={selectedCrops.length > 0 ? selectedCrops : ['CORN', 'SOYBEANS', 'WHEAT']} />
+      </div>
+
+      {/* ═══ GENERATE REPORT SECTION ═══ */}
+      <div style={{
+        background: 'rgba(255,255,255,0.02)', borderRadius: 20,
+        border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden',
+        marginBottom: 32,
+      }}>
+        {/* Toggle Header */}
+        <button
+          onClick={() => setShowGenerator(!showGenerator)}
+          style={{
+            width: '100%', padding: '20px 24px', cursor: 'pointer',
+            background: showGenerator ? 'rgba(5,150,105,0.04)' : 'transparent',
+            border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            borderBottom: showGenerator ? '1px solid rgba(255,255,255,0.06)' : 'none',
+          }}
         >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-      {expanded && (
-        <div className="px-5 pb-5 -mt-1">
-          <div className="prose prose-invert prose-sm max-w-none">
-            <MarkdownRenderer content={section.content} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(5,150,105,0.15), rgba(201,168,76,0.1))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>
+              ✨
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Generate New Report</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                AI analysis using real USDA data, weather forecasts, and market trends
+              </div>
+            </div>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round"
+            style={{ transform: showGenerator ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+
+        {/* Generator Form */}
+        {showGenerator && (
+          <div style={{ padding: 24 }}>
+            {/* Report Type */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Report Type
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+                {REPORT_TYPES.map(type => (
+                  <button
+                    key={type.id}
+                    onClick={() => setSelectedType(type.id)}
+                    style={{
+                      padding: '14px 16px', borderRadius: 14, cursor: 'pointer',
+                      border: selectedType === type.id
+                        ? '1.5px solid rgba(5,150,105,0.4)'
+                        : '1px solid rgba(255,255,255,0.06)',
+                      background: selectedType === type.id
+                        ? 'rgba(5,150,105,0.08)'
+                        : 'rgba(255,255,255,0.02)',
+                      textAlign: 'left', transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 16 }}>{type.emoji}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: selectedType === type.id ? C.emeraldLight : '#fff' }}>
+                        {type.name}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', lineHeight: 1.4 }}>
+                      {type.desc}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Location */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16, marginBottom: 24 }}>
+              {/* State */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  State
+                </label>
+                <select
+                  value={state}
+                  onChange={(e) => {
+                    setState(e.target.value);
+                    setCounty('');
+                  }}
+                  style={{
+                    width: '100%', padding: '12px 14px', fontSize: 14, fontWeight: 500,
+                    borderRadius: 12, border: '1.5px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(255,255,255,0.03)', color: '#fff',
+                    outline: 'none', cursor: 'pointer',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2' stroke-linecap='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 12px center',
+                  }}
+                >
+                  <option value="" style={{ background: C.dark }}>Select...</option>
+                  <optgroup label="Major Ag States" style={{ background: C.dark }}>
+                    {AG_STATES.map(s => (
+                      <option key={s} value={s} style={{ background: C.dark }}>{STATES[s]} ({s})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Other States" style={{ background: C.dark }}>
+                    {OTHER_STATES.map(s => (
+                      <option key={s} value={s} style={{ background: C.dark }}>{STATES[s]} ({s})</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* County Autocomplete */}
+              <CountyAutocomplete
+                state={state}
+                value={county}
+                onChange={setCounty}
+                darkMode={true}
+              />
+            </div>
+
+            {/* Crops */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Crops
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {CROPS.map(crop => {
+                  const isSelected = selectedCrops.includes(crop.id);
+                  return (
+                    <button
+                      key={crop.id}
+                      onClick={() => toggleCrop(crop.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 14px', borderRadius: 100, cursor: 'pointer',
+                        fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
+                        border: isSelected ? '1.5px solid rgba(5,150,105,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                        background: isSelected ? 'rgba(5,150,105,0.1)' : 'rgba(255,255,255,0.02)',
+                        color: isSelected ? C.emeraldLight : 'rgba(255,255,255,0.5)',
+                      }}
+                    >
+                      <span>{crop.emoji}</span>
+                      <span>{crop.name}</span>
+                      {isSelected && (
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill={C.emeraldLight}>
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div style={{
+                padding: '12px 16px', borderRadius: 12, marginBottom: 16,
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)',
+                fontSize: 13, color: C.red,
+              }}>
+                {error}
+              </div>
+            )}
+
+            {/* Generate Button */}
+            <button
+              onClick={generateReport}
+              disabled={generating}
+              style={{
+                width: '100%', padding: '16px 24px', borderRadius: 14,
+                background: generating ? C.sage : `linear-gradient(135deg, ${C.emerald}, ${C.forest})`,
+                color: '#fff', fontSize: 15, fontWeight: 700, cursor: generating ? 'wait' : 'pointer',
+                border: 'none', transition: 'all 0.3s',
+                boxShadow: generating ? 'none' : '0 4px 20px rgba(5,150,105,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {generating ? (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
+                    <path d="M12 2a10 10 0 019.5 6.8" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  Generating Intelligence Report...
+                </>
+              ) : (
+                <>
+                  Generate Intelligence Report
+                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ RECENT REPORTS ═══ */}
+      {recentReports.length > 0 && (
+        <div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 14, letterSpacing: '-0.01em' }}>
+            Recent Reports
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {recentReports.map(report => {
+              const type = REPORT_TYPES.find(t => t.id === report.report_type);
+              const isComplete = report.status === 'complete';
+              const date = new Date(report.created_at);
+              const timeAgo = getTimeAgo(date);
+
+              return (
+                <div key={report.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '14px 18px', borderRadius: 14,
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  transition: 'all 0.2s',
+                  cursor: 'pointer',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 18 }}>{type?.emoji || '📄'}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+                        {type?.name || 'Report'} — {report.county}, {report.state}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+                        {report.crops?.join(', ')} · {timeAgo}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 100,
+                      background: isComplete ? 'rgba(5,150,105,0.1)' : 'rgba(201,168,76,0.1)',
+                      color: isComplete ? C.emeraldLight : C.gold,
+                    }}>
+                      {isComplete ? '✓ Complete' : '⏳ Processing'}
+                    </span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                      stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round"
+                    >
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        select option { background: #0C1F17; color: #fff; }
+      `}</style>
     </div>
   );
 }
 
-
-// ── Simple Markdown Renderer ────────────────────────────────────────────────
-
-function MarkdownRenderer({ content }: { content: string }) {
-  // Simple markdown-to-html conversion for report content
-  const html = content
-    // Headers
-    .replace(/^### (.+)$/gm, '<h4 class="text-emerald-400 font-semibold mt-4 mb-2">$1</h4>')
-    .replace(/^#### (.+)$/gm, '<h5 class="text-gray-300 font-medium mt-3 mb-1">$1</h5>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Bullet points
-    .replace(/^- (.+)$/gm, '<li class="text-gray-300 ml-4 mb-1 list-disc">$1</li>')
-    // Tables (basic)
-    .replace(/\|(.+)\|/g, (match) => {
-      const cells = match.split('|').filter(Boolean).map(c => c.trim());
-      if (cells.every(c => c.match(/^[-:]+$/))) return ''; // Skip separator rows
-      const tag = cells.every(c => c === c.toUpperCase() || c.match(/^[-:]+$/)) ? 'th' : 'td';
-      return `<tr>${cells.map(c => `<${tag} class="px-3 py-1.5 text-sm border border-white/[0.06]">${c}</${tag}>`).join('')}</tr>`;
-    })
-    // Paragraphs
-    .replace(/\n\n/g, '</p><p class="text-gray-300 text-sm leading-relaxed mb-3">')
-    // Line breaks
-    .replace(/\n/g, '<br/>');
-
-  return (
-    <div
-      className="text-gray-300 text-sm leading-relaxed [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:rounded-lg [&_table]:overflow-hidden [&_th]:bg-white/[0.05] [&_th]:text-gray-400 [&_th]:font-medium [&_th]:text-xs [&_td]:text-gray-300"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+// ─── Time ago helper ─────────────────────────────────────────────────────────
+function getTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return date.toLocaleDateString();
 }
