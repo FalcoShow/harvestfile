@@ -160,22 +160,18 @@ export async function POST(request: NextRequest) {
         .eq('id', reportRecordId);
 
       // Update quota
-      const month = new Date().toISOString().substring(0, 7); // '2026-03'
-      await supabase.rpc('increment_report_quota', { 
-        p_org_id: orgId, 
-        p_month: month,
-        p_report_type: reportReq.report_type,
-      }).catch(() => {
-        // Fallback: upsert directly
-        supabase
+      const month = new Date().toISOString().substring(0, 7);
+      try {
+        await supabase
           .from('report_quotas')
           .upsert({
             org_id: orgId,
             month,
             reports_generated: 1,
-            [`${reportReq.report_type.replace('_', '_')}_reports`]: 1,
           }, { onConflict: 'org_id,month' });
-      });
+      } catch (e) {
+        console.error('Quota update failed (non-critical):', e);
+      }
     }
 
     // ── Return the report ───────────────────────────────────────────────
