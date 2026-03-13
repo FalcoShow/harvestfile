@@ -14,10 +14,10 @@ export interface AgWeatherForecast {
   location: { lat: number; lng: number; elevation?: number };
   daily: DailyWeather[];
   hourly_summary: {
-    frost_risk_hours: number;      // Hours below 32°F in next 7 days
-    heat_stress_hours: number;     // Hours above 95°F
+    frost_risk_hours: number;
+    heat_stress_hours: number;
     total_precipitation_mm: number;
-    growing_degree_days: number;   // GDD accumulation (base 50°F)
+    growing_degree_days: number;
   };
   soil: SoilData[];
   alerts: WeatherAlert[];
@@ -35,17 +35,17 @@ export interface DailyWeather {
   humidity_mean: number;
   sunshine_hours: number;
   uv_index_max: number;
-  et0_mm: number;                 // Reference evapotranspiration
-  gdd_base50: number;             // Growing degree days (base 50°F)
-  frost_risk: boolean;            // Min temp <= 32°F
-  conditions: string;             // Human-readable summary
+  et0_mm: number;
+  gdd_base50: number;
+  frost_risk: boolean;
+  conditions: string;
 }
 
 export interface SoilData {
   date: string;
-  soil_temp_2in_f: number;        // 2 inch depth
-  soil_temp_6in_f: number;        // 6 inch depth  
-  soil_moisture_0_4in: number;    // Volumetric water content (m³/m³)
+  soil_temp_2in_f: number;
+  soil_temp_6in_f: number;
+  soil_moisture_0_4in: number;
   soil_moisture_4_16in: number;
 }
 
@@ -66,8 +66,8 @@ export interface HistoricalWeatherSummary {
   climate_normals: {
     avg_annual_precip_mm: number;
     avg_growing_season_days: number;
-    avg_first_frost: string;        // Avg date of first fall frost
-    avg_last_frost: string;         // Avg date of last spring frost
+    avg_first_frost: string;
+    avg_last_frost: string;
     avg_gdd_accumulation: number;
   };
 }
@@ -80,7 +80,7 @@ export interface AnnualSummary {
   min_temp_f: number;
   frost_free_days: number;
   total_gdd_base50: number;
-  drought_days: number;           // Days with soil moisture < 0.15 m³/m³
+  drought_days: number;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -109,7 +109,6 @@ function getWeatherCondition(precip: number, cloudCover: number, windSpeed: numb
 // ═════════════════════════════════════════════════════════════════════════════
 
 export async function getAgForecast(lat: number, lng: number): Promise<AgWeatherForecast> {
-  // Fetch forecast from Open-Meteo with ag-specific variables
   const params = new URLSearchParams({
     latitude: lat.toString(),
     longitude: lng.toString(),
@@ -136,7 +135,7 @@ export async function getAgForecast(lat: number, lng: number): Promise<AgWeather
   });
 
   const forecastRes = await fetch(`${OPEN_METEO_BASE}/forecast?${params}`, {
-    next: { revalidate: 1800 } // Cache 30 min
+    next: { revalidate: 1800 }
   });
 
   if (!forecastRes.ok) {
@@ -147,7 +146,6 @@ export async function getAgForecast(lat: number, lng: number): Promise<AgWeather
   const daily = data.daily;
   const hourly = data.hourly;
 
-  // Process daily forecasts
   const dailyWeather: DailyWeather[] = [];
   let totalPrecip = 0;
   let totalGDD = 0;
@@ -183,7 +181,7 @@ export async function getAgForecast(lat: number, lng: number): Promise<AgWeather
       frost_risk: minF <= 32,
       conditions: getWeatherCondition(
         precip,
-        50, // Default cloud cover estimate
+        50,
         daily.wind_speed_10m_max[i] || 0
       ),
     });
@@ -191,7 +189,9 @@ export async function getAgForecast(lat: number, lng: number): Promise<AgWeather
 
   // Count frost/heat hours from hourly data
   if (hourly?.temperature_2m) {
-    for (const tempC of hourly.temperature_2m) {
+    const temps = hourly.temperature_2m as number[];
+    for (let i = 0; i < temps.length; i++) {
+      const tempC = temps[i];
       if (tempC !== null) {
         const tempF = celsiusToFahrenheit(tempC);
         if (tempF <= 32) frostHours++;
@@ -231,7 +231,6 @@ export async function getAgForecast(lat: number, lng: number): Promise<AgWeather
     }
   }
 
-  // Fetch NWS alerts
   const alerts = await getNWSAlerts(lat, lng);
 
   return {
@@ -259,7 +258,7 @@ async function getNWSAlerts(lat: number, lng: number): Promise<WeatherAlert[]> {
       `${NWS_BASE}/alerts/active?point=${lat},${lng}`,
       {
         headers: { 'User-Agent': '(HarvestFile, contact@harvestfile.com)' },
-        next: { revalidate: 900 } // 15 min
+        next: { revalidate: 900 }
       }
     );
 
@@ -276,7 +275,7 @@ async function getNWSAlerts(lat: number, lng: number): Promise<WeatherAlert[]> {
       sender: f.properties.senderName,
     }));
   } catch {
-    return []; // Don't fail the whole forecast if alerts fail
+    return [];
   }
 }
 
@@ -292,7 +291,7 @@ export async function getHistoricalWeather(opts: {
   endYear?: number;
 }): Promise<HistoricalWeatherSummary> {
   const endYear = opts.endYear || new Date().getFullYear() - 1;
-  const startYear = opts.startYear || endYear - 9; // Last 10 years
+  const startYear = opts.startYear || endYear - 9;
 
   const params = new URLSearchParams({
     latitude: opts.lat.toString(),
@@ -309,7 +308,7 @@ export async function getHistoricalWeather(opts: {
   });
 
   const res = await fetch(`${OPEN_METEO_ARCHIVE}/era5?${params}`, {
-    next: { revalidate: 86400 } // Cache 24 hours — historical doesn't change
+    next: { revalidate: 86400 }
   });
 
   if (!res.ok) {
@@ -319,8 +318,8 @@ export async function getHistoricalWeather(opts: {
   const data = await res.json();
   const daily = data.daily;
 
-  // Aggregate by year
-  const yearMap = new Map<number, {
+  // Aggregate by year — using object instead of Map to avoid iteration issues
+  const yearObj: Record<number, {
     temps: number[];
     maxTemps: number[];
     minTemps: number[];
@@ -330,7 +329,7 @@ export async function getHistoricalWeather(opts: {
     droughtDays: number;
     lastSpringFrost: string;
     firstFallFrost: string;
-  }>();
+  }> = {};
 
   for (let i = 0; i < daily.time.length; i++) {
     const date = daily.time[i];
@@ -338,44 +337,41 @@ export async function getHistoricalWeather(opts: {
     const month = parseInt(date.substring(5, 7));
     const maxC = daily.temperature_2m_max[i];
     const minC = daily.temperature_2m_min[i];
-    
+
     if (maxC === null || minC === null) continue;
 
     const maxF = celsiusToFahrenheit(maxC);
     const minF = celsiusToFahrenheit(minC);
     const avgF = (maxF + minF) / 2;
-    
-    if (!yearMap.has(year)) {
-      yearMap.set(year, {
+
+    if (!yearObj[year]) {
+      yearObj[year] = {
         temps: [], maxTemps: [], minTemps: [],
         precip: 0, frostFreeDays: 0, gdd: 0,
         droughtDays: 0, lastSpringFrost: '', firstFallFrost: '',
-      });
+      };
     }
 
-    const entry = yearMap.get(year)!;
+    const entry = yearObj[year];
     entry.temps.push(avgF);
     entry.maxTemps.push(maxF);
     entry.minTemps.push(minF);
     entry.precip += daily.precipitation_sum[i] || 0;
-    
+
     if (minF > 32) entry.frostFreeDays++;
-    
-    // GDD only during growing season (April-October)
+
     if (month >= 4 && month <= 10) {
       entry.gdd += calcGDD(maxF, minF);
     }
 
-    // Drought: soil moisture below threshold
     const soilMoisture = daily.soil_moisture_0_to_7cm_mean?.[i];
     if (soilMoisture !== null && soilMoisture !== undefined && soilMoisture < 0.15) {
       entry.droughtDays++;
     }
 
-    // Track frost dates
     if (minF <= 32) {
-      if (month <= 6) entry.lastSpringFrost = date; // Keep updating through spring
-      if (month >= 8 && !entry.firstFallFrost) entry.firstFallFrost = date; // First fall frost
+      if (month <= 6) entry.lastSpringFrost = date;
+      if (month >= 8 && !entry.firstFallFrost) entry.firstFallFrost = date;
     }
   }
 
@@ -386,8 +382,14 @@ export async function getHistoricalWeather(opts: {
   let totalPrecip = 0;
   let totalGrowingDays = 0;
   let totalGDD = 0;
+  let yearCount = 0;
 
-  for (const [year, entry] of yearMap) {
+  const years = Object.keys(yearObj).map(Number);
+  for (let yi = 0; yi < years.length; yi++) {
+    const year = years[yi];
+    const entry = yearObj[year];
+    yearCount++;
+
     const avgTemp = entry.temps.reduce((a, b) => a + b, 0) / entry.temps.length;
 
     annualSummaries.push({
@@ -408,7 +410,7 @@ export async function getHistoricalWeather(opts: {
     totalGDD += entry.gdd;
   }
 
-  const yearCount = yearMap.size || 1;
+  if (yearCount === 0) yearCount = 1;
 
   return {
     location: { lat: opts.lat, lng: opts.lng },
@@ -418,7 +420,7 @@ export async function getHistoricalWeather(opts: {
       avg_annual_precip_mm: Math.round(totalPrecip / yearCount),
       avg_growing_season_days: Math.round(totalGrowingDays / yearCount),
       avg_first_frost: allFirstFrost.length > 0
-        ? allFirstFrost.sort()[Math.floor(allFirstFrost.length / 2)] // Median
+        ? allFirstFrost.sort()[Math.floor(allFirstFrost.length / 2)]
         : 'N/A',
       avg_last_frost: allLastFrost.length > 0
         ? allLastFrost.sort()[Math.floor(allLastFrost.length / 2)]
@@ -442,7 +444,7 @@ export interface PlantingWindow {
   soil_temp_needed_f: number;
   frost_risk_level: 'low' | 'moderate' | 'high';
   days_until_safe: number;
-  confidence: number;            // 0-100
+  confidence: number;
   recommendation: string;
 }
 
@@ -452,12 +454,11 @@ export async function analyzePlantingWindows(opts: {
   crops: string[];
 }): Promise<PlantingWindow[]> {
   const forecast = await getAgForecast(opts.lat, opts.lng);
-  
-  // Crop-specific soil temp thresholds (°F)
+
   const cropThresholds: Record<string, { soilTemp: number; optimalStart: string; optimalEnd: string }> = {
     'CORN': { soilTemp: 50, optimalStart: 'Apr 15', optimalEnd: 'May 20' },
     'SOYBEANS': { soilTemp: 50, optimalStart: 'May 1', optimalEnd: 'Jun 10' },
-    'WHEAT': { soilTemp: 40, optimalStart: 'Sep 15', optimalEnd: 'Oct 25' }, // Winter wheat
+    'WHEAT': { soilTemp: 40, optimalStart: 'Sep 15', optimalEnd: 'Oct 25' },
     'SPRING WHEAT': { soilTemp: 38, optimalStart: 'Mar 20', optimalEnd: 'Apr 30' },
     'OATS': { soilTemp: 40, optimalStart: 'Mar 15', optimalEnd: 'Apr 20' },
     'COTTON': { soilTemp: 65, optimalStart: 'May 1', optimalEnd: 'Jun 1' },
@@ -469,24 +470,23 @@ export async function analyzePlantingWindows(opts: {
   const windows: PlantingWindow[] = [];
   const currentSoilTemp = forecast.soil.length > 0 ? forecast.soil[0].soil_temp_2in_f : 45;
 
-  for (const crop of opts.crops) {
+  for (let ci = 0; ci < opts.crops.length; ci++) {
+    const crop = opts.crops[ci];
     const key = crop.toUpperCase();
     const threshold = cropThresholds[key] || { soilTemp: 50, optimalStart: 'May 1', optimalEnd: 'Jun 1' };
-    
+
     const soilReady = currentSoilTemp >= threshold.soilTemp;
-    
-    // Calculate days until soil temp reaches threshold
+
     let daysUntilSafe = 0;
     if (!soilReady) {
-      for (const soil of forecast.soil) {
+      for (let si = 0; si < forecast.soil.length; si++) {
         daysUntilSafe++;
-        if (soil.soil_temp_2in_f >= threshold.soilTemp) break;
+        if (forecast.soil[si].soil_temp_2in_f >= threshold.soilTemp) break;
       }
     }
 
-    // Check frost risk in next 14 days
     const frostDays = forecast.daily.filter(d => d.frost_risk).length;
-    const frostRisk: 'low' | 'moderate' | 'high' = 
+    const frostRisk: 'low' | 'moderate' | 'high' =
       frostDays === 0 ? 'low' : frostDays <= 3 ? 'moderate' : 'high';
 
     const confidence = soilReady && frostRisk === 'low' ? 85 :
