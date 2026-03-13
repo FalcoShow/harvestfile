@@ -19,6 +19,20 @@ function IconDashboard({ className }: { className?: string }) {
   );
 }
 
+function IconIntelligence({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8Z" />
+      <path d="M12 2v4" />
+      <path d="m4.9 4.9 2.8 2.8" />
+      <path d="M2 12h4" />
+      <path d="m16.3 4.9 2.8 2.8" />
+      <path d="M18 12h4" />
+      <path d="M10 22h4" />
+    </svg>
+  );
+}
+
 function IconFarmers({ className }: { className?: string }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -119,6 +133,7 @@ function IconX({ className }: { className?: string }) {
 
 const mainNav = [
   { label: "Dashboard", href: "/dashboard", icon: IconDashboard },
+  { label: "Intelligence", href: "/dashboard/intelligence", icon: IconIntelligence },
   { label: "Farmers", href: "/dashboard/farmers", icon: IconFarmers },
   { label: "Calculator", href: "/dashboard/calculator", icon: IconCalculator },
   { label: "Reports", href: "/dashboard/reports", icon: IconReports },
