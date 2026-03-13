@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginForm() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,7 +52,6 @@ export default function LoginPage() {
 
         if (error) throw error;
 
-        // Successful login — redirect
         window.location.href = redirect;
       }
     } catch (err: any) {
@@ -84,7 +83,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0a0f0d] flex">
       {/* ── Left Panel — Branding ── */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-900/40 to-[#0a0f0d] items-center justify-center p-12 relative overflow-hidden">
-        {/* Decorative grid */}
         <div className="absolute inset-0 opacity-[0.03]">
           <div
             className="w-full h-full"
@@ -150,7 +148,6 @@ export default function LoginPage() {
       {/* ── Right Panel — Auth Form ── */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          {/* Logo on mobile */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
               <svg
@@ -198,7 +195,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* ── Google OAuth ── */}
           <button
             onClick={handleGoogleAuth}
             disabled={loading}
@@ -231,7 +227,6 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          {/* ── Email/Password Form ── */}
           <div className="space-y-4">
             {mode === 'signup' && (
               <div>
@@ -325,5 +320,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0a0f0d]" />}>
+      <LoginForm />
+    </Suspense>
   );
 }
