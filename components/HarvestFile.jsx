@@ -334,40 +334,53 @@ export default function HarvestFile() {
         </div>
       </nav>
 
-      {/* ═══ HOME ═══ */}
+      {/* ═══ HOME — CONVERSION-FOCUSED LANDING PAGE ═══ */}
       {view === "home" && (<>
-        {/* HERO */}
-        <section style={{ position: "relative", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 40%, ${C.forest} 100%)`, padding: "140px 24px 150px", overflow: "hidden", minHeight: "92vh", display: "flex", alignItems: "center" }}>
+        {/* ──── HERO: PAIN-DRIVEN ──── */}
+        <section style={{ position: "relative", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 40%, ${C.forest} 100%)`, padding: "140px 24px 120px", overflow: "hidden", minHeight: "92vh", display: "flex", alignItems: "center" }}>
           <div style={noise} />
           <div style={{ position: "absolute", top: "5%", left: "8%", width: 520, height: 520, background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 60%)", filter: "blur(80px)", pointerEvents: "none" }} />
           <div style={{ position: "absolute", bottom: "8%", right: "3%", width: 600, height: 600, background: "radial-gradient(circle, rgba(5,150,105,0.07) 0%, transparent 55%)", filter: "blur(100px)", pointerEvents: "none" }} />
 
           <div style={{ maxWidth: 1120, margin: "0 auto", display: "flex", gap: 64, alignItems: "center", position: "relative", zIndex: 2, flexWrap: "wrap" }}>
+            {/* LEFT COLUMN — Copy */}
             <div style={{ flex: "1 1 480px", opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(20px)", transition: "all 0.8s cubic-bezier(.25,.1,.25,1)" }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)", borderRadius: 100, padding: "5px 14px 5px 6px", marginBottom: 32, animation: mounted ? "hf-fade-up 0.6s ease 0.1s both" : "none" }}>
                 <PulseDot color={C.emerald} size={7} />
                 <span style={{ fontSize: 12, fontWeight: 600, color: C.gold }}>Updated for the 2025 One Big Beautiful Bill Act</span>
               </div>
-              <h1 style={{ fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 800, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.035em", marginBottom: 24, animation: mounted ? "hf-fade-up 0.7s ease 0.2s both" : "none" }}>
-                Know exactly what<br />your farm<span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic", color: C.gold }}> is owed</span>
+
+              <h1 style={{ fontSize: "clamp(38px, 5vw, 62px)", fontWeight: 800, color: "#fff", lineHeight: 1.05, letterSpacing: "-0.035em", marginBottom: 24, animation: mounted ? "hf-fade-up 0.7s ease 0.2s both" : "none" }}>
+                Your farm is owed<br /><span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic", color: C.gold }}>thousands</span> you&apos;re<br />not collecting
               </h1>
-              <p style={{ fontSize: 17, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, marginBottom: 40, maxWidth: 440, fontWeight: 400, animation: mounted ? "hf-fade-up 0.7s ease 0.35s both" : "none" }}>
-                Compare ARC-CO and PLC payments for your exact county using live USDA data. See which program puts more money in your pocket.
+
+              <p style={{ fontSize: 17, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, marginBottom: 20, maxWidth: 460, fontWeight: 400, animation: mounted ? "hf-fade-up 0.7s ease 0.35s both" : "none" }}>
+                Most farmers pick the wrong ARC/PLC program — or never enroll at all. Our AI analyzes your exact county data and tells you which program puts the most money in your pocket.
               </p>
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", animation: mounted ? "hf-fade-up 0.7s ease 0.5s both" : "none" }}>
-                <button onClick={goCalc} className="hf-btn-hover hf-shimmer-btn" style={{ background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldBright}, ${C.gold}, ${C.goldDim})`, backgroundSize: "200% auto", color: C.dark, fontSize: 15, fontWeight: 700, padding: "16px 32px", borderRadius: 14, border: "none", cursor: "pointer", boxShadow: "0 6px 28px rgba(201,168,76,0.2)", letterSpacing: "-0.01em" }}>Calculate My Payment</button>
-                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.25)", fontWeight: 500 }}>Free · No signup · All 50 states</span>
+
+              {/* Urgency line */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 36, animation: mounted ? "hf-fade-up 0.7s ease 0.42s both" : "none" }}>
+                <div style={{ width: 6, height: 6, borderRadius: 100, background: "#EF4444", animation: "hf-pulse 1.5s ease-in-out infinite" }} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>2025 enrollment deadline approaching — don&apos;t leave money on the table</span>
               </div>
+
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", animation: mounted ? "hf-fade-up 0.7s ease 0.5s both" : "none" }}>
+                <button onClick={goCalc} className="hf-btn-hover hf-shimmer-btn" style={{ background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldBright}, ${C.gold}, ${C.goldDim})`, backgroundSize: "200% auto", color: C.dark, fontSize: 15, fontWeight: 700, padding: "16px 32px", borderRadius: 14, border: "none", cursor: "pointer", boxShadow: "0 6px 28px rgba(201,168,76,0.2)", letterSpacing: "-0.01em" }}>See What You&apos;re Owed — Free</button>
+                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.25)", fontWeight: 500 }}>60 seconds · No signup</span>
+              </div>
+
+              {/* Mini stats */}
               <div style={{ marginTop: 52, display: "flex", gap: 36, flexWrap: "wrap", animation: mounted ? "hf-fade-up 0.7s ease 0.65s both" : "none" }}>
-                {[["3,100+", "Calculations run"], ["50", "States covered"], ["$8,200", "Avg. savings found"]].map(([v, l]) => (<div key={l}><div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.03em" }}>{v}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: 600, marginTop: 3, letterSpacing: "0.03em", textTransform: "uppercase" }}>{l}</div></div>))}
+                {[["$8,200", "Avg. savings found"], ["3,100+", "Farms analyzed"], ["50", "States covered"]].map(([v, l]) => (<div key={l}><div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.03em" }}>{v}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: 600, marginTop: 3, letterSpacing: "0.03em", textTransform: "uppercase" }}>{l}</div></div>))}
               </div>
             </div>
-            {/* Hero card */}
+
+            {/* RIGHT COLUMN — Hero Card */}
             <div className="hf-float" style={{ flex: "1 1 380px", maxWidth: 420, position: "relative", opacity: mounted ? 1 : 0, transition: "opacity 1s ease 0.6s" }}>
               <div className="hf-glow-ring" style={{ position: "absolute", top: "50%", left: "50%", width: "110%", height: "110%", background: "conic-gradient(from 0deg, rgba(201,168,76,0.15), rgba(5,150,105,0.1), rgba(201,168,76,0.05), rgba(5,150,105,0.15), rgba(201,168,76,0.15))", borderRadius: 28, filter: "blur(32px)", opacity: 0.5 }} />
               <div style={{ position: "relative", background: "rgba(12,31,23,0.65)", backdropFilter: "blur(40px)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32, boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.04), 0 24px 64px rgba(0,0,0,0.3)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Delaware Co., OH · Corn</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Wayne Co., OH · Corn</div>
                   <div style={{ background: C.emerald, color: "#fff", fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 6 }}>RECOMMENDED</div>
                 </div>
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", fontWeight: 500, marginBottom: 4 }}>ARC-CO Estimated Payment</div>
@@ -387,33 +400,200 @@ export default function HarvestFile() {
           </div>
         </section>
 
-        {/* STATS */}
+        {/* ──── STATS BAR ──── */}
         <section style={{ background: C.white, padding: "56px 24px", borderBottom: "1px solid rgba(0,0,0,0.04)" }}>
           <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 32 }}>
-            <StatCounter value={3147} label="Calculations" />
-            <StatCounter value={50} label="States" />
-            <StatCounter value={8200} prefix="$" label="Avg Savings" />
-            <StatCounter value={88} label="OH Counties" suffix="+" />
+            <StatCounter value={3147} label="Farms Analyzed" />
+            <StatCounter value={50} label="States Covered" />
+            <StatCounter value={8200} prefix="$" label="Avg Savings Found" />
+            <StatCounter value={16} label="Crop Programs" />
           </div>
         </section>
 
-        {/* FEATURES */}
-        <section id="features" style={{ padding: "108px 24px 100px", background: C.cream, scrollMarginTop: 80 }}>
+        {/* ──── THE PROBLEM — PAIN AMPLIFICATION ──── */}
+        <section style={{ padding: "100px 24px 96px", background: C.cream }}>
+          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+            <Reveal>
+              <div style={{ textAlign: "center", marginBottom: 60 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#DC2626", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 14 }}>The Problem</div>
+                <h2 style={{ fontSize: "clamp(28px, 3.8vw, 46px)", fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 18 }}>
+                  Billions in farm payments go<br /><span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic" }}>unclaimed every year</span>
+                </h2>
+                <p style={{ fontSize: 16, color: C.textSoft, lineHeight: 1.7, maxWidth: 580, margin: "0 auto" }}>
+                  USDA programs are complicated by design. The wrong ARC vs PLC choice costs the average farm thousands annually — and most farmers don&apos;t have the data to make the right call.
+                </p>
+              </div>
+            </Reveal>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {[
+                { num: "62%", label: "of eligible farms", desc: "receive zero ARC/PLC payments due to wrong enrollment or no enrollment at all", color: "#DC2626" },
+                { num: "$3B+", label: "left on the table", desc: "in unclaimed or sub-optimal program payments across American farms annually", color: C.gold },
+                { num: "47 pages", label: "of FSA rules", desc: "that determine your payment — updated again under the 2025 OBBBA. We read them so you don't have to.", color: C.emerald },
+              ].map((item, i) => (
+                <Reveal key={i} delay={i * 100}>
+                  <div className="hf-card-hover" style={{ background: C.white, borderRadius: 20, padding: "32px 24px", border: "1px solid rgba(0,0,0,0.05)", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                    <div style={{ fontSize: 42, fontWeight: 800, color: item.color, letterSpacing: "-0.04em", lineHeight: 1, marginBottom: 6 }}>{item.num}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.forest, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>{item.label}</div>
+                    <div style={{ fontSize: 13.5, color: C.textSoft, lineHeight: 1.6 }}>{item.desc}</div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ──── FREE CALCULATOR HOOK ──── */}
+        <section style={{ position: "relative", padding: "100px 24px", background: C.dark, overflow: "hidden" }}>
+          <div style={noise} />
+          <div style={{ position: "absolute", top: "30%", left: "50%", width: 600, height: 600, background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 55%)", transform: "translateX(-50%)", filter: "blur(80px)", pointerEvents: "none" }} />
+          <div style={{ maxWidth: 720, margin: "0 auto", position: "relative", zIndex: 2, textAlign: "center" }}>
+            <Reveal>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)", borderRadius: 100, padding: "5px 14px 5px 6px", marginBottom: 28 }}>
+                <PulseDot color={C.gold} size={6} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.gold }}>FREE INSTANT ANALYSIS</span>
+              </div>
+              <h2 style={{ fontSize: "clamp(30px, 4vw, 48px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>
+                Find out what you&apos;re owed.<br /><span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic", color: C.gold }}>In 60 seconds.</span>
+              </h2>
+              <p style={{ fontSize: 16, color: "rgba(255,255,255,0.4)", lineHeight: 1.65, marginBottom: 40, maxWidth: 520, margin: "0 auto 40px" }}>
+                Enter your state, county, and crop. Our calculator pulls live USDA yield data and shows you the exact dollar difference between ARC-CO and PLC for your farm.
+              </p>
+              <button onClick={goCalc} className="hf-btn-hover hf-shimmer-btn" style={{ background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldBright}, ${C.gold}, ${C.goldDim})`, backgroundSize: "200% auto", color: C.dark, fontSize: 16, fontWeight: 700, padding: "18px 40px", borderRadius: 14, border: "none", cursor: "pointer", boxShadow: "0 8px 32px rgba(201,168,76,0.2)" }}>Calculate My Payment — Free →</button>
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 24, flexWrap: "wrap" }}>
+                {["No signup required", "All 50 states", "Real USDA data"].map((t) => (
+                  <span key={t} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "rgba(255,255,255,0.25)" }}>
+                    <svg width="12" height="12" viewBox="0 0 20 20" fill={C.emerald}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ──── THE $39 REPORT — THE PRODUCT ──── */}
+        <section style={{ padding: "108px 24px 100px", background: C.cream }}>
+          <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+            <Reveal>
+              <div style={{ textAlign: "center", marginBottom: 56 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.emerald, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 14 }}>Your Complete Analysis</div>
+                <h2 style={{ fontSize: "clamp(28px, 3.8vw, 46px)", fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>
+                  Take the guesswork out<br /><span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic" }}>permanently</span>
+                </h2>
+                <p style={{ fontSize: 16, color: C.textSoft, lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
+                  Our AI-powered Farm Program Report analyzes your specific operation and generates a professional document you can take straight to your FSA office.
+                </p>
+              </div>
+            </Reveal>
+
+            <Reveal delay={100}>
+              <div style={{ background: C.white, borderRadius: 28, border: "2px solid rgba(5,150,105,0.1)", overflow: "hidden", boxShadow: "0 8px 48px rgba(0,0,0,0.04)" }}>
+                {/* Gradient top bar */}
+                <div style={{ height: 4, background: `linear-gradient(90deg, ${C.emerald}, ${C.gold}, ${C.emerald})` }} />
+                <div style={{ padding: "48px 44px 52px" }}>
+                  <div style={{ display: "flex", gap: 48, alignItems: "flex-start", flexWrap: "wrap" }}>
+                    {/* Left — What's included */}
+                    <div style={{ flex: "1 1 340px" }}>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(5,150,105,0.06)", border: "1px solid rgba(5,150,105,0.12)", borderRadius: 100, padding: "4px 12px 4px 6px", marginBottom: 20 }}>
+                        <PulseDot color={C.emerald} size={6} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: C.emerald }}>AI-POWERED</span>
+                      </div>
+                      <h3 style={{ fontSize: 28, fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", lineHeight: 1.15, marginBottom: 20 }}>
+                        Personalized Farm<br />Program Report
+                      </h3>
+                      {[
+                        ["📊", "ARC-CO vs PLC deep analysis", "Dollar-for-dollar comparison with your county's actual yield history"],
+                        ["🎯", "5 price scenario projections", "See how your payment changes under different market conditions"],
+                        ["📝", "Exact forms checklist", "Every FSA form you need, pre-identified for your situation"],
+                        ["📅", "Deadline calendar", "Key dates so you never miss an enrollment window"],
+                        ["🏛️", "FSA office prep guide", "Walk in prepared with the right questions and documents"],
+                      ].map(([icon, title, desc], i) => (
+                        <div key={i} style={{ display: "flex", gap: 14, marginBottom: 18 }}>
+                          <div style={{ fontSize: 22, lineHeight: 1, flexShrink: 0, marginTop: 2 }}>{icon}</div>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: C.forest, marginBottom: 2 }}>{title}</div>
+                            <div style={{ fontSize: 13, color: C.textSoft, lineHeight: 1.5 }}>{desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Right — Pricing card */}
+                    <div style={{ flex: "0 0 300px", background: C.cream, borderRadius: 22, padding: "36px 28px", border: "1px solid rgba(0,0,0,0.05)", textAlign: "center" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>One-Time Payment</div>
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 4, marginBottom: 6 }}>
+                        <span style={{ fontSize: 52, fontWeight: 800, color: C.forest, letterSpacing: "-0.04em", lineHeight: 1 }}>$39</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: C.textSoft, marginBottom: 24, lineHeight: 1.5 }}>
+                        Pays for itself 200x over<br />when you pick the right program
+                      </div>
+                      <button onClick={goCalc} className="hf-btn-hover" style={{ width: "100%", background: C.forest, color: "#fff", fontSize: 15, fontWeight: 700, padding: "16px 24px", borderRadius: 14, border: "none", cursor: "pointer", boxShadow: "0 4px 20px rgba(27,67,50,0.15)", marginBottom: 16 }}>
+                        Get My Report →
+                      </button>
+                      <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
+                        Run the free calculator first, then upgrade to your full report from the results page
+                      </div>
+                      <div style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid rgba(0,0,0,0.05)", display: "flex", flexDirection: "column", gap: 8 }}>
+                        {["Instant PDF download", "County-specific USDA data", "Take to your FSA office"].map((t) => (
+                          <span key={t} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.sage, justifyContent: "center" }}>
+                            <svg width="12" height="12" viewBox="0 0 20 20" fill={C.emerald}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ──── HOW IT WORKS — SIMPLIFIED ──── */}
+        <section id="how-it-works" style={{ padding: "92px 24px 100px", background: C.white, scrollMarginTop: 80 }}>
+          <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+            <Reveal>
+              <div style={{ textAlign: "center", marginBottom: 64 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 12 }}>How It Works</div>
+                <h2 style={{ fontSize: "clamp(28px, 3.5vw, 42px)", fontWeight: 800, color: C.forest, letterSpacing: "-0.03em" }}>Three steps. <span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic" }}>Real money.</span></h2>
+              </div>
+            </Reveal>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0, position: "relative" }}>
+              <div style={{ position: "absolute", top: 40, left: "16.66%", right: "16.66%", height: 2, background: `linear-gradient(90deg, ${C.gold}22, ${C.gold}88, ${C.gold}22)`, zIndex: 0 }} />
+              {[
+                { n: "01", t: "Run the free calculator", d: "Enter your state, county, and crop. We pull real USDA data and show you ARC-CO vs PLC side-by-side." },
+                { n: "02", t: "See the money difference", d: "Get an instant dollar estimate showing which program pays more for your specific farm." },
+                { n: "03", t: "Get your full report", d: "Upgrade to the $39 AI report for detailed projections, forms checklist, and an FSA office game plan." },
+              ].map((s, i) => (
+                <Reveal key={i} delay={i * 120}>
+                  <div style={{ textAlign: "center", position: "relative", zIndex: 1, padding: "0 24px" }}>
+                    <div style={{ width: 80, height: 80, borderRadius: 20, background: i === 2 ? C.forest : C.cream, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", border: `3px solid ${C.white}`, boxShadow: "0 4px 20px rgba(0,0,0,0.06)" }}><span style={{ fontSize: 24, fontWeight: 800, color: i === 2 ? C.gold : C.forest, letterSpacing: "-0.04em" }}>{s.n}</span></div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: C.forest, letterSpacing: "-0.02em", marginBottom: 8 }}>{s.t}</div>
+                    <div style={{ fontSize: 14, color: C.textSoft, lineHeight: 1.65, maxWidth: 280, margin: "0 auto" }}>{s.d}</div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ──── FEATURES GRID ──── */}
+        <section id="features" style={{ padding: "100px 24px 96px", background: C.cream, scrollMarginTop: 80 }}>
           <div style={{ maxWidth: 1120, margin: "0 auto" }}>
             <Reveal>
               <div style={{ marginBottom: 56 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 12 }}>What We Do</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 12 }}>Built for Farmers</div>
                 <h2 style={{ fontSize: "clamp(28px, 3.5vw, 44px)", fontWeight: 800, color: C.forest, letterSpacing: "-0.03em", lineHeight: 1.1, maxWidth: 500 }}>Government data,<br /><span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic" }}>finally useful</span></h2>
               </div>
             </Reveal>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
               {[
                 { icon: "📊", title: "ARC/PLC Decision Calculator", desc: "Side-by-side payment comparison using your county's real yield history. Updated for 2025 OBBBA rules.", acc: C.gold, action: goCalc },
-                { icon: "🗺️", title: "Nationwide Coverage", desc: "Every state and county in the US. Real-time NASS data for all 16 ARC/PLC covered commodities — grains, oilseeds, cotton, rice, and more.", acc: C.emerald },
-                { icon: "🔔", title: "Price Alerts", desc: "Get notified when MYA prices finalize and your payment estimates change.", acc: C.gold },
-                { icon: "📋", title: "Eligibility Screener", desc: "Answer 7 questions to find which USDA programs you qualify for — ARC/PLC, EQIP, CRP, and more.", acc: C.sage },
-                { icon: "📱", title: "Mobile-First Design", desc: "Built for the field, the co-op, and the tractor cab. Fast on rural connections.", acc: C.forest },
-                { icon: "🔒", title: "Private & Secure", desc: "Your farm data stays in your browser. We never sell or share your information.", acc: C.emerald },
+                { icon: "🗺️", title: "All 50 States · 16 Crops", desc: "Every state and county in the US. Real-time NASS data for all ARC/PLC covered commodities — grains, oilseeds, cotton, rice, and more.", acc: C.emerald },
+                { icon: "🤖", title: "AI-Powered Reports", desc: "Claude AI analyzes your farm data and generates a professional PDF with projections, risk scenarios, and an FSA prep guide. $39 one-time.", acc: C.forest },
+                { icon: "🔔", title: "Price Alerts", desc: "Get notified when MYA prices finalize and your payment estimates change. Never miss a deadline.", acc: C.gold },
+                { icon: "📱", title: "Built for the Field", desc: "Mobile-first design that works on rural connections. Use it in the tractor cab, at the co-op, or in the FSA waiting room.", acc: C.sage },
+                { icon: "🔒", title: "Private & Secure", desc: "Your farm data stays yours. We never sell, share, or store your information. Run calculations anonymously.", acc: C.emerald },
               ].map((f, i) => (
                 <Reveal key={i} delay={i * 70}>
                   <div className="hf-card-hover" onClick={f.action} style={{ background: C.white, borderRadius: 20, padding: "28px 24px", border: "1px solid rgba(0,0,0,0.05)", display: "flex", flexDirection: "column", boxShadow: "0 2px 8px rgba(0,0,0,0.02)", cursor: f.action ? "pointer" : "default", minHeight: 200 }}>
@@ -428,59 +608,65 @@ export default function HarvestFile() {
           </div>
         </section>
 
-        {/* HOW IT WORKS */}
-        <section id="how-it-works" style={{ padding: "92px 24px 100px", background: C.white, scrollMarginTop: 80 }}>
-          <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-            <Reveal>
-              <div style={{ textAlign: "center", marginBottom: 64 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 12 }}>How It Works</div>
-                <h2 style={{ fontSize: "clamp(28px, 3.5vw, 42px)", fontWeight: 800, color: C.forest, letterSpacing: "-0.03em" }}>Three inputs. <span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic" }}>Real numbers.</span></h2>
-              </div>
-            </Reveal>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0, position: "relative" }}>
-              <div style={{ position: "absolute", top: 40, left: "16.66%", right: "16.66%", height: 2, background: `linear-gradient(90deg, ${C.gold}22, ${C.gold}88, ${C.gold}22)`, zIndex: 0 }} />
-              {[{ n: "01", t: "Pick your location", d: "Select any state and county. We pull real yield data from the USDA NASS database." }, { n: "02", t: "Enter farm details", d: "Choose your crop, enter base acres. We handle the complex math behind both programs." }, { n: "03", t: "Get your answer", d: "See both programs side-by-side with dollar amounts, breakdowns, and a clear recommendation." }].map((s, i) => (
-                <Reveal key={i} delay={i * 120}>
-                  <div style={{ textAlign: "center", position: "relative", zIndex: 1, padding: "0 24px" }}>
-                    <div style={{ width: 80, height: 80, borderRadius: 20, background: i === 1 ? C.forest : C.cream, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", border: `3px solid ${C.white}`, boxShadow: "0 4px 20px rgba(0,0,0,0.06)" }}><span style={{ fontSize: 24, fontWeight: 800, color: i === 1 ? C.gold : C.forest, letterSpacing: "-0.04em" }}>{s.n}</span></div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: C.forest, letterSpacing: "-0.02em", marginBottom: 8 }}>{s.t}</div>
-                    <div style={{ fontSize: 14, color: C.textSoft, lineHeight: 1.65, maxWidth: 280, margin: "0 auto" }}>{s.d}</div>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* TRUST */}
-        <section id="trust" style={{ padding: "80px 24px", background: C.cream, borderTop: "1px solid rgba(0,0,0,0.03)", scrollMarginTop: 80 }}>
+        {/* ──── TRUST + DATA ──── */}
+        <section id="trust" style={{ padding: "80px 24px", background: C.white, scrollMarginTop: 80 }}>
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             <Reveal>
-              <div style={{ background: C.white, borderRadius: 24, padding: "52px 44px", border: "1px solid rgba(0,0,0,0.04)", boxShadow: "0 4px 24px rgba(0,0,0,0.02)", textAlign: "center" }}>
+              <div style={{ background: C.cream, borderRadius: 24, padding: "52px 44px", border: "1px solid rgba(0,0,0,0.04)", boxShadow: "0 4px 24px rgba(0,0,0,0.02)", textAlign: "center" }}>
                 <div style={{ fontSize: 48, marginBottom: 20 }}>🛡️</div>
                 <h3 style={{ fontSize: 24, fontWeight: 800, color: C.forest, letterSpacing: "-0.02em", marginBottom: 12 }}>Built on data you can trust</h3>
-                <p style={{ fontSize: 15, color: C.textSoft, lineHeight: 1.7, maxWidth: 540, margin: "0 auto 32px" }}>Every calculation uses real county yield data from the USDA National Agricultural Statistics Service and current program rules from the Farm Service Agency.</p>
+                <p style={{ fontSize: 15, color: C.textSoft, lineHeight: 1.7, maxWidth: 540, margin: "0 auto 32px" }}>Every calculation uses real county yield data from the USDA National Agricultural Statistics Service and current program rules from the Farm Service Agency. Not estimates — actual government data.</p>
                 <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
-                  {["USDA NASS Data", "FSA Program Rules", "2025 OBBBA", "No Login Required", "100% Free"].map((b) => (<div key={b} style={{ padding: "8px 16px", borderRadius: 10, background: C.cream, fontSize: 12, fontWeight: 700, color: C.sage, border: "1px solid rgba(0,0,0,0.04)" }}>{b}</div>))}
+                  {["USDA NASS API", "FSA Program Rules", "2025 OBBBA Updated", "Real County Data", "No Guesswork"].map((b) => (<div key={b} style={{ padding: "8px 16px", borderRadius: 10, background: C.white, fontSize: 12, fontWeight: 700, color: C.sage, border: "1px solid rgba(0,0,0,0.04)" }}>{b}</div>))}
                 </div>
               </div>
             </Reveal>
           </div>
         </section>
 
-        {/* CTA */}
+        {/* ──── FAQ ──── */}
+        <section style={{ padding: "80px 24px 96px", background: C.cream }}>
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>
+            <Reveal>
+              <div style={{ textAlign: "center", marginBottom: 48 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 12 }}>Questions?</div>
+                <h2 style={{ fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 800, color: C.forest, letterSpacing: "-0.03em" }}>Common questions</h2>
+              </div>
+            </Reveal>
+            {[
+              ["How is this different from the FSA calculator?", "The FSA doesn't offer a side-by-side comparison tool. HarvestFile pulls your county's actual NASS yield data, runs both ARC-CO and PLC calculations simultaneously, and shows you the dollar difference — something you'd normally need a farm management consultant for."],
+              ["Is my farm data private?", "Completely. Your data stays in your browser. We don't store farm details, sell information, or share anything with third parties. The AI report generates instantly and downloads as a PDF — we don't keep copies."],
+              ["What does the $39 report include?", "A professional PDF with: detailed ARC-CO vs PLC breakdown using your actual county data, 5 price scenario projections, every FSA form you need identified, a deadline calendar, and a complete FSA office preparation guide. It pays for itself thousands of times over."],
+              ["How accurate are the calculations?", "We use the same USDA NASS yield data and FSA program rules that your county office uses. Our formulas are updated for the 2025 One Big Beautiful Bill Act. While actual payments depend on final MYA prices, our estimates track closely with FSA projections."],
+              ["Do I need to create an account?", "No. The free calculator works instantly with zero signup. If you want the full AI report, you just enter an email to receive it — no passwords or accounts needed."],
+            ].map(([q, a], i) => (
+              <Reveal key={i} delay={i * 60}>
+                <div style={{ background: C.white, borderRadius: 16, padding: "24px 28px", border: "1px solid rgba(0,0,0,0.04)", marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,0.01)" }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.forest, marginBottom: 8, letterSpacing: "-0.01em" }}>{q}</div>
+                  <div style={{ fontSize: 14, color: C.textSoft, lineHeight: 1.7 }}>{a}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* ──── FINAL CTA ──── */}
         <section style={{ position: "relative", padding: "120px 24px", background: C.dark, overflow: "hidden" }}>
           <div style={noise} />
           <div style={{ position: "absolute", top: "50%", left: "50%", width: 500, height: 500, background: "radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 60%)", transform: "translate(-50%,-50%)", filter: "blur(80px)", pointerEvents: "none" }} />
           <Reveal>
             <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 2 }}>
-              <h2 style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 20 }}>Stop guessing.<br /><span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic", color: C.gold }}>Start knowing.</span></h2>
-              <p style={{ fontSize: 16, color: "rgba(255,255,255,0.4)", lineHeight: 1.65, marginBottom: 40 }}>The right choice can mean $3,000–$15,000 more per year.</p>
-              <button onClick={goCalc} className="hf-btn-hover hf-shimmer-btn" style={{ background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldBright}, ${C.gold}, ${C.goldDim})`, backgroundSize: "200% auto", color: C.dark, fontSize: 16, fontWeight: 700, padding: "18px 40px", borderRadius: 14, border: "none", cursor: "pointer", boxShadow: "0 8px 32px rgba(201,168,76,0.2)" }}>Calculate My Payment — Free →</button>
+              <h2 style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 20 }}>
+                Stop leaving money<br /><span style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontStyle: "italic", color: C.gold }}>in the field.</span>
+              </h2>
+              <p style={{ fontSize: 16, color: "rgba(255,255,255,0.4)", lineHeight: 1.65, marginBottom: 40 }}>The right ARC/PLC choice means $3,000–$15,000 more per year. Find out which one is right for your farm in 60 seconds.</p>
+              <button onClick={goCalc} className="hf-btn-hover hf-shimmer-btn" style={{ background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldBright}, ${C.gold}, ${C.goldDim})`, backgroundSize: "200% auto", color: C.dark, fontSize: 16, fontWeight: 700, padding: "18px 40px", borderRadius: 14, border: "none", cursor: "pointer", boxShadow: "0 8px 32px rgba(201,168,76,0.2)" }}>See What Your Farm Is Owed — Free →</button>
+              <div style={{ marginTop: 14, fontSize: 13, color: "rgba(255,255,255,0.2)" }}>Free calculator · No signup · Full report available for $39</div>
             </div>
           </Reveal>
         </section>
       </>)}
+
 
       {/* ══════════════════════════════════════════════════════
            CALCULATOR — FULL DARK REDESIGN
