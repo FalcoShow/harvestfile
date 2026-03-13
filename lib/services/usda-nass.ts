@@ -354,7 +354,7 @@ export async function getCountyCommodities(opts: {
     freq_desc: 'ANNUAL',
   });
 
-  const commodities = [...new Set(records.map(r => r.commodity_desc))];
+  const commodities = Array.from(new Set(records.map(r => r.commodity_desc)));
   return commodities.sort();
 }
 
