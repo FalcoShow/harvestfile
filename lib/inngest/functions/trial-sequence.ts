@@ -52,14 +52,16 @@ export const trialEmailSequence = inngest.createFunction(
     if (!stillTrial) return { completed: 'converted-early', stoppedAt: 'day-7' };
 
     await step.run('send-day7', async () => {
-      const hasEngaged = stats.reports > 0 || stats.alerts > 0;
+      const reportCount = stats.reports || 0;
+      const alertCount = stats.alerts || 0;
+      const hasEngaged = reportCount > 0 || alertCount > 0;
       await resend.emails.send({
         from: EMAIL_FROM.onboarding,
         to: [email],
         subject: hasEngaged
           ? `${firstName}, you're getting great results — here's what else HarvestFile can do`
           : `${firstName}, here's what farmers are finding with HarvestFile`,
-        html: buildDay7HTML(firstName, stats, hasEngaged),
+        html: buildDay7HTML(firstName, { reports: reportCount, alerts: alertCount }, hasEngaged),
       });
     });
 
