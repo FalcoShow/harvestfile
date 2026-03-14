@@ -1,3 +1,11 @@
+// =============================================================================
+// HarvestFile — Consolidated Middleware
+// Phase 4A: SEO + Architecture Fix
+//
+// Replaces BOTH existing middleware files (root middleware.ts + src/middleware.ts)
+// Handles: auth session refresh, dashboard route protection, auth redirects
+// =============================================================================
+
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -25,21 +33,25 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — important for Server Components
+  // IMPORTANT: Do NOT run any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could lead to users
+  // being randomly logged out.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect dashboard routes — redirect to login if no session
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  const { pathname } = request.nextUrl;
+
+  // ── Protect dashboard routes — redirect to login if no session ────────
+  if (!user && pathname.startsWith('/dashboard')) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('redirect', request.nextUrl.pathname);
+    url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 
-  // If logged in and hitting /login, redirect to dashboard
-  if (user && request.nextUrl.pathname === '/login') {
+  // ── Redirect logged-in users away from auth pages ─────────────────────
+  if (user && (pathname === '/login' || pathname === '/signup')) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
@@ -49,5 +61,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: [
+    // Match dashboard routes (protected)
+    '/dashboard/:path*',
+    // Match auth pages (redirect if logged in)
+    '/login',
+    '/signup',
+    // Match API routes that need session refresh
+    '/api/:path*',
+  ],
 };
