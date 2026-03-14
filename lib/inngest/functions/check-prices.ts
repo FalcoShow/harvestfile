@@ -70,7 +70,7 @@ export const checkCommodityPrices = inngest.createFunction(
 
     // Step 2: Get unique commodity+state combos and fetch prices
     const prices = await step.run('fetch-nass-prices', async () => {
-      const combos = [...new Set(alerts.map(a => `${a.commodity}|${a.state || 'OH'}`))];
+      const combos = Array.from(new Set(alerts.map(a => `${a.commodity}|${a.state || 'OH'}`)));
       const priceMap: Record<string, number | null> = {};
       for (const combo of combos) {
         const [commodity, state] = combo.split('|');
