@@ -41,7 +41,7 @@ export const trialEmailSequence = inngest.createFunction(
     const stats = await step.run('check-engagement', async () => {
       const { count: reports } = await supabase.from('reports').select('id', { count: 'exact', head: true }).eq('user_id', userId);
       const { count: alerts } = await supabase.from('price_alerts').select('id', { count: 'exact', head: true }).eq('created_by', userId).eq('is_active', true);
-      return { reports: reports || 0, alerts: alerts || 0 };
+      return { reports: reports ?? 0, alerts: alerts ?? 0 } as { reports: number; alerts: number };
     });
 
     const stillTrial = await step.run('check-trial-day7', async () => {
