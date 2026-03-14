@@ -21,5 +21,5 @@ export async function GET(request: NextRequest) {
   }
 
   // Redirect to error page if verification fails
-  redirect("/auth/login?error=verification_failed");
+  redirect("/login?error=verification_failed");
 }

@@ -9,7 +9,7 @@ if (!process.env.RESEND_API_KEY) {
   console.warn('⚠️ RESEND_API_KEY not set — emails will not send');
 }
 
-export const resend = new Resend(process.env.RESEND_API_KEY || '');
+export const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder');
 
 export const EMAIL_FROM = {
   alerts: process.env.RESEND_FROM_EMAIL || 'HarvestFile Alerts <alerts@mail.harvestfile.com>',

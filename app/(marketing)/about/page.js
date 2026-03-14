@@ -1,4 +1,4 @@
-import PageShell from "../../components/PageShell";
+import PageShell from "@/components/PageShell";
 
 export const metadata = {
   title: "About HarvestFile — Our Mission to Help American Farmers",

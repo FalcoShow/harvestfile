@@ -1,9 +1,9 @@
 // =============================================================================
 // HarvestFile — Consolidated Middleware
-// Phase 4A: SEO + Architecture Fix
+// Phase 4A Step 2, Build 1: Route Group Migration
 //
-// Replaces BOTH existing middleware files (root middleware.ts + src/middleware.ts)
 // Handles: auth session refresh, dashboard route protection, auth redirects
+// Auth pages are now at /login and /signup (via (auth) route group)
 // =============================================================================
 
 import { createServerClient } from '@supabase/ssr';

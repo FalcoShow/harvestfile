@@ -22,7 +22,7 @@ export async function getCropsByFarmerId(farmerId: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const pro = await getProfessional(supabase, user.id);
   if (!pro) return [];
@@ -58,7 +58,7 @@ export async function createCrop(input: CropInput) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const pro = await getProfessional(supabase, user.id);
   if (!pro) {
@@ -103,7 +103,7 @@ export async function updateCrop(
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const { data, error } = await supabase
     .from("crops")
@@ -128,7 +128,7 @@ export async function deleteCrop(id: string, farmerId: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const { error } = await supabase.from("crops").delete().eq("id", id);
 

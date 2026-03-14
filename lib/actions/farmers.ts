@@ -22,7 +22,7 @@ export async function getFarmers(search?: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const pro = await getProfessional(supabase, user.id);
   if (!pro) return [];
@@ -56,7 +56,7 @@ export async function getFarmerById(id: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const pro = await getProfessional(supabase, user.id);
   if (!pro) return null;
@@ -83,7 +83,7 @@ export async function createFarmer(input: FarmerInput) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const pro = await getProfessional(supabase, user.id);
   if (!pro) {
@@ -117,7 +117,7 @@ export async function updateFarmer(id: string, input: Partial<FarmerInput>) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const pro = await getProfessional(supabase, user.id);
   if (!pro) return { error: "No organization found." };
@@ -147,7 +147,7 @@ export async function deleteFarmer(id: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const pro = await getProfessional(supabase, user.id);
   if (!pro) return { error: "No organization found." };

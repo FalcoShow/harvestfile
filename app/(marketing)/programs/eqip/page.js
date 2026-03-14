@@ -1,4 +1,4 @@
-import PageShell from "../../../components/PageShell";
+import PageShell from "@/components/PageShell";
 
 export const metadata = {
   title: "EQIP Guide — Environmental Quality Incentives Program Explained",

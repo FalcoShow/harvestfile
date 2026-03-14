@@ -1,3 +1,11 @@
+// =============================================================================
+// HarvestFile — (auth) Route Group Layout
+// Phase 4A Step 2, Build 1: Route Group Migration
+//
+// Wraps /login and /signup pages with branded split-screen layout.
+// Routes resolve to /login and /signup (not /auth/login or /auth/signup).
+// =============================================================================
+
 export default function AuthLayout({
   children,
 }: {
@@ -48,37 +56,47 @@ export default function AuthLayout({
           {/* Value proposition */}
           <div className="space-y-8">
             <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight tracking-tight">
-              USDA program
+              Your farm&apos;s
               <br />
-              compliance,
+              financial command
               <br />
-              <span className="text-emerald-400">simplified.</span>
+              <span className="text-emerald-400">center.</span>
             </h1>
             <p className="text-lg text-gray-400 max-w-md leading-relaxed">
-              Manage farmer portfolios, optimize ARC/PLC decisions, and generate
-              compliance reports — all from one enterprise dashboard.
+              Save your operations, track commodity prices, generate AI reports,
+              and never miss a USDA deadline again. Every dollar you&apos;re owed
+              — found automatically.
             </p>
 
-            {/* Stats / trust signals */}
-            <div className="grid grid-cols-3 gap-6 pt-4">
-              <div>
-                <div className="text-2xl font-bold text-white">50</div>
-                <div className="text-sm text-gray-500 mt-1">States covered</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-white">16</div>
-                <div className="text-sm text-gray-500 mt-1">Crop programs</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-white">$39</div>
-                <div className="text-sm text-gray-500 mt-1">Per report</div>
-              </div>
+            {/* Feature list */}
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              {[
+                "Unlimited AI Reports",
+                "Price & Deadline Alerts",
+                "Saved Operations",
+                "Cross-Program Engine",
+              ].map((feature) => (
+                <div key={feature} className="flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-emerald-400 flex-shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span className="text-white/50 text-sm">{feature}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Footer */}
           <div className="text-sm text-gray-600">
-            © {new Date().getFullYear()} HarvestFile LLC. All rights reserved.
+            &copy; 2025 HarvestFile LLC. All rights reserved.
           </div>
         </div>
       </div>
