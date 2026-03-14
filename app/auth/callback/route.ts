@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { inngest } from "@/lib/inngest/client";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -11,7 +12,6 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Check if the user has an organization, if not create one
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -48,7 +48,6 @@ export async function GET(request: Request) {
               role: "admin",
             });
 
-            // Log the signup
             await supabase.from("activity_log").insert({
               org_id: org.id,
               actor_id: user.id,
@@ -56,6 +55,25 @@ export async function GET(request: Request) {
               entity_type: "professional",
               description: `${user.email} created an account`,
             });
+
+            // ── Phase 3D: Fire trial email sequence ──────────────
+            try {
+              await inngest.send({
+                name: 'app/user.trial_started',
+                data: {
+                  userId: user.id,
+                  email: user.email!,
+                  firstName:
+                    user.user_metadata?.full_name?.split(' ')[0] ||
+                    user.email?.split('@')[0] ||
+                    'there',
+                },
+              });
+            } catch (err) {
+              console.error('[Inngest] Failed to fire trial_started:', err);
+              // Don't block signup if Inngest fails
+            }
+            // ─────────────────────────────────────────────────────
           }
         }
       }
@@ -73,6 +91,5 @@ export async function GET(request: Request) {
     }
   }
 
-  // Auth code exchange failed — redirect to error page
   return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_failed`);
 }

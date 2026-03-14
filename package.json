@@ -13,11 +13,13 @@
     "@supabase/supabase-js": "^2.99.1",
     "@vercel/analytics": "^2.0.0",
     "@vercel/speed-insights": "^2.0.0",
+    "inngest": "^3.52.6",
     "next": "14.2.21",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^3.8.0",
+    "resend": "^6.9.3",
     "stripe": "^20.4.1"
   },
   "devDependencies": {

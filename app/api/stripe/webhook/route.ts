@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
+import { inngest } from '@/lib/inngest/client';
 import Stripe from 'stripe';
 
-// Use service role key for webhook — bypasses RLS
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -52,7 +52,6 @@ export async function POST(request: Request) {
             })
             .eq('id', userId);
 
-          // Log subscription event
           await supabaseAdmin.from('subscription_events').insert({
             user_id: userId,
             event_type: 'subscription_created',
@@ -63,6 +62,19 @@ export async function POST(request: Request) {
               trial_end: subscription.trial_end,
             },
           });
+
+          // ── Phase 3D: If not trialing (direct purchase), cancel drip emails ──
+          if (subscription.status === 'active') {
+            try {
+              await inngest.send({
+                name: 'app/user.converted',
+                data: { userId },
+              });
+            } catch (err) {
+              console.error('[Inngest] Failed to fire user.converted:', err);
+            }
+          }
+          // ─────────────────────────────────────────────────────────────────────
         }
         break;
       }
@@ -81,12 +93,13 @@ export async function POST(request: Request) {
             incomplete: 'incomplete',
           };
 
+          const previousStatus = (event.data as any).previous_attributes?.status;
+
           await supabaseAdmin
             .from('user_profiles')
             .update({
               subscription_status: statusMap[subscription.status] || subscription.status,
-              subscription_tier:
-                subscription.status === 'canceled' ? 'free' : 'pro',
+              subscription_tier: subscription.status === 'canceled' ? 'free' : 'pro',
               updated_at: new Date().toISOString(),
             })
             .eq('id', userId);
@@ -101,6 +114,19 @@ export async function POST(request: Request) {
               cancel_at: subscription.cancel_at,
             },
           });
+
+          // ── Phase 3D: Trial → Active = user converted, cancel drip emails ──
+          if (previousStatus === 'trialing' && subscription.status === 'active') {
+            try {
+              await inngest.send({
+                name: 'app/user.converted',
+                data: { userId },
+              });
+            } catch (err) {
+              console.error('[Inngest] Failed to fire user.converted:', err);
+            }
+          }
+          // ─────────────────────────────────────────────────────────────────────
         }
         break;
       }
@@ -137,7 +163,6 @@ export async function POST(request: Request) {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        // Look up user by Stripe customer ID
         const { data: profile } = await supabaseAdmin
           .from('user_profiles')
           .select('id')
