@@ -1,13 +1,15 @@
 // =============================================================================
 // HarvestFile — County ARC/PLC Page
-// Phase 5A-2: /[state]/[county]/arc-plc (e.g., /ohio/darke-county/arc-plc)
+// Phase 5A-2 + Phase 6B: County SEO page with Scenario Modeler
 //
 // THE MONEY PAGE — this is what every farmer searching "ARC PLC [county]" lands on.
 // Server Component for full SEO. Renders real USDA data.
+// Phase 6B adds the interactive Multi-Year Scenario Modeler as a client island.
 // =============================================================================
 
 import { Metadata } from 'next';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
 import {
   getCountyBySlug,
@@ -16,6 +18,37 @@ import {
   getRecommendation,
   type CommodityGroup,
 } from '@/lib/data/county-queries';
+
+// ─── Dynamic Import: Scenario Modeler (client-only, lazy-loaded) ─────────────
+// Keeps the initial page load fast. Recharts + modeler bundle (~40KB gzip)
+// only downloads when the user scrolls to this section.
+
+const ScenarioModeler = dynamic(
+  () => import('@/components/county/ScenarioModeler'),
+  { ssr: false, loading: () => <ModelerSkeleton /> }
+);
+
+function ModelerSkeleton() {
+  return (
+    <section className="mx-auto max-w-[1200px] px-6 pb-12">
+      <div className="rounded-2xl border border-harvest-gold/20 overflow-hidden animate-pulse">
+        <div className="px-8 py-6 border-b border-border/50">
+          <div className="h-4 w-24 bg-surface/50 rounded mb-2" />
+          <div className="h-7 w-64 bg-surface/50 rounded mb-2" />
+          <div className="h-4 w-80 bg-surface/50 rounded" />
+        </div>
+        <div className="px-8 py-5 border-b border-border/50">
+          <div className="flex gap-2">
+            {[1,2,3,4,5].map(i => <div key={i} className="h-9 w-28 bg-surface/50 rounded-lg" />)}
+          </div>
+        </div>
+        <div className="px-8 py-8">
+          <div className="h-[320px] bg-surface/30 rounded-xl" />
+        </div>
+      </div>
+    </section>
+  );
+}
 
 // ─── Dynamic Metadata ────────────────────────────────────────────────────────
 
@@ -30,7 +63,7 @@ export async function generateMetadata({
 
   const { county, state } = result;
   const title = `ARC vs PLC — ${county.display_name}, ${state.name} | Free Calculator & Data`;
-  const description = `Compare ARC-CO and PLC estimated payments for ${county.display_name}, ${state.name}. Real USDA NASS county yield data, benchmark revenues, and program recommendations. Free, updated for 2026 OBBBA.`;
+  const description = `Compare ARC-CO and PLC estimated payments for ${county.display_name}, ${state.name}. Real USDA NASS county yield data, multi-year scenario projections, and program recommendations. Free, updated for 2026 OBBBA.`;
 
   return {
     title,
@@ -43,6 +76,7 @@ export async function generateMetadata({
       `PLC ${county.display_name}`,
       `farm program ${state.name}`,
       `USDA county data ${state.abbreviation}`,
+      `ARC PLC scenario modeler ${state.abbreviation}`,
     ],
     openGraph: {
       title: `ARC vs PLC — ${county.display_name}, ${state.abbreviation}`,
@@ -100,6 +134,24 @@ export default async function CountyPage({
 
   // Most recent year with benchmark data for the hero stats
   const latestBench = primaryCrop?.years.find(y => y.benchmark_yield != null);
+
+  // ── Prepare data for the Scenario Modeler (serializable props) ──
+  const modelerCrops = cropGroups.map(g => ({
+    commodityCode: g.commodity_code,
+    displayName: g.display_name,
+    unitLabel: g.unit_label,
+    statutoryRefPrice: g.statutory_ref_price,
+    years: g.years.map(y => ({
+      crop_year: y.crop_year,
+      county_yield: y.county_yield,
+      mya_price: y.mya_price,
+      benchmark_yield: y.benchmark_yield,
+      benchmark_revenue: y.benchmark_revenue,
+      arc_guarantee: y.arc_guarantee,
+      arc_payment_rate: y.arc_payment_rate,
+      plc_payment_rate: y.plc_payment_rate,
+    })),
+  }));
 
   // JSON-LD
   const jsonLd = {
@@ -222,6 +274,15 @@ export default async function CountyPage({
           </section>
         )}
 
+        {/* ═══ SCENARIO MODELER (Phase 6B) ═══ */}
+        {modelerCrops.length > 0 && (
+          <ScenarioModeler
+            crops={modelerCrops}
+            countyName={county.display_name}
+            stateAbbr={state.abbreviation}
+          />
+        )}
+
         {/* ═══ CROP DATA TABLES ═══ */}
         {cropGroups.map((crop) => (
           <section key={crop.commodity_code} className="mx-auto max-w-[1200px] px-6 pb-12">
@@ -319,17 +380,18 @@ export default async function CountyPage({
                 <p>
                   The ARC-CO guarantee band expanded from 86% to 90% of benchmark revenue,
                   meaning payments trigger sooner when county revenue drops. The payment cap
-                  remains at 10% of benchmark revenue per acre. Trend-adjusted yields are now
-                  used in benchmark calculations.
+                  increased from 10% to 12% of benchmark revenue per acre. Trend-adjusted yields
+                  are now used in benchmark calculations. ARC-CO can also be stacked with SCO
+                  crop insurance (previously prohibited).
                 </p>
               </div>
               <div>
                 <h3 className="font-semibold text-foreground mb-2">PLC Improvements</h3>
                 <p>
                   Statutory reference prices increased significantly — corn from $3.70 to $4.10/bu,
-                  soybeans from $8.40 to $10.00/bu, wheat from $5.50 to $6.00/bu. The effective
-                  reference price (85% of 5-year Olympic average MYA) can push this even higher.
-                  Payment limits increased to $155,000.
+                  soybeans from $8.40 to $10.00/bu, wheat from $5.50 to $6.35/bu. The effective
+                  reference price escalator improved from 85% to 88% of the 5-year Olympic average MYA,
+                  and can push the ERP up to 115% of statutory. Payment limits increased to $155,000.
                 </p>
               </div>
             </div>
