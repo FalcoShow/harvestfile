@@ -2,24 +2,36 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { Bricolage_Grotesque, Instrument_Serif } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 
 // =============================================================================
 // HarvestFile — Root Layout
-// Phase 4A: SEO Emergency Fix
-//
-// Updated with:
-// - Enhanced metadata for Google indexing
-// - JSON-LD structured data (Organization + WebApplication + FAQ)
-// - Canonical URL
-// - Improved Open Graph / Twitter cards
-// - Proper viewport configuration
+// Build 2: Upgraded to next/font/google for zero-CLS font loading
 // =============================================================================
 
-export const metadata = {
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-bricolage",
+  display: "swap",
+  fallback: ["DM Sans", "system-ui", "-apple-system", "sans-serif"],
+});
+
+const instrumentSerif = Instrument_Serif({
+  weight: "400",
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  variable: "--font-instrument",
+  display: "swap",
+  fallback: ["Georgia", "Times New Roman", "serif"],
+});
+
+export const metadata: Metadata = {
   metadataBase: new URL("https://harvestfile.com"),
 
   title: {
-    default: "HarvestFile — ARC/PLC Decision Calculator for Farmers | Free, All 50 States",
+    default:
+      "HarvestFile — ARC/PLC Decision Calculator for Farmers | Free, All 50 States",
     template: "%s | HarvestFile",
   },
 
@@ -98,15 +110,10 @@ export const metadata = {
     canonical: "https://harvestfile.com",
   },
 
-  verification: {
-    // Add your Google Search Console verification code here after setup
-    // google: "YOUR_VERIFICATION_CODE",
-  },
-
   category: "agriculture",
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -116,32 +123,21 @@ export const viewport = {
   ],
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${bricolage.variable} ${instrumentSerif.variable}`}
+    >
       <head>
-        {/* ── Preconnect to external origins ──────────────────────────── */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Instrument+Serif:ital@0;1&display=swap"
-          rel="stylesheet"
-        />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-
-        {/* ── JSON-LD Structured Data ────────────────────────────────── */}
         <JsonLd />
       </head>
-      <body
-        style={{
-          fontFamily:
-            "'Bricolage Grotesque', 'DM Sans', system-ui, -apple-system, sans-serif",
-        }}
-      >
+      <body className="font-sans antialiased">
         {children}
         <Analytics />
         <SpeedInsights />

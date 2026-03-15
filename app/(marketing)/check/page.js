@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 // ─── SUPABASE (same instance as main app) ──────────────────
-const SB_URL = "https://fzduyjxjdcxbdwjlwrpu.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZHV5anhqZGN4YmR3amx3cnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzIwNzksImV4cCI6MjA4ODY0ODA3OX0.yVn6AN7ueY2cvVKIKcbR-pSNOT3aTyz5oGHfdQCN_0M";
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // ─── DESIGN TOKENS ─────────────────────────────────────────
 const C = {
@@ -67,7 +67,8 @@ function quickEstimate(crop, acres) {
   return { arc: arcT, plc: plcT, best, bestVal, diff };
 }
 
-const noise = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none", opacity: 0.18, mixBlendMode: "soft-light", backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` };
+// Noise texture via CSS class (fixes hydration error)
+const noise = "hf-noise";
 
 function Logo({ size = 28 }) {
   return (<svg width={size} height={size} viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="10" fill={C.forest} /><path d="M12 28L20 12L28 20" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="28" r="2.5" fill={C.gold} opacity="0.5" /><circle cx="20" cy="12" r="2.5" fill={C.gold} /><circle cx="28" cy="20" r="2.5" fill={C.gold} opacity="0.7" /><path d="M20 24V32" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.35" /><path d="M17 27L20 24L23 27" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" /></svg>);
@@ -148,34 +149,10 @@ export default function QuickCheck() {
 
   return (
     <div style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", minHeight: "100vh", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 45%, #0F3525 100%)`, position: "relative", overflow: "hidden" }}>
-      <style>{`
-        @keyframes qc-enter { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes qc-exit { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
-        @keyframes qc-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; } 50% { opacity: 0.5; box-shadow: 0 0 2px currentColor; } }
-        @keyframes qc-shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-        @keyframes qc-scale-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
-        @keyframes qc-counter { from { opacity: 0; transform: translateY(20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .qc-input:focus { border-color: rgba(201,168,76,0.4) !important; background: rgba(255,255,255,0.07) !important; }
-        .qc-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 16px center; }
-        .qc-select option { background: #0C1F17; color: #fff; }
-      `}</style>
-
-      <div style={noise} />
+      <div className={noise} />
       {/* Ambient glows */}
       <div style={{ position: "absolute", top: "8%", right: "10%", width: 500, height: 500, background: "radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 55%)", filter: "blur(80px)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: "10%", left: "5%", width: 400, height: 400, background: "radial-gradient(circle, rgba(5,150,105,0.06) 0%, transparent 55%)", filter: "blur(80px)", pointerEvents: "none" }} />
-
-      {/* Nav */}
-      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: "0 24px" }}>
-        <div style={{ maxWidth: 1120, margin: "12px auto 0", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, padding: "0 20px", background: "rgba(12,31,23,0.55)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: 16, border: "1px solid rgba(255,255,255,0.06)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => router.push("/")}>
-            <Logo size={26} />
-            <span style={{ fontSize: 17, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em" }}>Harvest<span style={{ color: C.gold }}>File</span></span>
-          </div>
-          <button onClick={() => router.push("/")} style={{ background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 12.5, fontWeight: 700, padding: "8px 18px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>Full Calculator →</button>
-        </div>
-      </nav>
 
       {/* Main content */}
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "120px 24px 80px", position: "relative", zIndex: 2 }}>
@@ -184,7 +161,7 @@ export default function QuickCheck() {
         {step < 5 && (
           <div style={{ textAlign: "center", marginBottom: 40, opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(16px)", transition: "all 0.6s ease" }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)", borderRadius: 100, padding: "5px 14px 5px 6px", marginBottom: 24 }}>
-              <div style={{ width: 6, height: 6, borderRadius: 100, background: C.emerald, animation: "qc-pulse 2s ease-in-out infinite" }} />
+              <div style={{ width: 6, height: 6, borderRadius: 100, background: C.emerald, animation: "hf-pulse 2s ease-in-out infinite" }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: C.gold }}>FREE — 30 Second Check</span>
             </div>
             <h1 style={{ fontSize: "clamp(28px, 4.5vw, 42px)", fontWeight: 800, color: "#fff", lineHeight: 1.1, letterSpacing: "-0.035em", marginBottom: 12 }}>
@@ -229,7 +206,7 @@ export default function QuickCheck() {
                 <select
                   value={st}
                   onChange={(e) => { setSt(e.target.value); if (e.target.value) advance(2); }}
-                  className="qc-input qc-select"
+                  className="hf-calc-input hf-select-arrow"
                   style={{ ...inputStyle, cursor: "pointer" }}
                 >
                   <option value="">Select your state...</option>
@@ -273,7 +250,7 @@ export default function QuickCheck() {
                   value={acres}
                   onChange={(e) => setAcres(e.target.value)}
                   placeholder="e.g. 500"
-                  className="qc-input"
+                  className="hf-calc-input"
                   style={{ ...inputStyle, fontSize: 24, fontWeight: 700, textAlign: "center", letterSpacing: "-0.02em" }}
                   autoFocus
                 />
@@ -322,7 +299,7 @@ export default function QuickCheck() {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(""); }}
                   placeholder="your@email.com"
-                  className="qc-input"
+                  className="hf-calc-input"
                   style={{ ...inputStyle, textAlign: "center", fontSize: 16 }}
                   autoFocus
                   onKeyDown={(e) => { if (e.key === "Enter") submitEmail(); }}
@@ -366,7 +343,7 @@ export default function QuickCheck() {
                   animation: "qc-scale-in 0.5s cubic-bezier(0.25,0.1,0.25,1)",
                 }}>
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(5,150,105,0.08)", border: "1px solid rgba(5,150,105,0.15)", borderRadius: 100, padding: "4px 12px 4px 6px", marginBottom: 20 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: 100, background: C.emerald, animation: "qc-pulse 2s ease-in-out infinite" }} />
+                    <div style={{ width: 6, height: 6, borderRadius: 100, background: C.emerald, animation: "hf-pulse 2s ease-in-out infinite" }} />
                     <span style={{ fontSize: 11, fontWeight: 700, color: C.emerald }}>Estimate Ready</span>
                   </div>
 
@@ -417,7 +394,7 @@ export default function QuickCheck() {
                     width: "100%", padding: "18px", fontSize: 16, fontWeight: 700, borderRadius: 14, border: "none",
                     background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldBright}, ${C.gold}, ${C.goldDim})`,
                     backgroundSize: "200% auto",
-                    animation: "qc-shimmer 3s linear infinite",
+                    animation: "hf-shimmer 3s linear infinite",
                     color: C.dark, cursor: "pointer",
                     boxShadow: "0 6px 28px rgba(201,168,76,0.2)",
                     marginBottom: 12,
@@ -456,10 +433,6 @@ export default function QuickCheck() {
         )}
       </div>
 
-      {/* Minimal footer */}
-      <footer style={{ position: "relative", zIndex: 2, padding: "40px 24px 24px", textAlign: "center" }}>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.08)" }}>© 2026 HarvestFile LLC · <a href="/privacy" style={{ color: "rgba(255,255,255,0.1)", textDecoration: "none" }}>Privacy</a> · <a href="/terms" style={{ color: "rgba(255,255,255,0.1)", textDecoration: "none" }}>Terms</a></div>
-      </footer>
     </div>
   );
 }

@@ -1,8 +1,9 @@
 // ============================================================
 // HarvestFile Type Definitions
+// Build 2: Updated pricing — $49/mo Pro, $149/mo Team, Enterprise
 // ============================================================
 
-export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
+export type SubscriptionTier = 'pro' | 'team' | 'enterprise';
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
 export type AlertType = 'price_drop' | 'price_spike' | 'deadline' | 'program_update';
 
@@ -85,55 +86,58 @@ export interface PricingTier {
 
 export const PRICING_TIERS: PricingTier[] = [
   {
-    name: 'Starter',
-    tier: 'free',
-    price: 0,
-    priceLabel: 'Free',
-    description: 'Get started with basic eligibility screening and program guides.',
-    features: [
-      'Eligibility screener (unlimited)',
-      'ARC/PLC decision calculator',
-      'Program guides (ARC-CO, PLC, EQIP, CRP, CSP)',
-      'One AI-generated report',
-      'Email support',
-    ],
-    cta: 'Get Started Free',
-    highlighted: false,
-  },
-  {
     name: 'Pro',
     tier: 'pro',
-    price: 29,
-    priceLabel: '$29/mo',
-    description: 'Unlock the full platform. Save operations, track prices, run unlimited reports.',
+    price: 49,
+    priceLabel: '$49/mo',
+    description: 'Everything you need to optimize your farm program elections and maximize payments.',
     features: [
-      'Everything in Starter',
+      'ARC/PLC decision calculator',
       'Save unlimited farm operations',
       'Unlimited AI-generated reports',
       'Price & deadline alerts',
       'Cross-program optimization engine',
       'County-level yield data (NASS)',
-      'Priority support',
       'Export reports as PDF',
+      'Email support',
     ],
     cta: 'Start 14-Day Free Trial',
     highlighted: true,
+  },
+  {
+    name: 'Team',
+    tier: 'team' as SubscriptionTier,
+    price: 149,
+    priceLabel: '$149/mo',
+    description: 'For ag consultants and crop insurance agents managing multiple producers.',
+    features: [
+      'Everything in Pro',
+      'Manage up to 25 producers',
+      'Branded client reports',
+      'Bulk operations import (CSV)',
+      'Team member accounts (up to 3)',
+      'Priority support',
+      'Client portfolio analytics',
+      'Quarterly market briefings',
+    ],
+    cta: 'Start 14-Day Free Trial',
+    highlighted: false,
   },
   {
     name: 'Enterprise',
     tier: 'enterprise',
     price: null,
     priceLabel: 'Custom',
-    description: 'For Farm Credit lenders, co-ops, and ag consultants managing multiple producers.',
+    description: 'For Farm Credit lenders, co-ops, and large ag firms managing 100+ producers.',
     features: [
-      'Everything in Pro',
-      'Multi-producer management',
-      'Branded client reports',
-      'Bulk operations import (CSV)',
+      'Everything in Team',
+      'Unlimited producers',
       'API access',
       'Dedicated account manager',
       'Custom integrations',
       'SSO & team management',
+      'White-label reports',
+      'On-call support',
     ],
     cta: 'Contact Sales',
     highlighted: false,

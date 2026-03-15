@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — (auth) Route Group Layout
-// Phase 4A Step 2, Build 1: Route Group Migration
+// Build 2: Added data-theme="auth" for gold-tinted immersive theme
 //
 // Wraps /login and /signup pages with branded split-screen layout.
 // Routes resolve to /login and /signup (not /auth/login or /auth/signup).
@@ -12,7 +12,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#0a0f0d] flex">
+    <div data-theme="auth" className="min-h-screen bg-background flex">
       {/* Left panel — brand / value prop */}
       <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] relative overflow-hidden">
         {/* Background with subtle agricultural pattern */}
@@ -40,7 +40,10 @@ export default function AuthLayout({
                   strokeLinejoin="round"
                   className="text-emerald-400"
                 >
-                  <path d="M12 2a10 10 0 0 1 0 20 10 10 0 0 1 0-20z" opacity="0" />
+                  <path
+                    d="M12 2a10 10 0 0 1 0 20 10 10 0 0 1 0-20z"
+                    opacity="0"
+                  />
                   <path d="M7 20h10" />
                   <path d="M12 20V10" />
                   <path d="M12 10c-2-2.96-6-3-6 0s4 4 6 2" />
@@ -96,7 +99,7 @@ export default function AuthLayout({
 
           {/* Footer */}
           <div className="text-sm text-gray-600">
-            &copy; 2025 HarvestFile LLC. All rights reserved.
+            &copy; 2026 HarvestFile LLC. All rights reserved.
           </div>
         </div>
       </div>

@@ -1,3 +1,11 @@
+// =============================================================================
+// HarvestFile — (dashboard) Route Group Layout
+// Build 2: Added data-theme="dark" for dashboard theme tokens
+//
+// Auth gate → redirects to /login if no session
+// Creates org + professional if missing (edge case: direct signup)
+// =============================================================================
+
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Sidebar from "./_components/Sidebar";
@@ -80,7 +88,7 @@ export default async function DashboardLayout({
   };
 
   return (
-    <div className="flex min-h-screen bg-[#0a0f0d]">
+    <div data-theme="dark" className="flex min-h-screen bg-[#0a0f0d]">
       <Sidebar
         user={{
           email: professional?.email || user.email || "",

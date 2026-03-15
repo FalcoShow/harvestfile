@@ -4,9 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import IntelligenceHero from './homepage/IntelligenceHero';
 
-const SB_URL = "https://fzduyjxjdcxbdwjlwrpu.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6ZHV5anhqZGN4YmR3amx3cnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzIwNzksImV4cCI6MjA4ODY0ODA3OX0.yVn6AN7ueY2cvVKIKcbR-pSNOT3aTyz5oGHfdQCN_0M";
-const NASS_KEY = "E3837A13-9EC3-3BF9-84EB-B475A476D4A7";
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const NASS_KEY = process.env.NEXT_PUBLIC_NASS_API_KEY;
 
 const C = {
   dark: "#0C1F17", forest: "#1B4332", sage: "#40624D", muted: "#6B8F71",
@@ -95,7 +95,9 @@ function Logo({ size = 32 }) {
   return (<svg width={size} height={size} viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="10" fill={C.forest} /><path d="M12 28L20 12L28 20" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="28" r="2.5" fill={C.gold} opacity="0.5" /><circle cx="20" cy="12" r="2.5" fill={C.gold} /><circle cx="28" cy="20" r="2.5" fill={C.gold} opacity="0.7" /><path d="M20 24V32" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.35" /><path d="M17 27L20 24L23 27" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" /></svg>);
 }
 
-const noise = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none", opacity: 0.22, mixBlendMode: "soft-light", backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` };
+// Noise texture now via CSS class in globals.css (fixes hydration mismatch from SVG data URLs)
+const noise = "hf-noise";
+const noiseSubtle = "hf-noise-subtle";
 
 // Dark-themed input styles for calculator
 const inpDark = {
@@ -301,45 +303,11 @@ export default function HarvestFile() {
   return (
     <div style={{ minHeight: "100vh", overflowX: "hidden" }}>
 
-      {/* ═══ GLOBAL STYLES ═══ */}
-      <style>{`
-        @keyframes hf-calc-glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
-        @keyframes hf-step-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes hf-step-exit { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
-        @keyframes hf-result-scale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes hf-bar-grow { from { width: 0; } to { width: var(--target-width, 100%); } }
-        @keyframes hf-shine { from { left: -100%; } to { left: 200%; } }
-        @keyframes hf-float-subtle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .hf-calc-input:focus { border-color: rgba(201,168,76,0.4) !important; background: rgba(255,255,255,0.07) !important; }
-        .hf-calc-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 16px center; }
-        .hf-calc-select option { background: #0C1F17; color: #fff; }
-        .hf-result-card { animation: hf-result-scale 0.5s cubic-bezier(0.25,0.1,0.25,1) both; }
-        .hf-result-card:nth-child(2) { animation-delay: 0.1s; }
-        .hf-breakdown-row { transition: background 0.15s; }
-        .hf-breakdown-row:hover { background: rgba(255,255,255,0.02); }
-      `}</style>
-
-      {/* ═══ NAV ═══ */}
-      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: "0 24px" }}>
-        <div style={{ maxWidth: 1120, margin: "12px auto 0", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, padding: "0 20px", background: isDark ? "rgba(12,31,23,0.55)" : "rgba(250,250,246,0.82)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: 16, border: isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.05)", transition: "background 0.4s, border-color 0.4s" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={goHome}>
-            <Logo size={28} />
-            <span style={{ fontSize: 18, fontWeight: 800, color: isDark ? "#fff" : C.forest, letterSpacing: "-0.04em", transition: "color 0.3s" }}>Harvest<span style={{ color: C.gold }}>File</span></span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <button onClick={() => goPage("/programs/arc-co")} className="hf-link-hover hf-nav-link" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>Programs</button>
-            <button onClick={() => goPage("/about")} className="hf-link-hover hf-nav-link" style={{ background: "none", border: "none", fontSize: 13, fontWeight: 600, color: isDark ? "rgba(255,255,255,0.45)" : C.textSoft, cursor: "pointer" }}>About</button>
-            <button onClick={goCalc} style={{ background: isDark ? "rgba(255,255,255,0.08)" : C.forest, color: "#fff", fontSize: 12.5, fontWeight: 700, padding: "8px 18px", borderRadius: 10, border: isDark ? "1px solid rgba(255,255,255,0.1)" : "none", cursor: "pointer", transition: "all 0.25s" }}>Get Started →</button>
-          </div>
-        </div>
-      </nav>
-
       {/* ═══ HOME — CONVERSION-FOCUSED LANDING PAGE ═══ */}
       {view === "home" && (<>
         {/* ──── HERO: PAIN-DRIVEN ──── */}
         <section style={{ position: "relative", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 40%, ${C.forest} 100%)`, padding: "140px 24px 120px", overflow: "hidden", minHeight: "92vh", display: "flex", alignItems: "center" }}>
-          <div style={noise} />
+          <div className={noise} />
           <div style={{ position: "absolute", top: "5%", left: "8%", width: 520, height: 520, background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 60%)", filter: "blur(80px)", pointerEvents: "none" }} />
           <div style={{ position: "absolute", bottom: "8%", right: "3%", width: 600, height: 600, background: "radial-gradient(circle, rgba(5,150,105,0.07) 0%, transparent 55%)", filter: "blur(100px)", pointerEvents: "none" }} />
 
@@ -448,7 +416,7 @@ export default function HarvestFile() {
 
         {/* ──── FREE CALCULATOR HOOK ──── */}
         <section style={{ position: "relative", padding: "100px 24px", background: C.dark, overflow: "hidden" }}>
-          <div style={noise} />
+          <div className={noise} />
           <div style={{ position: "absolute", top: "30%", left: "50%", width: 600, height: 600, background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 55%)", transform: "translateX(-50%)", filter: "blur(80px)", pointerEvents: "none" }} />
           <div style={{ maxWidth: 720, margin: "0 auto", position: "relative", zIndex: 2, textAlign: "center" }}>
             <Reveal>
@@ -656,7 +624,7 @@ export default function HarvestFile() {
 
         {/* ──── FINAL CTA ──── */}
         <section style={{ position: "relative", padding: "120px 24px", background: C.dark, overflow: "hidden" }}>
-          <div style={noise} />
+          <div className={noise} />
           <div style={{ position: "absolute", top: "50%", left: "50%", width: 500, height: 500, background: "radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 60%)", transform: "translate(-50%,-50%)", filter: "blur(80px)", pointerEvents: "none" }} />
           <Reveal>
             <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 2 }}>
@@ -677,7 +645,7 @@ export default function HarvestFile() {
            ══════════════════════════════════════════════════════ */}
       {view === "calculator" && (
         <section style={{ position: "relative", minHeight: "100vh", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 50%, #0F3525 100%)`, overflow: "hidden" }}>
-          <div style={noise} />
+          <div className={noise} />
           {/* Ambient glows */}
           <div style={{ position: "absolute", top: "10%", right: "5%", width: 500, height: 500, background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 60%)", filter: "blur(80px)", pointerEvents: "none", animation: "hf-calc-glow 6s ease-in-out infinite" }} />
           <div style={{ position: "absolute", bottom: "15%", left: "0%", width: 400, height: 400, background: "radial-gradient(circle, rgba(5,150,105,0.05) 0%, transparent 55%)", filter: "blur(80px)", pointerEvents: "none" }} />
@@ -746,7 +714,7 @@ export default function HarvestFile() {
                     <select
                       value={st}
                       onChange={(e) => { setSt(e.target.value); setCounty(""); setCS(""); }}
-                      className="hf-calc-input hf-calc-select"
+                      className="hf-calc-input hf-select-arrow"
                       style={{ ...inpDark, cursor: "pointer" }}
                     >
                       <option value="">Select your state...</option>
@@ -919,7 +887,7 @@ export default function HarvestFile() {
         <>
           {/* ──── Dark Hero Header ──── */}
           <section style={{ position: "relative", background: `linear-gradient(170deg, ${C.dark} 0%, #0A2E1C 50%, #0F3525 100%)`, padding: "120px 24px 80px", overflow: "hidden" }}>
-            <div style={noise} />
+            <div className={noise} />
             <div style={{ position: "absolute", top: "10%", left: "10%", width: 500, height: 500, background: "radial-gradient(circle, rgba(5,150,105,0.08) 0%, transparent 60%)", filter: "blur(80px)", pointerEvents: "none" }} />
             <div style={{ position: "absolute", bottom: "5%", right: "5%", width: 400, height: 400, background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 55%)", filter: "blur(80px)", pointerEvents: "none" }} />
 
@@ -1161,7 +1129,7 @@ export default function HarvestFile() {
               {/* Email capture / alerts */}
               <Reveal delay={280}>
                 <div style={{ background: C.dark, borderRadius: 20, padding: 36, textAlign: "center", marginBottom: 24, position: "relative", overflow: "hidden" }}>
-                  <div style={{ ...noise, opacity: 0.12 }} />
+                  <div className={noiseSubtle} />
                   <div style={{ position: "relative", zIndex: 2 }}>
                     <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Save results & get price alerts</div>
                     <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", marginBottom: 20 }}>We&apos;ll notify you when final MYA prices update your estimates.</div>
@@ -1187,43 +1155,6 @@ export default function HarvestFile() {
         </>
       )}
 
-      {/* ═══ FOOTER ═══ */}
-      <footer style={{ background: C.dark, padding: "56px 24px 32px", position: "relative", overflow: "hidden" }}>
-        <div style={{ ...noise, opacity: 0.1 }} />
-        <div style={{ maxWidth: 1120, margin: "0 auto", position: "relative", zIndex: 2 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 40, marginBottom: 48 }}>
-            <div style={{ minWidth: 200 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, cursor: "pointer" }} onClick={goHome}>
-                <Logo size={26} /><span style={{ fontSize: 17, fontWeight: 800, color: "#fff", letterSpacing: "-0.04em" }}>Harvest<span style={{ color: C.gold }}>File</span></span>
-              </div>
-              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", lineHeight: 1.65, maxWidth: 240 }}>Making USDA farm program data work for American farmers.</p>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>Tools</div>
-              <div onClick={goCalc} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>ARC/PLC Calculator</div>
-              <div onClick={() => scrollTo("features")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>Eligibility Screener</div>
-              <div onClick={() => scrollTo("features")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>County Data</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>Learn</div>
-              <div onClick={() => goPage("/programs/arc-co")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>How ARC-CO Works</div>
-              <div onClick={() => goPage("/programs/plc")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>How PLC Works</div>
-              <div onClick={() => goPage("/programs/eqip")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>EQIP Guide</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.1em" }}>Company</div>
-              <div onClick={() => goPage("/about")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>About</div>
-              <a href="mailto:hello@harvestfile.com" className="hf-link-hover" style={{ display: "block", fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer", textDecoration: "none" }}>Contact</a>
-              <div onClick={() => goPage("/privacy")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>Privacy Policy</div>
-              <div onClick={() => goPage("/terms")} className="hf-link-hover" style={{ fontSize: 13, color: "rgba(255,255,255,0.2)", marginBottom: 10, cursor: "pointer" }}>Terms of Service</div>
-            </div>
-          </div>
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.12)" }}>© 2026 HarvestFile LLC. All rights reserved.</span>
-            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.08)", maxWidth: 420 }}>Uses NASS API. Not endorsed by NASS or affiliated with USDA/FSA.</span>
-          </div>
-        </div>
-      </footer>
-    </div>
+      </div>
   );
 }
