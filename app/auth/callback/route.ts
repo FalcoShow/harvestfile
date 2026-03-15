@@ -1,3 +1,11 @@
+// =============================================================================
+// HarvestFile — OAuth Callback Handler
+// Build 3: Trial Gating — New orgs get 14-day Pro trial (not free tier)
+//
+// Flow: Google OAuth → exchange code → create org + professional if new →
+//       fire trial email sequence → redirect to dashboard
+// =============================================================================
+
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { inngest } from "@/lib/inngest/client";
@@ -24,13 +32,19 @@ export async function GET(request: Request) {
           .single();
 
         if (!existingPro) {
-          // First login — create org + professional record
+          // ── First login — create org + professional record ──────────
+          // Build 3: Every new org starts with 14-day Pro trial
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
           const { data: org } = await supabase
             .from("organizations")
             .insert({
               name: `${user.email?.split("@")[0]}'s Organization`,
-              subscription_tier: "free",
-              max_farmers: 10,
+              subscription_tier: "pro",
+              subscription_status: "trialing",
+              trial_ends_at: trialEndsAt.toISOString(),
+              max_farmers: 50,
               max_users: 1,
             })
             .select("id")
@@ -53,27 +67,26 @@ export async function GET(request: Request) {
               actor_id: user.id,
               action: "user_signup",
               entity_type: "professional",
-              description: `${user.email} created an account`,
+              description: `${user.email} created an account — 14-day Pro trial started`,
             });
 
-            // ── Phase 3D: Fire trial email sequence ──────────────
+            // ── Fire trial email sequence via Inngest ────────────────
             try {
               await inngest.send({
-                name: 'app/user.trial_started',
+                name: "app/user.trial_started",
                 data: {
                   userId: user.id,
                   email: user.email!,
                   firstName:
-                    user.user_metadata?.full_name?.split(' ')[0] ||
-                    user.email?.split('@')[0] ||
-                    'there',
+                    user.user_metadata?.full_name?.split(" ")[0] ||
+                    user.email?.split("@")[0] ||
+                    "there",
                 },
               });
             } catch (err) {
-              console.error('[Inngest] Failed to fire trial_started:', err);
+              console.error("[Inngest] Failed to fire trial_started:", err);
               // Don't block signup if Inngest fails
             }
-            // ─────────────────────────────────────────────────────
           }
         }
       }
@@ -91,5 +104,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_failed`);
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
 }

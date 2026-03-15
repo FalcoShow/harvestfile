@@ -1,3 +1,8 @@
+// =============================================================================
+// HarvestFile — Server Actions (Auth)
+// Build 3: Trial Gating — New orgs get 14-day Pro trial (not free tier)
+// =============================================================================
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -53,12 +58,18 @@ export async function signup(formData: FormData) {
       .single();
 
     if (!existingPro) {
+      // ── Build 3: Every new org starts with 14-day Pro trial ──────
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
       const { data: org } = await supabase
         .from("organizations")
         .insert({
           name: `${fullName}'s Organization`,
-          subscription_tier: "free",
-          max_farmers: 10,
+          subscription_tier: "pro",
+          subscription_status: "trialing",
+          trial_ends_at: trialEndsAt.toISOString(),
+          max_farmers: 50,
           max_users: 1,
         })
         .select("id")
@@ -78,7 +89,7 @@ export async function signup(formData: FormData) {
           actor_id: authData.user.id,
           action: "user_signup",
           entity_type: "professional",
-          description: `${email} created an account`,
+          description: `${email} created an account — 14-day Pro trial started`,
         });
       }
     }
@@ -95,7 +106,7 @@ export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/auth/login");
+  redirect("/login");
 }
 
 export async function forgotPassword(formData: FormData) {

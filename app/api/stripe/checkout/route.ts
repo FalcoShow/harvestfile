@@ -1,3 +1,14 @@
+// =============================================================================
+// HarvestFile — Stripe Checkout Session Creator
+// Build 3: Trial Gating
+//
+// CHANGES:
+// 1. Passes organization_id in Stripe metadata (webhook uses this)
+// 2. Supports pro_monthly, pro_annual, team_monthly, team_annual
+// 3. NO trial_period_days — trial is tracked in database, not Stripe
+// 4. Stores stripe_customer_id on organizations table
+// =============================================================================
+
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { stripe, getOrCreateCustomer, STRIPE_PRICES } from '@/lib/stripe';
@@ -15,29 +26,51 @@ export async function POST(request: Request) {
 
     const { priceType = 'pro_monthly' } = await request.json();
 
-    // Get or create Stripe customer
+    // Validate price type
+    const priceId = STRIPE_PRICES[priceType as keyof typeof STRIPE_PRICES];
+    if (!priceId) {
+      return NextResponse.json(
+        { error: `Invalid price type: ${priceType}` },
+        { status: 400 }
+      );
+    }
+
+    // ── Look up the professional's organization ───────────────────────────
+    // Auth chain: auth.users → professionals → organizations
+    const { data: professional } = await supabase
+      .from('professionals')
+      .select('org_id')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (!professional?.org_id) {
+      return NextResponse.json(
+        { error: 'No organization found. Please contact support.' },
+        { status: 400 }
+      );
+    }
+
+    const orgId = professional.org_id;
+
+    // ── Get or create Stripe customer ─────────────────────────────────────
     const customerId = await getOrCreateCustomer(
       user.email!,
       user.id,
       user.user_metadata?.full_name
     );
 
-    // Update Supabase profile with Stripe customer ID
+    // Store Stripe customer ID on the organization
     await supabase
-      .from('user_profiles')
-      .update({ stripe_customer_id: customerId })
-      .eq('id', user.id);
+      .from('organizations')
+      .update({
+        stripe_customer_id: customerId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orgId);
 
-    // Create checkout session
-    const priceId = STRIPE_PRICES[priceType as keyof typeof STRIPE_PRICES];
-
-    if (!priceId) {
-      return NextResponse.json(
-        { error: 'Invalid price type' },
-        { status: 400 }
-      );
-    }
-
+    // ── Create Stripe Checkout Session ────────────────────────────────────
+    // NO trial_period_days — the user is already in a database-tracked trial
+    // When they subscribe, they're upgrading to a paid plan immediately
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -49,15 +82,16 @@ export async function POST(request: Request) {
         },
       ],
       subscription_data: {
-        trial_period_days: 14,
         metadata: {
           supabase_user_id: user.id,
+          organization_id: orgId,
         },
       },
       success_url: `${request.headers.get('origin')}/dashboard?subscription=success`,
       cancel_url: `${request.headers.get('origin')}/pricing?subscription=canceled`,
       metadata: {
         supabase_user_id: user.id,
+        organization_id: orgId,
       },
     });
 

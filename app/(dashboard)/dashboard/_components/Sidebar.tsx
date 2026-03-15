@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useSubscription } from "./SubscriptionProvider";
 
 // ─── Icon components (inline SVGs to avoid dependency issues) ───────────────
 
@@ -154,6 +155,7 @@ interface SidebarProps {
   org: {
     name: string;
     subscription_tier: string;
+    subscription_status: string;
   };
 }
 
@@ -163,6 +165,7 @@ export default function Sidebar({ user, org }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const sub = useSubscription();
 
   async function handleLogout() {
     const supabase = createClient();
@@ -170,13 +173,6 @@ export default function Sidebar({ user, org }: SidebarProps) {
     router.push("/login");
     router.refresh();
   }
-
-  const tierColors: Record<string, string> = {
-    free: "bg-gray-500/20 text-gray-400",
-    starter: "bg-blue-500/20 text-blue-400",
-    professional: "bg-emerald-500/20 text-emerald-400",
-    enterprise: "bg-amber-500/20 text-amber-400",
-  };
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -208,12 +204,25 @@ export default function Sidebar({ user, org }: SidebarProps) {
             <div className="text-xs text-gray-500 truncate">{org.name}</div>
           </div>
         </div>
+        {/* ── Subscription badge (Build 3) ─────────── */}
         <div
-          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium capitalize ${
-            tierColors[org.subscription_tier] || tierColors.free
+          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+            sub.isTrialing
+              ? "bg-emerald-500/20 text-emerald-400"
+              : sub.isActive
+              ? "bg-emerald-500/20 text-emerald-400"
+              : sub.isPastDue
+              ? "bg-red-500/20 text-red-400"
+              : "bg-amber-500/20 text-amber-400"
           }`}
         >
-          {org.subscription_tier} plan
+          {sub.isTrialing
+            ? `Pro Trial · ${sub.daysRemaining}d left`
+            : sub.isActive
+            ? `${org.subscription_tier.charAt(0).toUpperCase() + org.subscription_tier.slice(1)} plan`
+            : sub.isPastDue
+            ? "Payment issue"
+            : "Expired"}
         </div>
       </div>
 
