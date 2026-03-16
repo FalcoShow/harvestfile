@@ -1,10 +1,11 @@
 // =============================================================================
 // HarvestFile — County ARC/PLC Page
-// Phase 5A-2 + Phase 6B: County SEO page with Scenario Modeler
+// Phase 5A-2 + Phase 6B + Phase 7A: County SEO + Scenario Modeler + Benchmarking
 //
 // THE MONEY PAGE — this is what every farmer searching "ARC PLC [county]" lands on.
 // Server Component for full SEO. Renders real USDA data.
 // Phase 6B adds the interactive Multi-Year Scenario Modeler as a client island.
+// Phase 7A adds the "Facebook moment" — live anonymous election benchmarking.
 // =============================================================================
 
 import { Metadata } from 'next';
@@ -18,6 +19,7 @@ import {
   getRecommendation,
   type CommodityGroup,
 } from '@/lib/data/county-queries';
+import { BenchmarkSection } from '@/components/county/BenchmarkSection';
 
 // ─── Dynamic Import: Scenario Modeler (client-only, lazy-loaded) ─────────────
 // Keeps the initial page load fast. Recharts + modeler bundle (~40KB gzip)
@@ -109,7 +111,7 @@ function fmtPrice(n: number | null | undefined): string {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export const revalidate = 86400; // ISR: revalidate daily
+export const revalidate = 60; // ISR: revalidate every 60s for live benchmarks
 
 export default async function CountyPage({
   params,
@@ -273,6 +275,18 @@ export default async function CountyPage({
             </div>
           </section>
         )}
+
+        {/* ═══ LIVE ELECTION BENCHMARKS — Phase 7A "The Facebook Moment" ═══ */}
+        <BenchmarkSection
+          countyFips={county.county_fips}
+          countyName={county.display_name}
+          stateName={state.name}
+          stateAbbr={state.abbreviation}
+          cropGroups={cropGroups.map(g => ({
+            commodity_code: g.commodity_code,
+            display_name: g.display_name,
+          }))}
+        />
 
         {/* ═══ SCENARIO MODELER (Phase 6B) ═══ */}
         {modelerCrops.length > 0 && (
