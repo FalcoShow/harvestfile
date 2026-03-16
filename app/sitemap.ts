@@ -1,9 +1,9 @@
 // =============================================================================
 // HarvestFile — Dynamic Sitemap Generator
-// Phase 5A-2: Expanded to include all state hub + county pages
+// Phase 5A-2 → Phase 8C: Added /elections page
 //
 // Next.js App Router automatically serves this at /sitemap.xml
-// Now generates ~2,500+ URLs for county SEO pages
+// Now generates ~2,500+ URLs for county SEO pages + election map
 // =============================================================================
 
 import { MetadataRoute } from 'next';
@@ -26,6 +26,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.95,
+    },
+    {
+      url: `${baseUrl}/elections`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9,
     },
     {
       url: `${baseUrl}/pricing`,

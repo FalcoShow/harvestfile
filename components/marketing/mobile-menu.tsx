@@ -1,3 +1,8 @@
+// =============================================================================
+// HarvestFile — Mobile Menu (Client Component)
+// Build 2 → Phase 8C: Added "Election Map" nav link
+// =============================================================================
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -95,6 +100,7 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
               <div className="space-y-1">
                 {[
                   { href: "/check", label: "ARC/PLC Calculator" },
+                  { href: "/elections", label: "Election Map" },
                   { href: "/pricing", label: "Pricing" },
                   { href: "/programs/arc-co", label: "Programs" },
                   { href: "/about", label: "About" },

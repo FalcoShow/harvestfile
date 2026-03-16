@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Marketing Header (Server Component)
-// Build 2: Auth-aware — checks Supabase session server-side
+// Build 2 → Phase 8C: Added "Election Map" nav link
 //
 // Logged out: "Log in" + "Get Started" CTAs
 // Logged in:  "Go to Dashboard →" CTA
@@ -39,6 +39,12 @@ export async function MarketingHeader() {
             className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
           >
             Calculator
+          </Link>
+          <Link
+            href="/elections"
+            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
+          >
+            Election Map
           </Link>
           <Link
             href="/pricing"

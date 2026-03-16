@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Build 2: Shared footer for all marketing pages
+// Build 2 → Phase 8C: Added Election Map link to Tools column
 // =============================================================================
 
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { Logo } from "./logo";
 const footerLinks = {
   Tools: [
     { label: "ARC/PLC Calculator", href: "/check" },
+    { label: "Election Map", href: "/elections" },
     { label: "Pricing", href: "/pricing" },
   ],
   Learn: [
