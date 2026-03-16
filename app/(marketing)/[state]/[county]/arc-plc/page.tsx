@@ -1,11 +1,13 @@
 // =============================================================================
 // HarvestFile — County ARC/PLC Page
-// Phase 5A-2 + Phase 6B + Phase 7A: County SEO + Scenario Modeler + Benchmarking
+// Phase 5A-2 + Phase 6B + Phase 7A + Phase 7B:
+// County SEO + Scenario Modeler + Benchmarking + Historical Enrollment Data
 //
 // THE MONEY PAGE — this is what every farmer searching "ARC PLC [county]" lands on.
 // Server Component for full SEO. Renders real USDA data.
 // Phase 6B adds the interactive Multi-Year Scenario Modeler as a client island.
 // Phase 7A adds the "Facebook moment" — live anonymous election benchmarking.
+// Phase 7B adds historical FSA enrollment data (cold-start) + dynamic OG images.
 // =============================================================================
 
 import { Metadata } from 'next';
@@ -20,6 +22,7 @@ import {
   type CommodityGroup,
 } from '@/lib/data/county-queries';
 import { BenchmarkSection } from '@/components/county/BenchmarkSection';
+import { HistoricalEnrollmentSection } from '@/components/county/HistoricalEnrollmentSection';
 
 // ─── Dynamic Import: Scenario Modeler (client-only, lazy-loaded) ─────────────
 // Keeps the initial page load fast. Recharts + modeler bundle (~40KB gzip)
@@ -53,6 +56,8 @@ function ModelerSkeleton() {
 }
 
 // ─── Dynamic Metadata ────────────────────────────────────────────────────────
+// NOTE: OG images are now handled by opengraph-image.tsx (Phase 7B).
+// The file convention auto-generates dynamic, data-driven social cards per county.
 
 export async function generateMetadata({
   params,
@@ -275,6 +280,13 @@ export default async function CountyPage({
             </div>
           </section>
         )}
+
+        {/* ═══ HISTORICAL ENROLLMENT — Phase 7B "Cold-Start Data" ═══ */}
+        <HistoricalEnrollmentSection
+          countyFips={county.county_fips}
+          countyName={county.display_name}
+          stateAbbr={state.abbreviation}
+        />
 
         {/* ═══ LIVE ELECTION BENCHMARKS — Phase 7A "The Facebook Moment" ═══ */}
         <BenchmarkSection
