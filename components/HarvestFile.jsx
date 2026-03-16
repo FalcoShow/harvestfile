@@ -330,7 +330,7 @@ export default function HarvestFile() {
               {/* Urgency line */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 36, animation: mounted ? "hf-fade-up 0.7s ease 0.42s both" : "none" }}>
                 <div style={{ width: 6, height: 6, borderRadius: 100, background: "#EF4444", animation: "hf-pulse 1.5s ease-in-out infinite" }} />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>2025 enrollment deadline approaching — don&apos;t leave money on the table</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>2026 ARC/PLC election required under OBBBA — new rules, new decision</span>
               </div>
 
               <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", animation: mounted ? "hf-fade-up 0.7s ease 0.5s both" : "none" }}>
