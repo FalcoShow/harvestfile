@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Marketing Header (Server Component)
-// Build 2 → Phase 8C: Added "Election Map" nav link
+// Build 2 → Phase 8C Build 4: Added "OBBBA Guide" nav link
 //
 // Logged out: "Log in" + "Get Started" CTAs
 // Logged in:  "Go to Dashboard →" CTA
@@ -45,6 +45,12 @@ export async function MarketingHeader() {
             className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
           >
             Election Map
+          </Link>
+          <Link
+            href="/obbba"
+            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
+          >
+            OBBBA Guide
           </Link>
           <Link
             href="/pricing"

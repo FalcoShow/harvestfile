@@ -1,9 +1,9 @@
 // =============================================================================
 // HarvestFile — Dynamic Sitemap Generator
-// Phase 5A-2 → Phase 8C: Added /elections page
+// Phase 5A-2 → Phase 8C Build 4: Added /elections + OBBBA content pages
 //
 // Next.js App Router automatically serves this at /sitemap.xml
-// Now generates ~2,500+ URLs for county SEO pages + election map
+// Now generates ~2,500+ URLs for county SEO pages + election map + OBBBA
 // =============================================================================
 
 import { MetadataRoute } from 'next';
@@ -34,6 +34,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
+      url: `${baseUrl}/obbba`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
       url: `${baseUrl}/pricing`,
       lastModified: now,
       changeFrequency: 'monthly',
@@ -58,6 +64,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     'arc-co', 'plc', 'eqip', 'crp', 'csp',
   ].map((program) => ({
     url: `${baseUrl}/programs/${program}`,
+    lastModified: now,
+    changeFrequency: 'monthly' as const,
+    priority: 0.8,
+  }));
+
+  // ── OBBBA content cluster pages ───────────────────────────────────────
+  const obbbaPages: MetadataRoute.Sitemap = [
+    'new-base-acres', 'arc-sco-stacking',
+  ].map((slug) => ({
+    url: `${baseUrl}/obbba/${slug}`,
     lastModified: now,
     changeFrequency: 'monthly' as const,
     priority: 0.8,
@@ -133,6 +149,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...corePages,
     ...programPages,
+    ...obbbaPages,
     ...statePages,
     ...countyPages,
     ...authPages,

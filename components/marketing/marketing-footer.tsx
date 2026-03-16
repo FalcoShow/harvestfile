@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Build 2 → Phase 8C: Added Election Map link to Tools column
+// Build 2 → Phase 8C Build 4: Added Election Map + OBBBA Guide links
 // =============================================================================
 
 import Link from "next/link";
@@ -13,6 +13,7 @@ const footerLinks = {
     { label: "Pricing", href: "/pricing" },
   ],
   Learn: [
+    { label: "OBBBA Guide", href: "/obbba" },
     { label: "How ARC-CO Works", href: "/programs/arc-co" },
     { label: "How PLC Works", href: "/programs/plc" },
     { label: "EQIP Guide", href: "/programs/eqip" },
