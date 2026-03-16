@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — OAuth Callback Handler
-// Build 3: Trial Gating — New orgs get 14-day Pro trial (not free tier)
+// Phase 8A: Fixed auth_user_id → auth_id to match actual DB column
 //
 // Flow: Google OAuth → exchange code → create org + professional if new →
 //       fire trial email sequence → redirect to dashboard
@@ -25,15 +25,16 @@ export async function GET(request: Request) {
       } = await supabase.auth.getUser();
 
       if (user) {
+        // FIXED: column is auth_id (not auth_user_id)
         const { data: existingPro } = await supabase
           .from("professionals")
           .select("id, org_id")
-          .eq("auth_user_id", user.id)
+          .eq("auth_id", user.id)
           .single();
 
         if (!existingPro) {
           // ── First login — create org + professional record ──────────
-          // Build 3: Every new org starts with 14-day Pro trial
+          // Every new org starts with 14-day Pro trial
           const trialEndsAt = new Date();
           trialEndsAt.setDate(trialEndsAt.getDate() + 14);
 
@@ -51,9 +52,10 @@ export async function GET(request: Request) {
             .single();
 
           if (org) {
+            // FIXED: column is auth_id (not auth_user_id)
             await supabase.from("professionals").insert({
               org_id: org.id,
-              auth_user_id: user.id,
+              auth_id: user.id,
               email: user.email!,
               full_name:
                 user.user_metadata?.full_name ||

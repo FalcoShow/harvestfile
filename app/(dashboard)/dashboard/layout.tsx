@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — (dashboard) Route Group Layout
-// Build 3: Trial Gating (v3 — fixed import + column issues)
+// Phase 8A: Fixed auth_user_id → auth_id to match actual DB column
 //
 // Auth gate → redirects to /login if no session
 // Subscription gate → redirects to /trial-expired if trial expired
@@ -75,7 +75,7 @@ export default async function DashboardLayout({
   }
 
   // ── Step 1: Get professional record ─────────────────────────────────────
-  // Try auth_user_id first, fall back to auth_id (legacy column name)
+  // FIXED: Use auth_id directly (the actual column name in the DB)
   let professional: {
     id: string;
     full_name: string;
@@ -87,61 +87,50 @@ export default async function DashboardLayout({
   const { data: proData, error: proError } = await supabase
     .from("professionals")
     .select("id, full_name, email, role, org_id")
-    .eq("auth_user_id", user.id)
+    .eq("auth_id", user.id)
     .single();
 
   if (proData) {
     professional = proData;
-  } else if (proError?.message?.includes("does not exist")) {
-    // Column name might be auth_id (legacy) — try fallback
-    const { data: proFallback } = await supabase
-      .from("professionals")
-      .select("id, full_name, email, role, org_id")
-      .eq("auth_id", user.id)
-      .single();
-
-    if (proFallback) {
-      professional = proFallback;
-    }
   }
 
   // ── Edge case: no professional record — create org + professional ───────
-  if (!professional && proError?.code === "PGRST116") {
-    // PGRST116 = "JSON object requested, multiple (or no) rows returned"
-    // This means the row genuinely doesn't exist
-    const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
-
-    const { data: org } = await supabase
-      .from("organizations")
-      .insert({
-        name: `${user.email?.split("@")[0]}'s Organization`,
-        subscription_tier: "pro",
-        subscription_status: "trialing",
-        trial_ends_at: trialEndsAt.toISOString(),
-        max_farmers: 50,
-        max_users: 1,
-      })
-      .select("id")
-      .single();
-
-    if (org) {
-      await supabase.from("professionals").insert({
-        org_id: org.id,
-        auth_user_id: user.id,
-        email: user.email!,
-        full_name:
-          user.user_metadata?.full_name ||
-          user.email?.split("@")[0] ||
-          "User",
-        role: "admin",
-      });
-
-      redirect("/dashboard");
-    }
-  }
-
   if (!professional) {
+    // Check if this is genuinely "no row" vs some other error
+    if (proError?.code === "PGRST116" || !proData) {
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
+      const { data: org } = await supabase
+        .from("organizations")
+        .insert({
+          name: `${user.email?.split("@")[0]}'s Organization`,
+          subscription_tier: "pro",
+          subscription_status: "trialing",
+          trial_ends_at: trialEndsAt.toISOString(),
+          max_farmers: 50,
+          max_users: 1,
+        })
+        .select("id")
+        .single();
+
+      if (org) {
+        // FIXED: column is auth_id (not auth_user_id)
+        await supabase.from("professionals").insert({
+          org_id: org.id,
+          auth_id: user.id,
+          email: user.email!,
+          full_name:
+            user.user_metadata?.full_name ||
+            user.email?.split("@")[0] ||
+            "User",
+          role: "admin",
+        });
+
+        redirect("/dashboard");
+      }
+    }
+
     console.error(
       "[Dashboard Layout] Could not load professional:",
       proError?.message || "unknown error"
