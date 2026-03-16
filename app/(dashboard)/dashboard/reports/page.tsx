@@ -24,33 +24,51 @@ interface Report {
 export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchReports() {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      const { data: professional } = await supabase
-        .from("professionals")
-        .select("org_id")
-        .eq("auth_id", user.id)
-        .single();
+        if (!user) {
+          setLoading(false);
+          return;
+        }
 
-      if (!professional) return;
+        // FIXED: column is auth_id (not auth_user_id)
+        const { data: professional } = await supabase
+          .from("professionals")
+          .select("org_id")
+          .eq("auth_id", user.id)
+          .single();
 
-      const { data, error } = await supabase
-        .from("reports")
-        .select("*, farmers(full_name, county, state), payments(amount_cents)")
-        .eq("org_id", professional.org_id)
-        .order("created_at", { ascending: false });
+        if (!professional) {
+          setLoading(false);
+          return;
+        }
 
-      if (!error && data) {
-        setReports(data);
+        const { data, error: queryError } = await supabase
+          .from("reports")
+          .select("*, farmers(full_name, county, state), payments(amount_cents)")
+          .eq("org_id", professional.org_id)
+          .order("created_at", { ascending: false });
+
+        if (queryError) {
+          console.error("Reports query error:", queryError);
+          setError("Failed to load reports");
+        } else if (data) {
+          setReports(data);
+        }
+      } catch (err) {
+        console.error("Reports fetch error:", err);
+        setError("Something went wrong loading reports");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
 
     fetchReports();
@@ -89,47 +107,74 @@ export default function ReportsPage() {
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         </div>
+      ) : error ? (
+        <div className="rounded-xl bg-red-900/20 border border-red-800 p-8 text-center">
+          <p className="text-red-400">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 text-sm text-emerald-400 hover:text-emerald-300"
+          >
+            Try again
+          </button>
+        </div>
       ) : reports.length === 0 ? (
-        <div className="text-center py-20 border border-gray-800 rounded-xl bg-gray-900/50">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-800 mb-4">
-            <svg className="w-7 h-7 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-12 text-center">
+          <div className="text-4xl mb-4">📄</div>
+          <h3 className="text-lg font-semibold text-white mb-2">No reports yet</h3>
+          <p className="text-gray-400 mb-6 max-w-md mx-auto">
+            Generate your first AI-powered report from the Intelligence Hub or from a farmer&apos;s detail page.
+          </p>
+          <Link
+            href="/dashboard/intelligence"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-white mb-1">No reports yet</h3>
-          <p className="text-gray-500 mb-4">Generate your first report from a farmer&apos;s profile page.</p>
-          <Link href="/dashboard/farmers" className="text-emerald-400 hover:text-emerald-300 font-semibold">Go to Farmers &rarr;</Link>
+            Open Intelligence Hub
+          </Link>
         </div>
       ) : (
         <div className="space-y-3">
           {reports.map((report) => (
-            <div key={report.id} className="border border-gray-800 rounded-xl bg-gray-900/50 p-5 hover:border-gray-700 transition">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
+            <div
+              key={report.id}
+              className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-5 hover:bg-white/[0.04] transition-colors"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="text-lg font-semibold text-white">{report.farmers?.full_name || "Unknown Farmer"}</h3>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${statusStyles[report.status] || statusStyles.pending}`}>{report.status}</span>
+                    <h3 className="text-sm font-semibold text-white truncate">
+                      {report.report_type
+                        ? report.report_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                        : "Report"}
+                    </h3>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide border ${
+                        statusStyles[report.status] || statusStyles.pending
+                      }`}
+                    >
+                      {report.status}
+                    </span>
                   </div>
-                  <p className="text-sm text-gray-500">{report.farmers?.county}, {report.farmers?.state} &bull; {formatDate(report.created_at)}</p>
-                  {report.content?.total_estimated_payments && (
-                    <p className="text-sm text-emerald-400 mt-2 font-medium">
-                      Optimized Est. Payment: ${Number(report.content.total_estimated_payments.optimized_elections).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  {report.farmers && (
+                    <p className="text-xs text-gray-500">
+                      {report.farmers.full_name} — {report.farmers.county},{" "}
+                      {report.farmers.state}
                     </p>
                   )}
+                  <p className="text-xs text-gray-600 mt-1">
+                    {formatDate(report.created_at)}
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  {report.status === "complete" && (
-                    <a href={`/api/reports/${report.id}/download`} className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download PDF
-                    </a>
-                  )}
-                  {report.status === "processing" && (
-                    <span className="text-sm text-yellow-400 animate-pulse">Generating...</span>
-                  )}
-                </div>
+                {report.status === "complete" && (
+                  <Link
+                    href={`/api/reports/${report.id}/download`}
+                    className="flex-shrink-0 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 text-xs font-semibold rounded-lg hover:bg-emerald-600/30 transition-colors"
+                  >
+                    Download PDF
+                  </Link>
+                )}
               </div>
             </div>
           ))}

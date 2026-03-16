@@ -204,7 +204,7 @@ export default function Sidebar({ user, org }: SidebarProps) {
             <div className="text-xs text-gray-500 truncate">{org.name}</div>
           </div>
         </div>
-        {/* ── Subscription badge (Build 3) ─────────── */}
+        {/* ── Subscription badge (Phase 8A: fixed null daysRemaining) ── */}
         <div
           className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
             sub.isTrialing
@@ -217,7 +217,9 @@ export default function Sidebar({ user, org }: SidebarProps) {
           }`}
         >
           {sub.isTrialing
-            ? `Pro Trial · ${sub.daysRemaining}d left`
+            ? sub.daysRemaining !== null
+              ? `Pro Trial · ${sub.daysRemaining}d left`
+              : "Pro Trial"
             : sub.isActive
             ? `${org.subscription_tier.charAt(0).toUpperCase() + org.subscription_tier.slice(1)} plan`
             : sub.isPastDue

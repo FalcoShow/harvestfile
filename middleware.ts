@@ -1,15 +1,35 @@
 // =============================================================================
 // HarvestFile — Consolidated Middleware
-// Phase 4A Step 2, Build 1: Route Group Migration
+// Phase 8A: Revenue Plumbing Fix
 //
 // Handles: auth session refresh, dashboard route protection, auth redirects
-// Auth pages are now at /login and /signup (via (auth) route group)
+// CRITICAL: Stripe webhook route is EXCLUDED from the matcher to prevent
+// 307 redirects that kill webhook delivery.
 // =============================================================================
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // ── EARLY RETURN: Skip auth logic for Stripe webhook ──────────────────
+  // Stripe POSTs have no Supabase cookies. Running the SSR cookie logic
+  // on them corrupts the response into a 307 redirect.
+  if (pathname.startsWith('/api/stripe/webhook') || pathname.startsWith('/api/webhooks/stripe')) {
+    return NextResponse.next();
+  }
+
+  // ── EARLY RETURN: Skip auth logic for public API routes ───────────────
+  // These are called from client components or external services
+  if (
+    pathname.startsWith('/api/benchmarks') ||
+    pathname.startsWith('/api/counties') ||
+    pathname.startsWith('/api/inngest')
+  ) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -40,8 +60,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-
   // ── Protect dashboard routes — redirect to login if no session ────────
   if (!user && pathname.startsWith('/dashboard')) {
     const url = request.nextUrl.clone();
@@ -68,6 +86,9 @@ export const config = {
     '/login',
     '/signup',
     // Match API routes that need session refresh
+    // NOTE: Stripe webhook, benchmarks, counties, and inngest are excluded
+    // via early returns above (they still match here for session refresh
+    // on authenticated API calls like /api/stripe/checkout)
     '/api/:path*',
   ],
 };
