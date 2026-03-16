@@ -509,3 +509,42 @@
   0%, 100% { opacity: 1; box-shadow: 0 0 6px currentColor; }
   50% { opacity: 0.5; box-shadow: 0 0 2px currentColor; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PHASE 9: HOMEPAGE REVOLUTION — ANIMATION ADDITIONS
+   Add this block to the END of your globals.css file (before the closing brace
+   if there is one, or just at the very bottom)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Hero Entrance Animation ────────────────────────────────────────────────── */
+@keyframes hf-hero-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Gold Button Shimmer ────────────────────────────────────────────────────── */
+@keyframes hf-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* ── Reduced Motion: Disable all custom animations ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
