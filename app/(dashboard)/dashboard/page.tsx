@@ -152,7 +152,7 @@ export default async function DashboardPage() {
               },
               {
                 label: "Generate report",
-                href: "/dashboard/reports/new",
+                href: "/dashboard/intelligence",
                 icon: "📝",
               },
               {
