@@ -1,11 +1,12 @@
 // =============================================================================
 // HarvestFile — ElectionMapTeaser (Client Component)
-// Phase 9 Build 1: Homepage Revolution
+// Phase 9 Build 1.5: Cinematic Homepage Polish
 //
-// A premium teaser section that showcases the election choropleth map.
-// Lazy-loads the full ElectionMap component to protect performance.
-// Dark section with gold accents — this is the "holy shit" moment
-// where farmers realize HarvestFile has data nobody else has.
+// Changes from Build 1:
+//   - Removed bg-harvest-forest-950 (parent wrapper provides dark bg)
+//   - Reduced top padding (flows from hero, no visual break)
+//   - Kept noise texture for depth continuity
+//   - Gold gradient accent subtle enough to not create a "section" feel
 // =============================================================================
 
 'use client';
@@ -15,7 +16,6 @@ import Link from 'next/link';
 import { RevealOnScroll } from './shared/RevealOnScroll';
 import { AnimatedCounter } from './shared/AnimatedCounter';
 
-// Lazy-load the map — it's ~400KB with react-simple-maps + TopoJSON
 const ElectionMap = dynamic(
   () => import('@/components/marketing/ElectionMap'),
   {
@@ -33,11 +33,11 @@ const ElectionMap = dynamic(
 
 export function ElectionMapTeaser() {
   return (
-    <section className="relative overflow-hidden bg-harvest-forest-950 py-20 sm:py-28">
-      {/* Noise */}
+    <section className="relative overflow-hidden pt-8 pb-16 sm:pt-12 sm:pb-24">
+      {/* Noise — continuity with hero */}
       <div className="hf-noise-subtle" />
 
-      {/* Gradient accents */}
+      {/* Subtle gradient accent */}
       <div
         className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none"
         style={{
@@ -47,9 +47,8 @@ export function ElectionMapTeaser() {
 
       <div className="relative z-10 mx-auto max-w-[1100px] px-6">
         <RevealOnScroll>
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] mb-6">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] mb-5">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-harvest-gold opacity-75" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-harvest-gold" />
@@ -72,17 +71,14 @@ export function ElectionMapTeaser() {
           </div>
         </RevealOnScroll>
 
-        {/* Map */}
-        <RevealOnScroll delay={150}>
+        <RevealOnScroll delay={100}>
           <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
             <ElectionMap />
           </div>
         </RevealOnScroll>
 
-        {/* Stats + CTA */}
-        <RevealOnScroll delay={300}>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-8">
-            {/* Stats */}
+        <RevealOnScroll delay={200}>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-8 sm:gap-12">
               {[
                 { value: 3142, label: 'Counties mapped' },
@@ -100,20 +96,17 @@ export function ElectionMapTeaser() {
               ))}
             </div>
 
-            {/* CTAs */}
-            <div className="flex items-center gap-3">
-              <Link
-                href="/elections"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
-                  bg-white/[0.06] border border-white/[0.1] text-[14px] font-semibold text-white/70
-                  hover:bg-white/[0.1] hover:text-white transition-all duration-200"
-              >
-                Explore Full Map
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Link>
-            </div>
+            <Link
+              href="/elections"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
+                bg-white/[0.06] border border-white/[0.1] text-[14px] font-semibold text-white/70
+                hover:bg-white/[0.1] hover:text-white transition-all duration-200"
+            >
+              Explore Full Map
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </Link>
           </div>
         </RevealOnScroll>
       </div>

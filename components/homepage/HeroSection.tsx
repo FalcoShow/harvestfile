@@ -1,22 +1,13 @@
 // =============================================================================
 // HarvestFile — HeroSection (Client Component)
-// Phase 9 Build 1: Homepage Revolution
+// Phase 9 Build 1.5: Cinematic Homepage Polish
 //
-// THE FIRST THING EVERY FARMER SEES. This must create an immediate
-// "Woah, who built this?" reaction within 2 seconds of landing.
-//
-// Design approach:
-//   - Dark forest background with gradient mesh orbs (Linear-inspired)
-//   - Noise texture overlay for depth
-//   - Staggered CSS entrance animations (no layout shift)
-//   - Gold shimmer CTA button
-//   - Trust metrics embedded in hero (32% signup increase pattern)
-//   - Animated stat counters at bottom
-//
-// Performance:
-//   - CSS animations only (no JS animation libraries)
-//   - No images — pure CSS gradients + SVG noise
-//   - Intersection Observer only for stat counters
+// Changes from Build 1:
+//   - Removed bottom gradient fade (page orchestrator handles transitions)
+//   - Removed "Scroll" indicator (breaks seamless flow illusion)
+//   - Hero flows directly into Election Map with no visual break
+//   - Added scroll-padding for nav offset
+//   - Reduced min-height slightly so bottom of hero hints at next section
 // =============================================================================
 
 'use client';
@@ -26,7 +17,7 @@ import { AnimatedCounter } from './shared/AnimatedCounter';
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden bg-harvest-forest-950">
+    <section className="relative min-h-[92dvh] flex flex-col items-center justify-center overflow-hidden bg-harvest-forest-950 pt-24">
       {/* ── Gradient Mesh Background ────────────────────────────────── */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -52,7 +43,7 @@ export function HeroSection() {
       />
 
       {/* ── Main Content ────────────────────────────────────────────── */}
-      <div className="relative z-10 mx-auto max-w-[900px] px-6 py-24 sm:py-32 text-center">
+      <div className="relative z-10 mx-auto max-w-[900px] px-6 py-16 sm:py-20 text-center">
 
         {/* Badge */}
         <div
@@ -119,7 +110,6 @@ export function HeroSection() {
               backgroundSize: '200% auto',
             }}
           >
-            {/* Shimmer overlay */}
             <span
               className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
               style={{
@@ -151,7 +141,7 @@ export function HeroSection() {
 
         {/* Trust Strip */}
         <div
-          className="flex items-center justify-center gap-x-5 gap-y-2 flex-wrap mb-16"
+          className="flex items-center justify-center gap-x-5 gap-y-2 flex-wrap mb-12"
           style={{ animation: 'hf-hero-fade-in 0.8s ease-out 0.4s both' }}
         >
           {[
@@ -201,24 +191,8 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* ── Bottom Fade ─────────────────────────────────────────────── */}
-      <div
-        className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
-        style={{
-          background: 'linear-gradient(to top, var(--hf-background), transparent)',
-        }}
-      />
-
-      {/* ── Scroll Indicator ────────────────────────────────────────── */}
-      <div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-30"
-        style={{ animation: 'hf-hero-fade-in 1s ease-out 1s both' }}
-      >
-        <span className="text-[11px] text-white/40 font-medium tracking-widest uppercase">
-          Scroll
-        </span>
-        <div className="w-[1px] h-8 bg-gradient-to-b from-white/30 to-transparent" />
-      </div>
+      {/* ── Subtle gradient hint that content continues below ───────── */}
+      <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none bg-gradient-to-t from-harvest-forest-950/50 to-transparent" />
     </section>
   );
 }

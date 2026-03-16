@@ -1,17 +1,19 @@
 // =============================================================================
 // HarvestFile — Marketing Header (Server Component)
-// Build 2 → Phase 8C Build 4: Added "OBBBA Guide" nav link
+// Phase 9 Build 1.5: Cinematic Homepage Polish
 //
-// Logged out: "Log in" + "Get Started" CTAs
-// Logged in:  "Go to Dashboard →" CTA
-// No "use client" — auth resolves before HTML ships = zero FOUC
+// ADAPTIVE HEADER — text colors are driven by CSS custom properties
+// injected by HeaderScrollWrapper based on scroll position and section theme.
+// This means nav text is white on dark backgrounds and dark on light backgrounds.
+//
+// Auth-aware: shows "Go to Dashboard" when logged in, "Log in" + "Get Started" when not.
 // =============================================================================
 
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { HeaderScrollWrapper } from "./header-scroll-wrapper";
-import { MobileMenu } from "./mobile-menu";
-import { Logo } from "./logo";
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { HeaderScrollWrapper } from './header-scroll-wrapper';
+import { MobileMenu } from './mobile-menu';
+import { Logo } from './logo';
 
 export async function MarketingHeader() {
   const supabase = await createClient();
@@ -24,52 +26,36 @@ export async function MarketingHeader() {
   return (
     <HeaderScrollWrapper>
       <nav className="relative flex h-16 items-center justify-between">
-        {/* Logo */}
+        {/* Logo — uses CSS custom property for adaptive color */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <Logo size={28} />
-          <span className="text-[17px] font-extrabold tracking-[-0.04em] text-foreground">
+          <span
+            className="text-[17px] font-extrabold tracking-[-0.04em] transition-colors duration-500"
+            style={{ color: 'var(--nav-text)' }}
+          >
             Harvest<span className="text-harvest-gold">File</span>
           </span>
         </Link>
 
         {/* Desktop nav links */}
         <div className="hidden md:flex items-center gap-8">
-          <Link
-            href="/check"
-            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
-          >
-            Calculator
-          </Link>
-          <Link
-            href="/elections"
-            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
-          >
-            Election Map
-          </Link>
-          <Link
-            href="/obbba"
-            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
-          >
-            OBBBA Guide
-          </Link>
-          <Link
-            href="/pricing"
-            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
-          >
-            Pricing
-          </Link>
-          <Link
-            href="/programs/arc-co"
-            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
-          >
-            Programs
-          </Link>
-          <Link
-            href="/about"
-            className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
-          >
-            About
-          </Link>
+          {[
+            { href: '/check', label: 'Calculator' },
+            { href: '/elections', label: 'Election Map' },
+            { href: '/obbba', label: 'OBBBA Guide' },
+            { href: '/pricing', label: 'Pricing' },
+            { href: '/programs/arc-co', label: 'Programs' },
+            { href: '/about', label: 'About' },
+          ].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="text-sm font-medium transition-colors duration-500 hover:opacity-80"
+              style={{ color: 'var(--nav-text-muted)' }}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
 
         {/* Desktop CTAs */}
@@ -77,7 +63,11 @@ export async function MarketingHeader() {
           {isAuthenticated ? (
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary-hover transition-colors"
+              className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-500"
+              style={{
+                backgroundColor: 'var(--nav-cta-bg)',
+                color: 'var(--nav-cta-text)',
+              }}
             >
               Go to Dashboard →
             </Link>
@@ -85,13 +75,18 @@ export async function MarketingHeader() {
             <>
               <Link
                 href="/login"
-                className="text-sm font-medium text-foreground/55 hover:text-foreground transition-colors"
+                className="text-sm font-medium transition-colors duration-500 hover:opacity-80"
+                style={{ color: 'var(--nav-text-muted)' }}
               >
                 Log in
               </Link>
               <Link
                 href="/signup"
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary-hover transition-colors"
+                className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-500"
+                style={{
+                  backgroundColor: 'var(--nav-cta-bg)',
+                  color: 'var(--nav-cta-text)',
+                }}
               >
                 Get Started
               </Link>
