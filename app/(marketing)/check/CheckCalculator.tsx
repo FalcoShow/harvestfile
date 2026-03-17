@@ -264,6 +264,9 @@ export default function CheckCalculator() {
   const [counties, setCounties] = useState<CountyOption[]>([]);
   const [loadingCounties, setLoadingCounties] = useState(false);
   const [results, setResults] = useState<EstimateResult | null>(null);
+  const [isCountySpecific, setIsCountySpecific] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [dataYears, setDataYears] = useState(0);
 
   // Email capture (optional, after results)
   const [showEmailCapture, setShowEmailCapture] = useState(false);
@@ -306,10 +309,41 @@ export default function CheckCalculator() {
 
   // ── Calculate results ─────────────────────────────────────────────────────
 
-  const calculate = () => {
-    const est = quickEstimate(cropCode, parseInt(acres) || 0);
-    setResults(est);
+  const calculate = async () => {
+    const acresNum = parseInt(acres) || 0;
+    setCalculating(true);
     goTo(3);
+
+    // Try county-specific estimate first
+    try {
+      const res = await fetch(`/api/calculator/estimate?county_fips=${countyFips}&crop=${cropCode}&acres=${acresNum}`);
+      const data = await res.json();
+
+      if (data.hasCountyData && data.arcPerAcre !== undefined) {
+        setResults({
+          arc: data.arc,
+          plc: data.plc,
+          arcPerAcre: data.arcPerAcre,
+          plcPerAcre: data.plcPerAcre,
+          best: data.best,
+          diff: data.diff,
+          diffPerAcre: data.diffPerAcre,
+        });
+        setIsCountySpecific(true);
+        setDataYears(data.dataYears || 0);
+        setCalculating(false);
+        return;
+      }
+    } catch {
+      // Fall through to national benchmark
+    }
+
+    // Fall back to national benchmark estimate
+    const est = quickEstimate(cropCode, acresNum);
+    setResults(est);
+    setIsCountySpecific(false);
+    setDataYears(0);
+    setCalculating(false);
   };
 
   // ── Save email ────────────────────────────────────────────────────────────
@@ -600,8 +634,18 @@ export default function CheckCalculator() {
             {/* ════════════════════════════════════════════════════════════
                  STEP 3: RESULTS
                  ════════════════════════════════════════════════════════ */}
-            {step === 3 && results && (
+            {step === 3 && (results || calculating) && (
               <div>
+                {/* Loading overlay */}
+                {calculating && (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-10 h-10 border-2 border-[#C9A84C]/30 border-t-[#C9A84C] rounded-full animate-spin mb-4" />
+                    <span className="text-[14px] text-white/40 font-medium">Crunching USDA data...</span>
+                  </div>
+                )}
+
+                {!calculating && (
+                <>
                 {/* Results card */}
                 <div
                   className="rounded-[24px] p-7 sm:p-10 text-center mb-6"
@@ -614,6 +658,18 @@ export default function CheckCalculator() {
                     animation: "qc-scale-in 0.5s cubic-bezier(0.25,0.1,0.25,1)",
                   }}
                 >
+                  {/* Data source badge */}
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider" style={{
+                      background: isCountySpecific ? "rgba(5,150,105,0.1)" : "rgba(255,255,255,0.05)",
+                      border: isCountySpecific ? "1px solid rgba(5,150,105,0.2)" : "1px solid rgba(255,255,255,0.06)",
+                      color: isCountySpecific ? "#34D399" : "rgba(255,255,255,0.3)",
+                    }}>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: isCountySpecific ? "#34D399" : "rgba(255,255,255,0.3)" }} />
+                      {isCountySpecific ? `County data · ${dataYears} years` : "National estimate"}
+                    </div>
+                  </div>
+
                   {/* Winner badge */}
                   <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-5" style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)" }}>
                     <IconTrophy />
@@ -747,7 +803,10 @@ export default function CheckCalculator() {
 
                 {/* Disclaimer */}
                 <div className="text-[11px] text-white/20 text-center leading-relaxed mb-6 max-w-[420px] mx-auto" style={{ opacity: 0, animation: "qc-enter 0.4s cubic-bezier(0.16,1,0.3,1) 0.5s forwards" }}>
-                  Estimates based on national benchmark data and OBBBA program rules.{" "}
+                  {isCountySpecific
+                    ? `Based on ${dataYears} years of real USDA county data and OBBBA program rules.`
+                    : "Estimates based on national benchmark data and OBBBA program rules."
+                  }{" "}
                   {countySlug && stateSlug ? (
                     <Link
                       href={`/${stateSlug}/${countySlug}/arc-plc`}
@@ -849,11 +908,13 @@ export default function CheckCalculator() {
 
                 {/* ── Start over ───────────────────────────────────────── */}
                 <button
-                  onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); }}
+                  onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); }}
                   className="block mx-auto mt-6 text-[12px] text-white/15 hover:text-white/30 transition-colors cursor-pointer bg-transparent border-none"
                 >
                   ← Calculate for a different farm
                 </button>
+                </>
+                )}
               </div>
             )}
           </div>
