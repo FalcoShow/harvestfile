@@ -1,12 +1,14 @@
 // =============================================================================
 // HarvestFile — ElectionMapTeaser (Client Component)
-// Phase 9 Build 1.5: Cinematic Homepage Polish
+// Phase 9 Build 4.5: Mobile Polish
 //
-// Changes from Build 1:
-//   - Removed bg-harvest-forest-950 (parent wrapper provides dark bg)
-//   - Reduced top padding (flows from hero, no visual break)
-//   - Kept noise texture for depth continuity
-//   - Gold gradient accent subtle enough to not create a "section" feel
+// FIXES:
+//   - Mobile padding increased (px-4 → px-5, tighter inner spacing)
+//   - Stats row: flex-wrap with centered alignment on mobile
+//   - Map container: explicit overflow-hidden to prevent bleed
+//   - KPI stats under map: grid layout instead of flex (better mobile)
+//   - "Explore Full Map" button: full-width on mobile
+//   - Reduced section bottom padding on mobile
 // =============================================================================
 
 'use client';
@@ -33,7 +35,7 @@ const ElectionMap = dynamic(
 
 export function ElectionMapTeaser() {
   return (
-    <section className="relative overflow-hidden pt-8 pb-16 sm:pt-12 sm:pb-24">
+    <section className="relative overflow-hidden pt-8 pb-12 sm:pt-12 sm:pb-24">
       {/* Noise — continuity with hero */}
       <div className="hf-noise-subtle" />
 
@@ -45,9 +47,9 @@ export function ElectionMapTeaser() {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-[1100px] px-6">
+      <div className="relative z-10 mx-auto max-w-[1100px] px-5 sm:px-6">
         <RevealOnScroll>
-          <div className="text-center mb-10">
+          <div className="text-center mb-8 sm:mb-10">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] mb-5">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-harvest-gold opacity-75" />
@@ -58,55 +60,60 @@ export function ElectionMapTeaser() {
               </span>
             </div>
 
-            <h2 className="text-[clamp(28px,4vw,46px)] font-extrabold text-white tracking-[-0.03em] leading-[1.1] mb-4">
+            <h2 className="text-[clamp(24px,4vw,46px)] font-extrabold text-white tracking-[-0.03em] leading-[1.1] mb-4">
               See what every county{' '}
               <span className="font-serif italic font-normal text-harvest-gold">
                 is choosing
               </span>
             </h2>
-            <p className="text-[16px] text-white/35 leading-relaxed max-w-[540px] mx-auto">
+            <p className="text-[15px] sm:text-[16px] text-white/45 leading-relaxed max-w-[540px] mx-auto">
               The first real-time ARC-CO vs PLC election map. Explore 7 years of
               enrollment data across every farming county in America.
             </p>
           </div>
         </RevealOnScroll>
 
+        {/* Map container — overflow-hidden prevents bleed on mobile */}
         <RevealOnScroll delay={100}>
           <div className="rounded-2xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
             <ElectionMap />
           </div>
         </RevealOnScroll>
 
+        {/* Stats + CTA row — grid on mobile for better wrapping */}
         <RevealOnScroll delay={200}>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-8 sm:gap-12">
-              {[
-                { value: 3142, label: 'Counties mapped' },
-                { value: 7, label: 'Years of history' },
-                { value: 16, label: 'Commodities tracked' },
-              ].map((stat, i) => (
-                <div key={stat.label} className="text-center sm:text-left">
-                  <div className="text-[22px] font-extrabold text-white tracking-tight">
-                    <AnimatedCounter value={stat.value} duration={1200 + i * 200} />
+          <div className="mt-6 sm:mt-8">
+            {/* Stats grid — 3 cols on mobile, inline with CTA on desktop */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className="grid grid-cols-3 gap-4 sm:gap-8 lg:gap-12 w-full sm:w-auto">
+                {[
+                  { value: 3142, label: 'Counties mapped' },
+                  { value: 7, label: 'Years of history' },
+                  { value: 16, label: 'Commodities tracked' },
+                ].map((stat, i) => (
+                  <div key={stat.label} className="text-center">
+                    <div className="text-[20px] sm:text-[22px] font-extrabold text-white tracking-tight">
+                      <AnimatedCounter value={stat.value} duration={1200 + i * 200} />
+                    </div>
+                    <div className="text-[10px] sm:text-[11px] text-white/25 font-semibold uppercase tracking-wider mt-0.5">
+                      {stat.label}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-white/25 font-semibold uppercase tracking-wider mt-0.5">
-                    {stat.label}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <Link
-              href="/elections"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
-                bg-white/[0.06] border border-white/[0.1] text-[14px] font-semibold text-white/70
-                hover:bg-white/[0.1] hover:text-white transition-all duration-200"
-            >
-              Explore Full Map
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </Link>
+              <Link
+                href="/elections"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
+                  bg-white/[0.06] border border-white/[0.1] text-[14px] font-semibold text-white/70
+                  hover:bg-white/[0.1] hover:text-white transition-all duration-200"
+              >
+                Explore Full Map
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
+            </div>
           </div>
         </RevealOnScroll>
       </div>

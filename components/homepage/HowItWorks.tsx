@@ -1,9 +1,9 @@
 // =============================================================================
 // HarvestFile — HowItWorks (Server Component)
-// Phase 9 Build 4: Unified Cream — Final Polish
+// Phase 9 Build 4.5: Mobile Polish
 //
-// FIX: Background unified to #F5F0E6 (golden cream) — matches all light sections
-// Added ambient radial glows for visual richness (same treatment as Features)
+// FIX: Step number badges now vertically centered on their step cards
+//      (was top-aligned, looked misaligned especially on mobile)
 // =============================================================================
 
 import Link from 'next/link';
@@ -19,10 +19,7 @@ const steps = [
 export function HowItWorks() {
   return (
     <section className="relative py-[120px] lg:py-[160px] overflow-hidden" style={{ background: '#F5F0E6' }}>
-      {/* Grain texture */}
       <div className="hf-grain" />
-
-      {/* Ambient radial glows — matches Feature section richness */}
       <div className="absolute inset-0 pointer-events-none" style={{
         backgroundImage: [
           'radial-gradient(ellipse 500px 400px at 70% 20%, rgba(201,168,76,0.05) 0%, transparent 70%)',
@@ -41,7 +38,7 @@ export function HowItWorks() {
         </RevealOnScroll>
 
         <div className="relative">
-          {/* Gold dotted connecting line */}
+          {/* Gold dotted connecting line — centered on badges */}
           <div className="hidden sm:block absolute left-[39px] top-[60px] bottom-[60px] w-[2px]" style={{
             backgroundImage: 'repeating-linear-gradient(to bottom, rgba(201,168,76,0.3) 0px, rgba(201,168,76,0.3) 4px, transparent 4px, transparent 12px)',
           }} />
@@ -49,16 +46,19 @@ export function HowItWorks() {
           <div className="space-y-8">
             {steps.map((step, i) => (
               <RevealOnScroll key={step.number} delay={i * 120}>
-                <div className="flex gap-6 sm:gap-8">
+                {/* items-center vertically centers the badge on the card */}
+                <div className="flex items-center gap-6 sm:gap-8">
+                  {/* Step number badge */}
                   <div className="shrink-0">
-                    <div className="w-[80px] h-[80px] rounded-2xl bg-harvest-forest-950 flex items-center justify-center relative z-10" style={{ boxShadow: '0 4px 12px rgba(12,31,23,0.20), 0 1px 3px rgba(12,31,23,0.15)' }}>
-                      <span className="text-[22px] font-extrabold text-harvest-gold tracking-[-0.04em]">{step.number}</span>
+                    <div className="w-[64px] h-[64px] sm:w-[80px] sm:h-[80px] rounded-2xl bg-harvest-forest-950 flex items-center justify-center relative z-10" style={{ boxShadow: '0 4px 12px rgba(12,31,23,0.20), 0 1px 3px rgba(12,31,23,0.15)' }}>
+                      <span className="text-[18px] sm:text-[22px] font-extrabold text-harvest-gold tracking-[-0.04em]">{step.number}</span>
                     </div>
                   </div>
-                  <div className="flex-1 rounded-2xl p-7 sm:p-8" style={{ background: '#FFFDF9', border: '1px solid rgba(12,31,23,0.05)', boxShadow: '0 1px 2px rgba(12,31,23,0.05), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03), 0 8px 16px rgba(12,31,23,0.02)' }}>
-                    <h3 className="text-[22px] font-bold text-harvest-forest-950 tracking-[-0.02em] mb-3">{step.title}</h3>
-                    <p className="text-[18px] text-[#4A5E52] leading-[1.65] mb-3">{step.description}</p>
-                    <span className="text-[13px] font-semibold text-harvest-gold-dim uppercase tracking-wider">{step.detail}</span>
+                  {/* Step card */}
+                  <div className="flex-1 rounded-2xl p-6 sm:p-8" style={{ background: '#FFFDF9', border: '1px solid rgba(12,31,23,0.05)', boxShadow: '0 1px 2px rgba(12,31,23,0.05), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03), 0 8px 16px rgba(12,31,23,0.02)' }}>
+                    <h3 className="text-[20px] sm:text-[22px] font-bold text-harvest-forest-950 tracking-[-0.02em] mb-3">{step.title}</h3>
+                    <p className="text-[16px] sm:text-[18px] text-[#4A5E52] leading-[1.65] mb-3">{step.description}</p>
+                    <span className="text-[12px] sm:text-[13px] font-semibold text-harvest-gold-dim uppercase tracking-wider">{step.detail}</span>
                   </div>
                 </div>
               </RevealOnScroll>

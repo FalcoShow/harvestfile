@@ -1,8 +1,10 @@
 // =============================================================================
 // HarvestFile — FeatureShowcase (Client Component)
-// Phase 9 Build 4: Unified Cream — Final Polish
+// Phase 9 Build 4.5: Mobile Polish
 //
-// FIX: Accent pill widened from 40% to 60% of card width
+// FIX: "Most Popular" badge repositioned below accent pill with proper
+//      spacing so it doesn't crowd the bar on mobile.
+//      Badge now inline with icon row, not absolute-positioned.
 // =============================================================================
 
 'use client';
@@ -85,17 +87,26 @@ function FeatureCard({ Icon, title, description, iconBg, iconColor, accentColor,
         <div className="flex justify-center pt-4">
           <div className="h-[3px] w-[60%] rounded-full" style={{ background: accentColor }} />
         </div>
-        {highlight && (
-          <div className="absolute top-4 right-5">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-harvest-gold/10 border border-harvest-gold/20 text-[10px] font-bold text-harvest-gold-dim uppercase tracking-wider">Most Popular</span>
+
+        {/* Content */}
+        <div className="p-6 sm:p-7 pb-7 sm:pb-8">
+          {/* Icon row with optional highlight badge — inline, not absolute */}
+          <div className="flex items-center justify-between mb-5">
+            <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${iconBg}`}>
+              <Icon className={iconColor} />
+            </div>
+            {highlight && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-harvest-gold/10 border border-harvest-gold/20 text-[10px] font-bold text-harvest-gold-dim uppercase tracking-wider">
+                Most Popular
+              </span>
+            )}
           </div>
-        )}
-        <div className="p-7 pb-8">
-          <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${iconBg} mb-5`}><Icon className={iconColor} /></div>
-          <h3 className="text-[18px] font-bold text-harvest-forest-950 tracking-[-0.01em] mb-3">{title}</h3>
-          <p className="text-[16px] text-[#4A5E52] leading-[1.65]">{description}</p>
+
+          <h3 className="text-[17px] sm:text-[18px] font-bold text-harvest-forest-950 tracking-[-0.01em] mb-3">{title}</h3>
+          <p className="text-[15px] sm:text-[16px] text-[#4A5E52] leading-[1.65]">{description}</p>
         </div>
-        {children && <div className="px-7 pb-7">{children}</div>}
+
+        {children && <div className="px-6 sm:px-7 pb-6 sm:pb-7">{children}</div>}
       </div>
     </div>
   );
@@ -103,19 +114,19 @@ function FeatureCard({ Icon, title, description, iconBg, iconColor, accentColor,
 
 export function FeatureShowcase() {
   return (
-    <section className="relative py-[120px] lg:py-[160px] overflow-hidden" style={{ background: '#F5F0E6' }}>
+    <section className="relative py-[100px] sm:py-[120px] lg:py-[160px] overflow-hidden" style={{ background: '#F5F0E6' }}>
       <div className="hf-grain" />
       <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: ['radial-gradient(ellipse 600px 400px at 15% 25%, rgba(12,31,23,0.05) 0%, transparent 70%)', 'radial-gradient(ellipse 500px 500px at 80% 60%, rgba(201,168,76,0.07) 0%, transparent 70%)', 'radial-gradient(ellipse 400px 300px at 30% 85%, rgba(45,94,71,0.04) 0%, transparent 70%)'].join(', ') }} />
 
-      <div className="relative z-10 mx-auto max-w-[1100px] px-6">
+      <div className="relative z-10 mx-auto max-w-[1100px] px-5 sm:px-6">
         <RevealOnScroll>
-          <div className="mb-16">
+          <div className="mb-12 sm:mb-16">
             <SectionBadgeLight variant="gold" className="mb-5">Built for Farmers</SectionBadgeLight>
             <h2 className="text-[clamp(28px,4vw,46px)] font-extrabold text-harvest-forest-950 tracking-[-0.03em] leading-[1.1] max-w-[480px]">Government data,{' '}<span className="font-serif italic font-normal">finally useful</span></h2>
           </div>
         </RevealOnScroll>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           <RevealOnScroll delay={0} className="md:col-span-2">
             <FeatureCard Icon={IconCalculator} title="ARC/PLC Decision Calculator" description="Side-by-side payment comparison using your county's real yield history. Updated for 2025 OBBBA reference prices. See exactly how much you'd receive under each program." iconBg="bg-amber-50" iconColor="text-amber-700" accentColor="linear-gradient(90deg, #9E7E30, #C9A84C, #E2C366)" highlight><MiniCalculatorMockup /></FeatureCard>
           </RevealOnScroll>
