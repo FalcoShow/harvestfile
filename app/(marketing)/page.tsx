@@ -1,17 +1,14 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Phase 9 Build 2: Section Architecture Revolution
+// Phase 9 Build 2.5: Light Chapter Polish
 //
-// PROBLEM SOLVED: Build 1.5 had 4 GradientBridge components creating muddy
-// olive-green bands. CSS linear-gradient between #0C1F17 and #FAFAF7 mixes
-// RGB channels, hitting a dead grayish-olive at 50%.
+// CHANGES FROM BUILD 2:
+//   - Added GoldSeparator component between light chapter sections
+//   - Separators create visual breathing room within the continuous cream
+//   - Thin gold gradient line with consistent container width
+//   - Prevents the 4-section light chapter from reading as one endless block
 //
-// SOLUTION: 3 chapters with 2 transitions. Each transition uses the SCRIM
-// technique: a base color underneath, with an overlay of the OTHER color
-// at varying opacity. Because only ONE hue is present in each gradient
-// (varying only in opacity), there is zero muddy midtone.
-//
-// FLOW:
+// FLOW (unchanged from Build 2):
 //   CHAPTER 1 — DARK: Hero → Election Map
 //   ── Scrim transition (dark→light) ──
 //   CHAPTER 2 — LIGHT: Features → How It Works → Report → Social Proof
@@ -29,11 +26,24 @@ import { SocialProof } from '@/components/homepage/SocialProof';
 import { CountySearchSection } from '@/components/marketing/CountySearchSection';
 import { FinalCTA } from '@/components/homepage/FinalCTA';
 
+// ─── Gold Separator ──────────────────────────────────────────────────────────
+// Thin horizontal gold accent line between light chapter sections.
+// Creates visual breathing room without any color shift.
+function GoldSeparator() {
+  return (
+    <div className="mx-auto max-w-[1100px] px-6" aria-hidden="true">
+      <div
+        className="h-[1px]"
+        style={{
+          background:
+            'linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.15) 20%, rgba(201,168,76,0.25) 50%, rgba(201,168,76,0.15) 80%, transparent 100%)',
+        }}
+      />
+    </div>
+  );
+}
+
 // ─── Scrim Transition: Dark → Light ──────────────────────────────────────────
-// Base: cream (#FAFAF7) — the destination color
-// Overlay: dark green at varying opacity — fades from 100% to 0%
-// Result: top looks fully dark, bottom looks fully cream, middle is
-//         cream showing through semi-transparent dark (NOT olive mud)
 function DarkToLightTransition() {
   return (
     <div
@@ -41,7 +51,6 @@ function DarkToLightTransition() {
       style={{ height: '160px', background: '#FAFAF7' }}
       aria-hidden="true"
     >
-      {/* Dark green overlay — opacity ramp from 1 → 0 (sine curve) */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -65,8 +74,6 @@ function DarkToLightTransition() {
           )`,
         }}
       />
-
-      {/* Gold accent line — centered in the transition zone */}
       <div
         className="absolute left-0 right-0 z-10"
         style={{
@@ -81,10 +88,6 @@ function DarkToLightTransition() {
 }
 
 // ─── Scrim Transition: Light → Dark ──────────────────────────────────────────
-// Base: dark green (#0C1F17) — the destination color
-// Overlay: cream at varying opacity — fades from 100% to 0%
-// Result: top looks fully cream, bottom looks fully dark, middle is
-//         dark showing through semi-transparent cream (NOT olive mud)
 function LightToDarkTransition() {
   return (
     <div
@@ -92,7 +95,6 @@ function LightToDarkTransition() {
       style={{ height: '160px', background: '#0C1F17' }}
       aria-hidden="true"
     >
-      {/* Cream overlay — opacity ramp from 1 → 0 (sine curve) */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -116,8 +118,6 @@ function LightToDarkTransition() {
           )`,
         }}
       />
-
-      {/* Gold accent line — centered in the transition zone */}
       <div
         className="absolute left-0 right-0 z-10"
         style={{
@@ -136,35 +136,35 @@ export default function Home() {
     <>
       {/* ═══════════════════════════════════════════════════════════════════════
           CHAPTER 1 — DARK: The Dramatic Opening
-          Hero + Election Map — continuous dark, zero breaks
           ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
         <HeroSection />
         <ElectionMapTeaser />
       </div>
 
-      {/* ═══ TRANSITION: Dark → Light (scrim + gold accent) ═══ */}
+      {/* ═══ TRANSITION: Dark → Light ═══ */}
       <DarkToLightTransition />
 
       {/* ═══════════════════════════════════════════════════════════════════════
           CHAPTER 2 — LIGHT: The Value Story
-          All light-background content grouped together under ONE continuous
-          cream background. No more light→dark→light sandwich.
+          Gold separators between sections provide visual pacing within
+          the continuous cream background — no color changes needed.
           ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="light" className="bg-[#FAFAF7]">
         <FeatureShowcase />
+        <GoldSeparator />
         <HowItWorks />
+        <GoldSeparator />
         <ReportProduct />
+        <GoldSeparator />
         <SocialProof />
       </div>
 
-      {/* ═══ TRANSITION: Light → Dark (scrim + gold accent) ═══ */}
+      {/* ═══ TRANSITION: Light → Dark ═══ */}
       <LightToDarkTransition />
 
       {/* ═══════════════════════════════════════════════════════════════════════
           CHAPTER 3 — DARK: The Conversion Close
-          Benchmark Teaser (moved from middle) + County Search + CTA
-          Flows seamlessly into the dark footer
           ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
         <BenchmarkTeaser />

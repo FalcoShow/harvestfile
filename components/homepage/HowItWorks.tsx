@@ -1,9 +1,14 @@
 // =============================================================================
 // HarvestFile — HowItWorks (Server Component)
-// Phase 9 Build 1: Homepage Revolution
+// Phase 9 Build 2.5: Light Chapter Polish
 //
-// Simple 3-step visual showing the path from landing to decision.
-// Cream background, connected timeline, gold step numbers.
+// CHANGES FROM BUILD 1:
+//   - Section padding bumped to 120-160px
+//   - Body text increased from 15px → 18px
+//   - Detail text from 12px → 13px
+//   - Step title from 20px → 22px
+//   - More generous spacing between steps (space-y-10 sm:space-y-14)
+//   - CTA button text bumped to 16px
 // =============================================================================
 
 import Link from 'next/link';
@@ -36,11 +41,11 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="relative py-24 sm:py-32 bg-[#FAFAF7]">
+    <section className="relative py-[120px] lg:py-[160px] bg-[#FAFAF7]">
       <div className="mx-auto max-w-[900px] px-6">
         {/* Header */}
         <RevealOnScroll>
-          <div className="text-center mb-16">
+          <div className="text-center mb-20">
             <SectionBadgeLight className="mb-5">How It Works</SectionBadgeLight>
             <h2 className="text-[clamp(28px,4vw,44px)] font-extrabold text-harvest-forest-950 tracking-[-0.03em] leading-[1.1]">
               Three steps.{' '}
@@ -54,7 +59,7 @@ export function HowItWorks() {
           {/* Connecting line (desktop only) */}
           <div className="hidden sm:block absolute left-[39px] top-[60px] bottom-[60px] w-[2px] bg-gradient-to-b from-harvest-gold/30 via-harvest-gold/15 to-harvest-gold/30" />
 
-          <div className="space-y-8 sm:space-y-12">
+          <div className="space-y-10 sm:space-y-14">
             {steps.map((step, i) => (
               <RevealOnScroll key={step.number} delay={i * 120}>
                 <div className="flex gap-6 sm:gap-8">
@@ -69,13 +74,13 @@ export function HowItWorks() {
 
                   {/* Content */}
                   <div className="pt-2">
-                    <h3 className="text-[20px] font-bold text-harvest-forest-950 tracking-[-0.02em] mb-2">
+                    <h3 className="text-[22px] font-bold text-harvest-forest-950 tracking-[-0.02em] mb-3">
                       {step.title}
                     </h3>
-                    <p className="text-[15px] text-[#6B7264] leading-relaxed mb-2">
+                    <p className="text-[18px] text-[#5A6356] leading-[1.65] mb-3">
                       {step.description}
                     </p>
-                    <span className="text-[12px] font-semibold text-harvest-gold-dim uppercase tracking-wider">
+                    <span className="text-[13px] font-semibold text-harvest-gold-dim uppercase tracking-wider">
                       {step.detail}
                     </span>
                   </div>
@@ -87,11 +92,11 @@ export function HowItWorks() {
 
         {/* CTA */}
         <RevealOnScroll delay={400}>
-          <div className="text-center mt-14">
+          <div className="text-center mt-16">
             <Link
               href="/check"
               className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl
-                bg-harvest-forest-950 text-[15px] font-bold text-white
+                bg-harvest-forest-950 text-[16px] font-bold text-white
                 hover:bg-harvest-forest-800 transition-all duration-200
                 shadow-lg shadow-harvest-forest-950/20 hover:shadow-harvest-forest-800/30
                 hover:-translate-y-0.5"
