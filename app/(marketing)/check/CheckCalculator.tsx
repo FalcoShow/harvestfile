@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { DarkSelect } from "./DarkSelect";
 
 // ─── State & Crop Data ──────────────────────────────────────────────────────
 
@@ -407,45 +408,30 @@ export default function CheckCalculator() {
                 </p>
 
                 {/* State select */}
-                <label className="block text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">State</label>
-                <select
+                <DarkSelect
+                  label="State"
+                  options={STATES.map(s => ({ value: s.abbr, label: s.name }))}
                   value={stateAbbr}
-                  onChange={(e) => setStateAbbr(e.target.value)}
-                  className="hf-calc-input w-full p-4 rounded-[14px] text-base font-medium text-white bg-white/[0.04] border border-white/[0.08] outline-none cursor-pointer appearance-none transition-colors focus:border-[#C9A84C]/40 focus:ring-1 focus:ring-[#C9A84C]/20"
-                  style={{ colorScheme: "dark", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='rgba(255,255,255,0.3)' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6l3.5 4 3.5-4z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 16px center", paddingRight: "44px" }}
-                >
-                  <option value="">Select your state...</option>
-                  {STATES.map((s) => (
-                    <option key={s.abbr} value={s.abbr}>{s.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setStateAbbr(val)}
+                  placeholder="Select your state..."
+                />
 
                 {/* County select */}
                 {stateAbbr && (
                   <div className="mt-5" style={{ animation: "qc-enter 0.35s ease" }}>
-                    <label className="block text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">County</label>
-                    {loadingCounties ? (
-                      <div className="flex items-center gap-3 p-4 rounded-[14px] bg-white/[0.02] border border-white/[0.06]">
-                        <div className="w-5 h-5 border-2 border-[#C9A84C]/30 border-t-[#C9A84C] rounded-full animate-spin" />
-                        <span className="text-sm text-white/30">Loading counties...</span>
-                      </div>
-                    ) : (
-                      <select
-                        value={countyFips}
-                        onChange={(e) => {
-                          setCountyFips(e.target.value);
-                          const c = counties.find(c => c.county_fips === e.target.value);
-                          if (c) { setCountyName(c.display_name); setCountySlug(c.slug); }
-                        }}
-                        className="hf-calc-input w-full p-4 rounded-[14px] text-base font-medium text-white bg-white/[0.04] border border-white/[0.08] outline-none cursor-pointer appearance-none transition-colors focus:border-[#C9A84C]/40 focus:ring-1 focus:ring-[#C9A84C]/20"
-                        style={{ colorScheme: "dark", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='rgba(255,255,255,0.3)' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6l3.5 4 3.5-4z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 16px center", paddingRight: "44px" }}
-                      >
-                        <option value="">Select your county...</option>
-                        {counties.map((c) => (
-                          <option key={c.county_fips} value={c.county_fips}>{c.display_name}</option>
-                        ))}
-                      </select>
-                    )}
+                    <DarkSelect
+                      label="County"
+                      options={counties.map(c => ({ value: c.county_fips, label: c.display_name }))}
+                      value={countyFips}
+                      onChange={(val, opt) => {
+                        setCountyFips(val);
+                        const c = counties.find(c => c.county_fips === val);
+                        if (c) { setCountyName(c.display_name); setCountySlug(c.slug); }
+                      }}
+                      placeholder="Select your county..."
+                      searchable={true}
+                      loading={loadingCounties}
+                    />
                   </div>
                 )}
 
