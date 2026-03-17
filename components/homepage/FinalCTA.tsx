@@ -1,10 +1,11 @@
 // =============================================================================
 // HarvestFile — FinalCTA (Server Component)
-// Phase 9 Build 1: Homepage Revolution
+// Phase 9 Build 3: Dark Chapter Harmonization
 //
-// The final conversion section before the footer. Dark forest green
-// background matching the hero for visual bookending. Urgent but
-// genuine — references real USDA deadlines, not fake scarcity.
+// CHANGES FROM BUILD 1:
+//   - Padding: py-24 sm:py-32 → py-[120px] lg:py-[160px]
+//   - Body text: text-[16px] text-white/35 → text-[18px] text-white/45
+//   - Sub-CTA links: text-white/25 → text-white/30
 // =============================================================================
 
 import Link from 'next/link';
@@ -12,7 +13,7 @@ import { RevealOnScroll } from './shared/RevealOnScroll';
 
 export function FinalCTA() {
   return (
-    <section className="relative overflow-hidden bg-harvest-forest-950 py-24 sm:py-32">
+    <section className="relative overflow-hidden bg-harvest-forest-950 py-[120px] lg:py-[160px]">
       {/* Noise */}
       <div className="hf-noise-subtle" />
 
@@ -44,7 +45,7 @@ export function FinalCTA() {
             </span>
           </h2>
 
-          <p className="text-[16px] text-white/35 leading-relaxed mb-10 max-w-[480px] mx-auto">
+          <p className="text-[18px] text-white/45 leading-[1.65] mb-10 max-w-[480px] mx-auto">
             The difference between ARC-CO and PLC can be $15 to $80+ per base acre.
             For a 500-acre farm, that&apos;s up to $40,000 you could be missing.
           </p>
@@ -75,17 +76,17 @@ export function FinalCTA() {
             </svg>
           </Link>
 
-          {/* Sub-CTA links */}
+          {/* Sub-CTA links — bumped from white/25 to white/30 */}
           <div className="flex items-center justify-center gap-6 mt-8">
             <Link
               href="/elections"
-              className="text-[13px] font-medium text-white/25 hover:text-white/50 transition-colors"
+              className="text-[13px] font-medium text-white/30 hover:text-white/50 transition-colors"
             >
               Explore Election Map →
             </Link>
             <Link
               href="/pricing"
-              className="text-[13px] font-medium text-white/25 hover:text-white/50 transition-colors"
+              className="text-[13px] font-medium text-white/30 hover:text-white/50 transition-colors"
             >
               View Pricing →
             </Link>

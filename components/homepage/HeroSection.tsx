@@ -1,13 +1,11 @@
 // =============================================================================
 // HarvestFile — HeroSection (Client Component)
-// Phase 9 Build 1.5: Cinematic Homepage Polish
+// Phase 9 Build 3: Dark Chapter Harmonization
 //
-// Changes from Build 1:
-//   - Removed bottom gradient fade (page orchestrator handles transitions)
-//   - Removed "Scroll" indicator (breaks seamless flow illusion)
-//   - Hero flows directly into Election Map with no visual break
-//   - Added scroll-padding for nav offset
-//   - Reduced min-height slightly so bottom of hero hints at next section
+// CHANGES FROM BUILD 1.5:
+//   - Subheadline opacity: text-white/40 → text-white/50 (more readable)
+//   - Stat labels opacity: text-white/25 → text-white/35 (no longer invisible)
+//   - Trust strip opacity: text-white/25 → text-white/30
 // =============================================================================
 
 'use client';
@@ -83,9 +81,9 @@ export function HeroSection() {
           {' '}farm is owed
         </h1>
 
-        {/* Subheadline */}
+        {/* Subheadline — bumped from white/40 to white/50 */}
         <p
-          className="text-[clamp(16px,2vw,20px)] text-white/40 leading-relaxed max-w-[620px] mx-auto mb-10"
+          className="text-[clamp(16px,2vw,20px)] text-white/50 leading-relaxed max-w-[620px] mx-auto mb-10"
           style={{ animation: 'hf-hero-fade-in 0.8s ease-out 0.2s both' }}
         >
           Compare ARC-CO vs PLC payments for your county, your crops, your farm.
@@ -139,7 +137,7 @@ export function HeroSection() {
           </Link>
         </div>
 
-        {/* Trust Strip */}
+        {/* Trust Strip — bumped from white/25 to white/30 */}
         <div
           className="flex items-center justify-center gap-x-5 gap-y-2 flex-wrap mb-12"
           style={{ animation: 'hf-hero-fade-in 0.8s ease-out 0.4s both' }}
@@ -150,7 +148,7 @@ export function HeroSection() {
             '3,000+ counties',
             '16 covered crops',
           ].map((text) => (
-            <span key={text} className="flex items-center gap-1.5 text-[13px] text-white/25">
+            <span key={text} className="flex items-center gap-1.5 text-[13px] text-white/30">
               <svg className="w-3.5 h-3.5 text-emerald-500/70 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
@@ -183,7 +181,8 @@ export function HeroSection() {
                   }
                 />
               </div>
-              <div className="text-[12px] font-semibold text-white/25 tracking-wide uppercase mt-1">
+              {/* Stat labels — bumped from white/25 to white/35 */}
+              <div className="text-[12px] font-semibold text-white/35 tracking-wide uppercase mt-1">
                 {stat.label}
               </div>
             </div>

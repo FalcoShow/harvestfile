@@ -1,14 +1,13 @@
 // =============================================================================
 // HarvestFile — HowItWorks (Server Component)
-// Phase 9 Build 2.5: Light Chapter Polish
+// Phase 9 Build 3: The Visceral Upgrade
 //
-// CHANGES FROM BUILD 1:
-//   - Section padding bumped to 120-160px
-//   - Body text increased from 15px → 18px
-//   - Detail text from 12px → 13px
-//   - Step title from 20px → 22px
-//   - More generous spacing between steps (space-y-10 sm:space-y-14)
-//   - CTA button text bumped to 16px
+// CHANGES:
+//   - Dot grid background pattern (precision agriculture feel)
+//   - Radial mask so dots fade at edges
+//   - Step description text bumped to 18px
+//   - More generous spacing between steps
+//   - Grain texture overlay
 // =============================================================================
 
 import Link from 'next/link';
@@ -41,8 +40,22 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="relative py-[120px] lg:py-[160px] bg-[#FAFAF7]">
-      <div className="mx-auto max-w-[900px] px-6">
+    <section className="relative py-[120px] lg:py-[160px] overflow-hidden" style={{ background: '#FAFAF7' }}>
+      {/* Dot grid background (precision agriculture feel) */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(12,31,23,0.06) 0.75px, transparent 0.75px)',
+          backgroundSize: '24px 24px',
+          maskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 70%)',
+        }}
+      />
+
+      {/* Grain texture */}
+      <div className="hf-grain" />
+
+      <div className="relative z-10 mx-auto max-w-[900px] px-6">
         {/* Header */}
         <RevealOnScroll>
           <div className="text-center mb-20">
@@ -56,16 +69,21 @@ export function HowItWorks() {
 
         {/* Steps */}
         <div className="relative">
-          {/* Connecting line (desktop only) */}
+          {/* Connecting line */}
           <div className="hidden sm:block absolute left-[39px] top-[60px] bottom-[60px] w-[2px] bg-gradient-to-b from-harvest-gold/30 via-harvest-gold/15 to-harvest-gold/30" />
 
-          <div className="space-y-10 sm:space-y-14">
+          <div className="space-y-12 sm:space-y-16">
             {steps.map((step, i) => (
               <RevealOnScroll key={step.number} delay={i * 120}>
                 <div className="flex gap-6 sm:gap-8">
-                  {/* Step number */}
+                  {/* Step number badge */}
                   <div className="shrink-0">
-                    <div className="w-[80px] h-[80px] rounded-2xl bg-harvest-forest-950 flex items-center justify-center shadow-lg shadow-harvest-forest-950/20 relative z-10">
+                    <div
+                      className="w-[80px] h-[80px] rounded-2xl bg-harvest-forest-950 flex items-center justify-center relative z-10"
+                      style={{
+                        boxShadow: '0 4px 12px rgba(12,31,23,0.20), 0 1px 3px rgba(12,31,23,0.15)',
+                      }}
+                    >
                       <span className="text-[22px] font-extrabold text-harvest-gold tracking-[-0.04em]">
                         {step.number}
                       </span>
@@ -77,7 +95,7 @@ export function HowItWorks() {
                     <h3 className="text-[22px] font-bold text-harvest-forest-950 tracking-[-0.02em] mb-3">
                       {step.title}
                     </h3>
-                    <p className="text-[18px] text-[#5A6356] leading-[1.65] mb-3">
+                    <p className="text-[18px] text-[#4A5E52] leading-[1.65] mb-3">
                       {step.description}
                     </p>
                     <span className="text-[13px] font-semibold text-harvest-gold-dim uppercase tracking-wider">
@@ -97,9 +115,10 @@ export function HowItWorks() {
               href="/check"
               className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl
                 bg-harvest-forest-950 text-[16px] font-bold text-white
-                hover:bg-harvest-forest-800 transition-all duration-200
-                shadow-lg shadow-harvest-forest-950/20 hover:shadow-harvest-forest-800/30
-                hover:-translate-y-0.5"
+                hover:bg-harvest-forest-800 transition-all duration-200 hover:-translate-y-0.5"
+              style={{
+                boxShadow: '0 4px 12px rgba(12,31,23,0.20), 0 1px 3px rgba(12,31,23,0.15)',
+              }}
             >
               Start Your Free Calculation
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

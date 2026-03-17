@@ -1,10 +1,12 @@
 // =============================================================================
 // HarvestFile — BenchmarkTeaser (Server Component)
-// Phase 9 Build 1: Homepage Revolution
+// Phase 9 Build 3: Dark Chapter Harmonization
 //
-// The "Facebook moment" pitch: share your election anonymously, see
-// what your county neighbors chose. This section explains the network
-// effect and creates FOMO. Dark section with emerald accents.
+// CHANGES FROM BUILD 1:
+//   - Padding: py-24 sm:py-32 → py-[120px] lg:py-[160px]
+//   - Body text: text-[16px] text-white/35 → text-[18px] text-white/45
+//   - Bullet items: text-[14px] text-white/40 → text-[16px] text-white/45
+//   - CTA button text bumped to 15px
 // =============================================================================
 
 import Link from 'next/link';
@@ -12,7 +14,7 @@ import { RevealOnScroll } from './shared/RevealOnScroll';
 
 export function BenchmarkTeaser() {
   return (
-    <section className="relative overflow-hidden bg-harvest-forest-950 py-24 sm:py-32">
+    <section className="relative overflow-hidden bg-harvest-forest-950 py-[120px] lg:py-[160px]">
       {/* Noise */}
       <div className="hf-noise-subtle" />
 
@@ -42,7 +44,7 @@ export function BenchmarkTeaser() {
                 </span>
               </h2>
 
-              <p className="text-[16px] text-white/35 leading-relaxed mb-6">
+              <p className="text-[18px] text-white/45 leading-[1.65] mb-6">
                 Share your ARC/PLC election anonymously. Instantly see what
                 percentage of your county neighbors chose ARC-CO vs PLC.
                 It&apos;s the conversation you&apos;d have at the coffee shop —
@@ -59,7 +61,7 @@ export function BenchmarkTeaser() {
                     <svg className="w-4 h-4 text-emerald-500/70 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-[14px] text-white/40">{item}</span>
+                    <span className="text-[16px] text-white/45">{item}</span>
                   </div>
                 ))}
               </div>
@@ -67,7 +69,7 @@ export function BenchmarkTeaser() {
               <Link
                 href="/check"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
-                  bg-emerald-500 text-[14px] font-semibold text-white
+                  bg-emerald-500 text-[15px] font-semibold text-white
                   hover:bg-emerald-400 transition-all duration-200
                   shadow-lg shadow-emerald-500/20 hover:shadow-emerald-400/30
                   hover:-translate-y-0.5"
