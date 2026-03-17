@@ -275,7 +275,25 @@ export default function CheckCalculator() {
 
   // Mount animation
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [shared, setShared] = useState(false);
+  const pendingUrlCalc = useRef<{ county: string; crop: string; acres: string; countyName: string } | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    // Read URL params for shared links
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const urlState = p.get("state");
+      const urlCounty = p.get("county");
+      const urlCrop = p.get("crop");
+      const urlAcres = p.get("acres");
+      const urlName = p.get("name");
+      if (urlState && urlCounty && urlCrop && urlAcres) {
+        setStateAbbr(urlState);
+        pendingUrlCalc.current = { county: urlCounty, crop: urlCrop, acres: urlAcres, countyName: urlName || "" };
+      }
+    }
+  }, []);
 
   // ── Step transitions ──────────────────────────────────────────────────────
 
@@ -301,8 +319,29 @@ export default function CheckCalculator() {
     fetch(`/api/calculator/counties?state=${stateAbbr}`)
       .then(r => r.json())
       .then(data => {
-        setCounties(data.counties || []);
+        const list = data.counties || [];
+        setCounties(list);
         setLoadingCounties(false);
+        // Auto-populate from shared URL params
+        if (pendingUrlCalc.current) {
+          const p = pendingUrlCalc.current;
+          const match = list.find((c: CountyOption) => c.county_fips === p.county);
+          if (match) {
+            setCountyFips(match.county_fips);
+            setCountyName(match.display_name);
+            setCountySlug(match.slug);
+            setCropCode(p.crop);
+            setAcres(p.acres);
+            pendingUrlCalc.current = null;
+            // Auto-calculate after a tick
+            setTimeout(() => {
+              const btn = document.getElementById("hf-calc-btn");
+              if (btn) btn.click();
+            }, 100);
+          } else {
+            pendingUrlCalc.current = null;
+          }
+        }
       })
       .catch(() => setLoadingCounties(false));
   }, [stateAbbr]);
@@ -312,7 +351,14 @@ export default function CheckCalculator() {
   const calculate = async () => {
     const acresNum = parseInt(acres) || 0;
     setCalculating(true);
+    setShared(false);
     goTo(3);
+
+    // Update URL for shareability (doesn't trigger navigation)
+    const params = new URLSearchParams({
+      state: stateAbbr, county: countyFips, crop: cropCode, acres: String(acresNum), name: countyName,
+    });
+    window.history.replaceState(null, "", `/check?${params.toString()}`);
 
     // Try county-specific estimate first
     try {
@@ -614,6 +660,7 @@ export default function CheckCalculator() {
                     ← Back
                   </button>
                   <button
+                    id="hf-calc-btn"
                     disabled={!cropCode || !acres || parseInt(acres) <= 0}
                     onClick={calculate}
                     className="flex-1 p-3.5 rounded-[14px] text-[15px] font-bold border-none cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
@@ -864,6 +911,38 @@ export default function CheckCalculator() {
                   </Link>
                 )}
 
+                {/* ── Share button ────────────────────────────────────── */}
+                <button
+                  onClick={() => {
+                    const url = window.location.href;
+                    navigator.clipboard.writeText(url).then(() => {
+                      setShared(true);
+                      setTimeout(() => setShared(false), 3000);
+                    }).catch(() => {
+                      // Fallback for older browsers
+                      const input = document.createElement("input");
+                      input.value = url;
+                      document.body.appendChild(input);
+                      input.select();
+                      document.execCommand("copy");
+                      document.body.removeChild(input);
+                      setShared(true);
+                      setTimeout(() => setShared(false), 3000);
+                    });
+                  }}
+                  className="flex items-center justify-center gap-2 w-full p-3 rounded-[14px] text-[13px] font-semibold cursor-pointer transition-all duration-200 hover:bg-white/[0.03] active:scale-[0.98] active:duration-75 mb-2 bg-transparent"
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: shared ? "#34D399" : "rgba(255,255,255,0.35)",
+                  }}
+                >
+                  {shared ? (
+                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg> Link copied — share it!</>
+                  ) : (
+                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg> Share these results</>
+                  )}
+                </button>
+
                 {/* ── Email capture (optional) ─────────────────────────── */}
                 {!showEmailCapture && !emailSaved && (
                   <button
@@ -908,7 +987,7 @@ export default function CheckCalculator() {
 
                 {/* ── Start over ───────────────────────────────────────── */}
                 <button
-                  onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); }}
+                  onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); window.history.replaceState(null, "", "/check"); }}
                   className="block mx-auto mt-6 text-[12px] text-white/15 hover:text-white/30 transition-colors cursor-pointer bg-transparent border-none"
                 >
                   ← Calculate for a different farm
