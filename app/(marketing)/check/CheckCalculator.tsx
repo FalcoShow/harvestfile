@@ -892,19 +892,19 @@ export default function CheckCalculator() {
         {/* Grain texture overlay */}
         <div className="hf-grain" style={{ opacity: 0.04 }} />
 
-        {/* Ambient gold glow at transition */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 50% 0%, rgba(201,168,76,0.08) 0%, transparent 70%)" }} />
+        {/* Ambient gold glow at transition — compact */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[150px] pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(201,168,76,0.06) 0%, transparent 70%)" }} />
 
         {/* Gold separator line */}
         <div className="mx-auto max-w-[500px] px-8">
           <div className="h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.25) 50%, transparent 100%)" }} />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-[680px] px-5 sm:px-6 py-16 sm:py-24">
+        <div className="relative z-10 mx-auto max-w-[680px] px-5 sm:px-6 pt-10 sm:pt-14 pb-16 sm:pb-24">
 
           {/* ── How It Works ─────────────────────────────────────── */}
           <ScrollReveal>
-            <div className="text-center mb-14 sm:mb-20">
+            <div className="text-center mb-10 sm:mb-14">
               <h2 className="text-[22px] sm:text-[28px] font-extrabold text-white tracking-[-0.02em] mb-3">
                 How does ARC-CO vs PLC work?
               </h2>
@@ -914,7 +914,7 @@ export default function CheckCalculator() {
             </div>
           </ScrollReveal>
 
-          <div className="grid sm:grid-cols-2 gap-5 mb-16 sm:mb-20">
+          <div className="grid sm:grid-cols-2 gap-5 mb-12 sm:mb-16">
             {[
               {
                 title: "ARC-CO (County Revenue)",
@@ -939,7 +939,7 @@ export default function CheckCalculator() {
 
           {/* ── What Changed in OBBBA ────────────────────────────── */}
           <ScrollReveal>
-          <div className="mb-16 sm:mb-20">
+          <div className="mb-12 sm:mb-16">
             <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-4">
               What changed under OBBBA (2025 Farm Bill)?
             </h2>
@@ -964,13 +964,13 @@ export default function CheckCalculator() {
           </ScrollReveal>
 
           {/* ── Gold separator ────────────────────────────────────── */}
-          <div className="mb-16 sm:mb-20 mx-auto max-w-[300px]">
+          <div className="mb-12 sm:mb-16 mx-auto max-w-[300px]">
             <div className="h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.15), transparent)" }} />
           </div>
 
           {/* ── FAQ ──────────────────────────────────────────────── */}
           <ScrollReveal>
-          <div className="mb-16 sm:mb-20">
+          <div className="mb-12 sm:mb-16">
             <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-6">
               Frequently asked questions
             </h2>
