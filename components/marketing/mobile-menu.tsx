@@ -1,5 +1,11 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
+// Phase 10 Build 1: HAMBURGER VISIBILITY FIX
+//
+// FIX: The hamburger button now uses var(--nav-text) CSS custom property
+// instead of text-foreground/60, so it adapts to dark/light sections
+// just like the desktop nav links do.
+//
 // Build 2 → Phase 8C Build 4: Added "OBBBA Guide" nav link
 // =============================================================================
 
@@ -30,10 +36,11 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
 
   return (
     <>
-      {/* Hamburger button */}
+      {/* Hamburger button — uses adaptive var(--nav-text) for visibility on ALL backgrounds */}
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden p-2 -mr-2 rounded-lg text-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors"
+        className="md:hidden p-2 -mr-2 rounded-lg transition-colors hover:bg-white/10"
+        style={{ color: 'var(--nav-text, rgba(255,255,255,0.8))' }}
         aria-label="Open menu"
       >
         <svg
