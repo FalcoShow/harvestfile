@@ -571,3 +571,151 @@
 
 /* Ensure content inside sections with grain sits above the texture */
 .hf-grain + * { position: relative; z-index: 2; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PHASE 12: PREMIUM AUTH PAGES — CSS ADDITIONS
+   Append this ENTIRE block to the END of globals.css
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Aurora Background Blobs ────────────────────────────────────────────────── */
+.hf-aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: hf-aurora-drift linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+@keyframes hf-aurora-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -40px) scale(1.05);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
+  75% {
+    transform: translate(40px, 30px) scale(1.03);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+/* ── Staggered Entrance Animation ───────────────────────────────────────────── */
+.hf-auth-stagger {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: hf-auth-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--stagger-index, 0) * 80ms + 150ms);
+}
+
+@keyframes hf-auth-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Auth Input Styles ──────────────────────────────────────────────────────── */
+.hf-auth-input {
+  width: 100%;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 16px;
+  font-size: 15px;
+  color: #F0EDE6;
+  outline: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+}
+
+.hf-auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.hf-auth-input:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.hf-auth-input:focus {
+  border-color: rgba(201, 168, 76, 0.5);
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hf-auth-input-error {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.06) !important;
+}
+
+/* Prevent iOS zoom on focus (input font-size < 16px triggers zoom) */
+@media (max-width: 768px) {
+  .hf-auth-input {
+    font-size: 16px;
+    padding: 14px 16px;
+  }
+}
+
+/* ── Gold CTA Button ────────────────────────────────────────────────────────── */
+.hf-auth-cta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: #0C1F17;
+  background: linear-gradient(135deg, #C9A84C, #E2C366);
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(201, 168, 76, 0.25), 0 1px 3px rgba(201, 168, 76, 0.15);
+  overflow: hidden;
+}
+
+.hf-auth-cta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: hf-shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.hf-auth-cta:hover:not(:disabled) {
+  background: linear-gradient(135deg, #D4B55A, #EDD580);
+  box-shadow: 0 6px 24px rgba(201, 168, 76, 0.35), 0 2px 6px rgba(201, 168, 76, 0.2);
+  transform: translateY(-1px);
+}
+
+.hf-auth-cta:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.hf-auth-cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Mobile: taller touch target */
+@media (max-width: 768px) {
+  .hf-auth-cta {
+    height: 52px;
+    font-size: 16px;
+  }
+}
