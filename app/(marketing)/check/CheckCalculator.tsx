@@ -44,16 +44,36 @@ const STATES = [
 ];
 
 const CROPS = [
-  { code: "CORN", name: "Corn", icon: "🌽" },
-  { code: "SOYBEANS", name: "Soybeans", icon: "🫘" },
-  { code: "WHEAT", name: "Wheat", icon: "🌾" },
-  { code: "SORGHUM", name: "Sorghum", icon: "🌿" },
-  { code: "BARLEY", name: "Barley", icon: "🪴" },
-  { code: "OATS", name: "Oats", icon: "🌱" },
-  { code: "RICE", name: "Rice", icon: "🍚" },
-  { code: "PEANUTS", name: "Peanuts", icon: "🥜" },
-  { code: "COTTON", name: "Cotton", icon: "☁️" },
+  { code: "CORN", name: "Corn" },
+  { code: "SOYBEANS", name: "Soybeans" },
+  { code: "WHEAT", name: "Wheat" },
+  { code: "SORGHUM", name: "Sorghum" },
+  { code: "BARLEY", name: "Barley" },
+  { code: "OATS", name: "Oats" },
+  { code: "RICE", name: "Rice" },
+  { code: "PEANUTS", name: "Peanuts" },
+  { code: "COTTON", name: "Cotton" },
 ];
+
+// SVG crop icons — premium, consistent, no emoji rendering differences
+function CropIcon({ crop, size = 28 }: { crop: string; size?: number }) {
+  const color = "currentColor";
+  const s = size;
+  const props = { width: s, height: s, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: "1.5", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+  switch (crop) {
+    case "CORN": return (<svg {...props}><path d="M12 2v20" /><path d="M8 6c0 0 2 2 4 2s4-2 4-2" /><path d="M7 10c0 0 2.5 2 5 2s5-2 5-2" /><path d="M8 14c0 0 2 2 4 2s4-2 4-2" /><path d="M9 18c0 0 1.5 1 3 1s3-1 3-1" /></svg>);
+    case "SOYBEANS": return (<svg {...props}><circle cx="9" cy="10" r="3" /><circle cx="15" cy="10" r="3" /><path d="M12 7V2" /><path d="M12 13v9" /><path d="M9 13c1.5 1 4.5 1 6 0" /></svg>);
+    case "WHEAT": return (<svg {...props}><path d="M12 2v20" /><path d="M8 6l4-2 4 2" /><path d="M7 10l5-2 5 2" /><path d="M8 14l4-2 4 2" /><path d="M9 18l3-1 3 1" /></svg>);
+    case "SORGHUM": return (<svg {...props}><path d="M12 22V8" /><circle cx="12" cy="5" r="3" /><path d="M8 8c2 1 6 1 8 0" /><path d="M9 12c1.5 .5 4.5 .5 6 0" /></svg>);
+    case "BARLEY": return (<svg {...props}><path d="M12 2v20" /><path d="M7 8l5-1 5 1" /><path d="M7 12l5-1 5 1" /><path d="M8 16l4-1 4 1" /><path d="M6 4l6 2 6-2" /></svg>);
+    case "OATS": return (<svg {...props}><path d="M12 22V6" /><path d="M12 6c-2-3-5-4-5-4" /><path d="M12 6c2-3 5-4 5-4" /><path d="M9 14c0 0 1.5 1 3 1s3-1 3-1" /></svg>);
+    case "RICE": return (<svg {...props}><path d="M12 2v20" /><path d="M7 7c2.5 2 7.5 2 10 0" /><path d="M6 12c3 2 9 2 12 0" /><path d="M8 17c2 1 6 1 8 0" /></svg>);
+    case "PEANUTS": return (<svg {...props}><ellipse cx="9" cy="12" rx="4" ry="6" /><ellipse cx="15" cy="12" rx="4" ry="6" /><path d="M12 6V2" /><path d="M10 6c1 .5 3 .5 4 0" /></svg>);
+    case "COTTON": return (<svg {...props}><circle cx="12" cy="10" r="5" /><path d="M12 15v7" /><path d="M8 7c1-2 3-3 4-3s3 1 4 3" /><path d="M7 11c0 2 2 4 5 4s5-2 5-4" /></svg>);
+    default: return (<svg {...props}><circle cx="12" cy="12" r="8" /><path d="M12 8v8" /><path d="M8 12h8" /></svg>);
+  }
+}
 
 // National benchmark data — OBBBA updated reference prices & typical values
 const BENCH: Record<string, { by: number; bp: number; mya: number; lr: number; ref: number; pyf: number; unit: string }> = {
@@ -392,7 +412,7 @@ export default function CheckCalculator() {
                   value={stateAbbr}
                   onChange={(e) => setStateAbbr(e.target.value)}
                   className="hf-calc-input w-full p-4 rounded-[14px] text-base font-medium text-white bg-white/[0.04] border border-white/[0.08] outline-none cursor-pointer appearance-none transition-colors focus:border-[#C9A84C]/40 focus:ring-1 focus:ring-[#C9A84C]/20"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='rgba(255,255,255,0.3)' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6l3.5 4 3.5-4z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 16px center", paddingRight: "44px" }}
+                  style={{ colorScheme: "dark", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='rgba(255,255,255,0.3)' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6l3.5 4 3.5-4z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 16px center", paddingRight: "44px" }}
                 >
                   <option value="">Select your state...</option>
                   {STATES.map((s) => (
@@ -418,7 +438,7 @@ export default function CheckCalculator() {
                           if (c) { setCountyName(c.display_name); setCountySlug(c.slug); }
                         }}
                         className="hf-calc-input w-full p-4 rounded-[14px] text-base font-medium text-white bg-white/[0.04] border border-white/[0.08] outline-none cursor-pointer appearance-none transition-colors focus:border-[#C9A84C]/40 focus:ring-1 focus:ring-[#C9A84C]/20"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='rgba(255,255,255,0.3)' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6l3.5 4 3.5-4z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 16px center", paddingRight: "44px" }}
+                        style={{ colorScheme: "dark", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='rgba(255,255,255,0.3)' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6l3.5 4 3.5-4z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 16px center", paddingRight: "44px" }}
                       >
                         <option value="">Select your county...</option>
                         {counties.map((c) => (
@@ -471,7 +491,9 @@ export default function CheckCalculator() {
                         background: cropCode === c.code ? "rgba(201,168,76,0.06)" : "rgba(255,255,255,0.02)",
                       }}
                     >
-                      <div className="text-[28px] sm:text-[32px] mb-1">{c.icon}</div>
+                      <div className="mb-1.5 flex justify-center" style={{ color: cropCode === c.code ? "#C9A84C" : "rgba(255,255,255,0.35)" }}>
+                        <CropIcon crop={c.code} size={30} />
+                      </div>
                       <div className="text-[12px] sm:text-[13px] font-bold" style={{ color: cropCode === c.code ? "#C9A84C" : "rgba(255,255,255,0.5)" }}>
                         {c.name}
                       </div>
@@ -563,7 +585,7 @@ export default function CheckCalculator() {
 
                   {/* Context line */}
                   <div className="text-[13px] text-white/35 mb-2">
-                    {cropObj?.icon} {cropObj?.name} · {parseInt(acres).toLocaleString()} base acres · {countyName || stateAbbr}
+                    {cropObj?.name} · {parseInt(acres).toLocaleString()} base acres · {countyName || stateAbbr}
                   </div>
 
                   {/* Main number */}
@@ -658,7 +680,7 @@ export default function CheckCalculator() {
 
                 {/* ── SECONDARY CTA: AI Report ─────────────────────────── */}
                 <Link
-                  href="/report"
+                  href="/pricing"
                   className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[14px] font-bold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] mb-6 no-underline"
                   style={{
                     border: "1.5px solid rgba(201,168,76,0.2)",
@@ -679,7 +701,7 @@ export default function CheckCalculator() {
                       color: "rgba(255,255,255,0.5)",
                     }}
                   >
-                    View Full {countyName} County Analysis →
+                    View Full {countyName} Analysis →
                   </Link>
                 )}
 
@@ -760,6 +782,132 @@ export default function CheckCalculator() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+           BELOW-THE-FOLD: Educational Content + FAQ + Trust
+           Always visible — provides SEO value and fills the page
+           ═══════════════════════════════════════════════════════════════ */}
+      <div className="relative z-10 border-t border-white/[0.04]" style={{ background: "linear-gradient(180deg, #0A2E1C 0%, #0C1F17 100%)" }}>
+        <div className="mx-auto max-w-[680px] px-5 sm:px-6 py-16 sm:py-24">
+
+          {/* ── How It Works ─────────────────────────────────────── */}
+          <div className="text-center mb-14 sm:mb-20">
+            <h2 className="text-[22px] sm:text-[28px] font-extrabold text-white tracking-[-0.02em] mb-3">
+              How does ARC-CO vs PLC work?
+            </h2>
+            <p className="text-[14px] sm:text-[15px] text-white/35 leading-relaxed max-w-[520px] mx-auto">
+              Every year, farmers with base acres must choose between two USDA safety-net programs. Picking the right one can mean thousands of dollars in difference.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-5 mb-16 sm:mb-20">
+            {[
+              {
+                title: "ARC-CO (County Revenue)",
+                desc: "Pays when your county\u2019s actual crop revenue falls below 90% of its benchmark revenue. Covers both price drops and yield losses. Capped at 12% of benchmark.",
+                accent: "#C9A84C",
+              },
+              {
+                title: "PLC (Price Loss Coverage)",
+                desc: "Pays when the national average price drops below the statutory reference price. Payments are based on your farm\u2019s PLC yield, not county yields. No payment cap per acre.",
+                accent: "#59A985",
+              },
+            ].map((card) => (
+              <div key={card.title} className="p-5 sm:p-6 rounded-[18px] border border-white/[0.06] bg-white/[0.02]">
+                <div className="w-2 h-2 rounded-full mb-3" style={{ background: card.accent }} />
+                <h3 className="text-[15px] font-bold text-white mb-2">{card.title}</h3>
+                <p className="text-[13px] text-white/30 leading-relaxed">{card.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── What Changed in OBBBA ────────────────────────────── */}
+          <div className="mb-16 sm:mb-20">
+            <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-4">
+              What changed under OBBBA (2025 Farm Bill)?
+            </h2>
+            <div className="space-y-3">
+              {[
+                "ARC-CO guarantee increased from 86% to 90% of benchmark revenue",
+                "ARC payment cap raised from 10% to 12% of benchmark revenue",
+                "Statutory reference prices increased — corn from $3.70 to $4.10/bu, soybeans from $8.40 to $10.00/bu",
+                "Effective reference price escalator improved from 85% to 88% of Olympic average MYA",
+                "Payment limits increased from $125,000 to $155,000 per person",
+                "30 million new base acres eligible for the first time",
+                "2025 crop year uses automatic higher-of ARC or PLC payments",
+                "Programs extended through 2031 (8 crop years)",
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-3 text-[13px] sm:text-[14px] text-white/35 leading-relaxed">
+                  <span className="text-[#C9A84C] mt-0.5 shrink-0"><IconCheck /></span>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── FAQ ──────────────────────────────────────────────── */}
+          <div className="mb-16 sm:mb-20">
+            <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-6">
+              Frequently asked questions
+            </h2>
+            <div className="space-y-4">
+              {[
+                {
+                  q: "Is this calculator really free?",
+                  a: "Yes. The ARC/PLC comparison calculator is 100% free, no registration required. We also offer a paid Pro dashboard ($49/mo) with multi-year projections, scenario modeling, and portfolio management for ag professionals.",
+                },
+                {
+                  q: "Where does the data come from?",
+                  a: "All county yield data comes from the USDA National Agricultural Statistics Service (NASS) Quick Stats API. Program rules follow OBBBA (Pub. L. 119-21) and FSA published parameters. We are not affiliated with USDA or FSA.",
+                },
+                {
+                  q: "How accurate are these estimates?",
+                  a: "Our calculations use the same formulas as FSA, but actual payments depend on final Marketing Year Average prices, official county yields, and your farm-specific PLC yield. Use these estimates for planning — always confirm with your local FSA office before making enrollment decisions.",
+                },
+                {
+                  q: "When is the 2026 ARC/PLC election deadline?",
+                  a: "FSA has not yet announced the 2026 enrollment period. Current estimates from extension economists suggest enrollment may open in summer or fall 2026. The 2025 crop year uses automatic higher-of payments (no election needed).",
+                },
+                {
+                  q: "Do you store my farm data?",
+                  a: "The free calculator processes everything in your browser — no farm data is stored on our servers unless you create an account. We never sell your data to third parties. See our privacy policy for full details.",
+                },
+              ].map((faq) => (
+                <details key={faq.q} className="group rounded-[14px] border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+                  <summary className="flex items-center justify-between p-4 sm:p-5 cursor-pointer text-[14px] sm:text-[15px] font-semibold text-white/70 hover:text-white transition-colors list-none [&::-webkit-details-marker]:hidden">
+                    {faq.q}
+                    <svg className="w-4 h-4 text-white/20 group-open:rotate-180 transition-transform shrink-0 ml-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </summary>
+                  <div className="px-4 sm:px-5 pb-4 sm:pb-5 text-[13px] text-white/30 leading-relaxed -mt-1">
+                    {faq.a}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Data Sources ─────────────────────────────────────── */}
+          <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6">
+            <h3 className="text-[13px] font-bold text-white/50 uppercase tracking-wider mb-4">Data Sources</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { abbr: "NASS", name: "County yields via Quick Stats API" },
+                { abbr: "FSA", name: "ARC/PLC program rules" },
+                { abbr: "OBBBA", name: "2025 farm bill parameters" },
+                { abbr: "ERS", name: "Price forecasts & baselines" },
+              ].map((src) => (
+                <div key={src.abbr} className="text-center">
+                  <div className="text-[15px] font-extrabold text-[#C9A84C]/60 mb-1">{src.abbr}</div>
+                  <div className="text-[11px] text-white/20 leading-snug">{src.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
