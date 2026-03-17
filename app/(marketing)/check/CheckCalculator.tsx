@@ -2,19 +2,26 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Phase 10 Build 1: The Calculator Revolution
+// Phase 10 Build 3: Premium Polish
 //
 // 3-step premium wizard: Location → Farm Details → Results
-// - County selection with live USDA-backed data
-// - Animated results reveal with comparison cards
-// - Conversion CTAs to Pro ($49/mo) and AI Report ($39)
+// - Custom dark-themed dropdowns (DarkSelect component)
+// - SVG crop icons (no emojis)
+// - Animated results with staggered reveal, visual bar chart, plain-English explainer
+// - Expandable calculation breakdown table
+// - Conversion CTAs: Pro trial (primary) + See Plans (secondary)
+// - Below-fold: educational content, FAQ accordion, data sources
+// - Grain texture, gold separators, scroll-reveal animations matching homepage
 // - Mobile-first, 48dp touch targets, WCAG AAA contrast
-// - No email gate before results — free, instant, ungated
 // =============================================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { DarkSelect } from "./DarkSelect";
+
+// Lazy-load Recharts to keep initial bundle small
+const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
 
 // ─── State & Crop Data ──────────────────────────────────────────────────────
 
@@ -159,6 +166,52 @@ function AnimatedNumber({ value, duration = 2000, prefix = "$" }: { value: numbe
   }, [value, duration]);
 
   return <span style={{ fontVariantNumeric: "tabular-nums" }}>{prefix}{display.toLocaleString()}</span>;
+}
+
+// ─── Scroll Reveal (CSS-only, Intersection Observer) ────────────────────────
+
+function ScrollReveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setVisible(true); return; }
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.unobserve(el); } }, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(20px)",
+        transition: `opacity 0.6s cubic-bezier(0.16,1,0.3,1) ${delay}ms, transform 0.6s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Stagger Item (for results reveal) ──────────────────────────────────────
+
+function StaggerItem({ children, index, className = "" }: { children: React.ReactNode; index: number; className?: string }) {
+  return (
+    <div
+      className={className}
+      style={{
+        opacity: 0,
+        animation: `qc-enter 0.4s cubic-bezier(0.16,1,0.3,1) ${200 + index * 80}ms forwards`,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 // ─── SVG Icons ──────────────────────────────────────────────────────────────
@@ -631,8 +684,69 @@ export default function CheckCalculator() {
                   </div>
                 </div>
 
+                {/* ── Visual Bar Chart ──────────────────────────────────── */}
+                <StaggerItem index={1}>
+                  <div className="mb-6 rounded-[16px] p-4 sm:p-5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                    <LazyChart arcPerAcre={results.arcPerAcre} plcPerAcre={results.plcPerAcre} winner={results.best} />
+                  </div>
+                </StaggerItem>
+
+                {/* ── "What this means" Explainer ──────────────────────── */}
+                <StaggerItem index={2}>
+                  <div className="mb-6 rounded-[16px] p-5 sm:p-6" style={{ background: "rgba(201,168,76,0.03)", border: "1px solid rgba(201,168,76,0.1)" }}>
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-[#C9A84C]/15 flex items-center justify-center shrink-0 mt-0.5">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="2.5" strokeLinecap="round"><path d="M12 16v-4M12 8h.01" /></svg>
+                      </div>
+                      <div>
+                        <div className="text-[13px] font-semibold text-white/70 mb-1.5">What this means for your farm</div>
+                        <p className="text-[13px] text-white/40 leading-relaxed">
+                          {results.best === "ARC-CO"
+                            ? `Based on current estimates, ARC-CO\u2019s county revenue guarantee would trigger a payment because actual revenue is projected below 90% of the benchmark. Over ${parseInt(acres).toLocaleString()} base acres, that\u2019s $${results.diff.toLocaleString()} more than PLC would pay. This is an estimate \u2014 actual payments depend on final MYA prices and official county yields.`
+                            : `Based on current estimates, PLC\u2019s price-based guarantee triggers a larger payment because the effective reference price exceeds the projected marketing year average price. Over ${parseInt(acres).toLocaleString()} base acres, PLC pays $${results.diff.toLocaleString()} more than ARC-CO. This is an estimate \u2014 actual payments depend on final MYA prices.`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </StaggerItem>
+
+                {/* ── Expandable Breakdown ──────────────────────────────── */}
+                <StaggerItem index={3}>
+                  <details className="mb-6 rounded-[16px] border border-white/[0.06] bg-white/[0.02] overflow-hidden group">
+                    <summary className="flex items-center justify-between p-4 sm:p-5 cursor-pointer text-[13px] font-semibold text-white/50 hover:text-white/70 transition-colors list-none [&::-webkit-details-marker]:hidden">
+                      How we calculated this
+                      <svg className="w-4 h-4 text-white/20 group-open:rotate-180 transition-transform shrink-0 ml-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                    </summary>
+                    <div className="px-4 sm:px-5 pb-4 sm:pb-5 -mt-1">
+                      <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+                        {/* Header */}
+                        <div className="p-3 text-[11px] font-bold text-white/30 uppercase tracking-wider" style={{ background: "#0C1F17" }}>&nbsp;</div>
+                        <div className="p-3 text-[11px] font-bold text-[#C9A84C]/60 uppercase tracking-wider text-center" style={{ background: "#0C1F17" }}>ARC-CO</div>
+                        <div className="p-3 text-[11px] font-bold text-white/30 uppercase tracking-wider text-center" style={{ background: "#0C1F17" }}>PLC</div>
+                        {/* Rows */}
+                        {[
+                          { label: "Per acre", arc: `$${results.arcPerAcre.toFixed(2)}`, plc: `$${results.plcPerAcre.toFixed(2)}` },
+                          { label: "Total payment", arc: `$${results.arc.toLocaleString()}`, plc: `$${results.plc.toLocaleString()}` },
+                          { label: "Payment acres", arc: "85%", plc: "85%" },
+                          { label: "Sequestration", arc: "5.7%", plc: "5.7%" },
+                        ].map((row) => (
+                          <div key={row.label} className="contents">
+                            <div className="p-3 text-[12px] text-white/40" style={{ background: "rgba(12,31,23,0.8)" }}>{row.label}</div>
+                            <div className="p-3 text-[12px] text-white/60 text-center font-medium tabular-nums" style={{ background: "rgba(12,31,23,0.8)" }}>{row.arc}</div>
+                            <div className="p-3 text-[12px] text-white/40 text-center tabular-nums" style={{ background: "rgba(12,31,23,0.8)" }}>{row.plc}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 text-[11px] text-white/20 leading-relaxed">
+                        Calculations use OBBBA (2025 Farm Bill) program rules. ARC-CO guarantee = 90% of benchmark revenue. PLC uses effective reference price with 88% escalator. Both programs apply 85% payment acres and 5.7% sequestration.
+                      </div>
+                    </div>
+                  </details>
+                </StaggerItem>
+
                 {/* Disclaimer */}
-                <div className="text-[11px] text-white/20 text-center leading-relaxed mb-6 max-w-[420px] mx-auto">
+                <div className="text-[11px] text-white/20 text-center leading-relaxed mb-6 max-w-[420px] mx-auto" style={{ opacity: 0, animation: "qc-enter 0.4s cubic-bezier(0.16,1,0.3,1) 0.5s forwards" }}>
                   Estimates based on national benchmark data and OBBBA program rules.{" "}
                   {countySlug && stateSlug ? (
                     <Link
@@ -649,7 +763,7 @@ export default function CheckCalculator() {
                 {/* ── PRIMARY CTA: Pro Dashboard Trial ──────────────────── */}
                 <Link
                   href="/signup"
-                  className="flex items-center justify-center gap-2 w-full p-4 sm:p-[18px] rounded-[14px] text-[15px] sm:text-base font-bold border-none cursor-pointer transition-all duration-200 hover:-translate-y-0.5 mb-3 no-underline"
+                  className="flex items-center justify-center gap-2 w-full p-4 sm:p-[18px] rounded-[14px] text-[15px] sm:text-base font-bold border-none cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 mb-3 no-underline"
                   style={{
                     background: "linear-gradient(90deg, #9E7E30, #C9A84C, #E2C366, #C9A84C, #9E7E30)",
                     backgroundSize: "200% auto",
@@ -664,17 +778,17 @@ export default function CheckCalculator() {
                   $49/month after trial · Multi-year projections · Scenario modeling · Unlimited farms
                 </p>
 
-                {/* ── SECONDARY CTA: AI Report ─────────────────────────── */}
+                {/* ── SECONDARY CTA: See Plans ───────────────────────────── */}
                 <Link
                   href="/pricing"
-                  className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[14px] font-bold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] mb-6 no-underline"
+                  className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[14px] font-bold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] active:scale-[0.98] active:duration-75 mb-6 no-underline"
                   style={{
-                    border: "1.5px solid rgba(201,168,76,0.2)",
-                    background: "rgba(201,168,76,0.03)",
-                    color: "#C9A84C",
+                    border: "1.5px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.02)",
+                    color: "rgba(255,255,255,0.6)",
                   }}
                 >
-                  Get AI-Powered Farm Report — $39 →
+                  See All Plans & Pricing →
                 </Link>
 
                 {/* ── County deep-dive link ─────────────────────────────── */}
@@ -774,18 +888,31 @@ export default function CheckCalculator() {
            BELOW-THE-FOLD: Educational Content + FAQ + Trust
            Always visible — provides SEO value and fills the page
            ═══════════════════════════════════════════════════════════════ */}
-      <div className="relative z-10 border-t border-white/[0.04]" style={{ background: "linear-gradient(180deg, #0A2E1C 0%, #0C1F17 100%)" }}>
-        <div className="mx-auto max-w-[680px] px-5 sm:px-6 py-16 sm:py-24">
+      <div className="relative z-10" style={{ background: "linear-gradient(180deg, #0A2E1C 0%, #0C1F17 100%)" }}>
+        {/* Grain texture overlay */}
+        <div className="hf-grain" style={{ opacity: 0.04 }} />
+
+        {/* Ambient gold glow at transition */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 50% 0%, rgba(201,168,76,0.08) 0%, transparent 70%)" }} />
+
+        {/* Gold separator line */}
+        <div className="mx-auto max-w-[500px] px-8">
+          <div className="h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.25) 50%, transparent 100%)" }} />
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-[680px] px-5 sm:px-6 py-16 sm:py-24">
 
           {/* ── How It Works ─────────────────────────────────────── */}
-          <div className="text-center mb-14 sm:mb-20">
-            <h2 className="text-[22px] sm:text-[28px] font-extrabold text-white tracking-[-0.02em] mb-3">
-              How does ARC-CO vs PLC work?
-            </h2>
-            <p className="text-[14px] sm:text-[15px] text-white/35 leading-relaxed max-w-[520px] mx-auto">
-              Every year, farmers with base acres must choose between two USDA safety-net programs. Picking the right one can mean thousands of dollars in difference.
-            </p>
-          </div>
+          <ScrollReveal>
+            <div className="text-center mb-14 sm:mb-20">
+              <h2 className="text-[22px] sm:text-[28px] font-extrabold text-white tracking-[-0.02em] mb-3">
+                How does ARC-CO vs PLC work?
+              </h2>
+              <p className="text-[14px] sm:text-[15px] text-white/35 leading-relaxed max-w-[520px] mx-auto">
+                Every year, farmers with base acres must choose between two USDA safety-net programs. Picking the right one can mean thousands of dollars in difference.
+              </p>
+            </div>
+          </ScrollReveal>
 
           <div className="grid sm:grid-cols-2 gap-5 mb-16 sm:mb-20">
             {[
@@ -799,16 +926,19 @@ export default function CheckCalculator() {
                 desc: "Pays when the national average price drops below the statutory reference price. Payments are based on your farm\u2019s PLC yield, not county yields. No payment cap per acre.",
                 accent: "#59A985",
               },
-            ].map((card) => (
-              <div key={card.title} className="p-5 sm:p-6 rounded-[18px] border border-white/[0.06] bg-white/[0.02]">
-                <div className="w-2 h-2 rounded-full mb-3" style={{ background: card.accent }} />
-                <h3 className="text-[15px] font-bold text-white mb-2">{card.title}</h3>
-                <p className="text-[13px] text-white/30 leading-relaxed">{card.desc}</p>
-              </div>
+            ].map((card, i) => (
+              <ScrollReveal key={card.title} delay={i * 100}>
+                <div className="p-5 sm:p-6 rounded-[18px] border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.03] transition-all duration-300">
+                  <div className="w-2 h-2 rounded-full mb-3" style={{ background: card.accent }} />
+                  <h3 className="text-[15px] font-bold text-white mb-2">{card.title}</h3>
+                  <p className="text-[13px] text-white/30 leading-relaxed">{card.desc}</p>
+                </div>
+              </ScrollReveal>
             ))}
           </div>
 
           {/* ── What Changed in OBBBA ────────────────────────────── */}
+          <ScrollReveal>
           <div className="mb-16 sm:mb-20">
             <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-4">
               What changed under OBBBA (2025 Farm Bill)?
@@ -831,8 +961,15 @@ export default function CheckCalculator() {
               ))}
             </div>
           </div>
+          </ScrollReveal>
+
+          {/* ── Gold separator ────────────────────────────────────── */}
+          <div className="mb-16 sm:mb-20 mx-auto max-w-[300px]">
+            <div className="h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.15), transparent)" }} />
+          </div>
 
           {/* ── FAQ ──────────────────────────────────────────────── */}
+          <ScrollReveal>
           <div className="mb-16 sm:mb-20">
             <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-6">
               Frequently asked questions
@@ -874,9 +1011,11 @@ export default function CheckCalculator() {
               ))}
             </div>
           </div>
+          </ScrollReveal>
 
           {/* ── Data Sources ─────────────────────────────────────── */}
-          <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6">
+          <ScrollReveal>
+          <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 hover:border-white/[0.1] transition-all duration-300">
             <h3 className="text-[13px] font-bold text-white/50 uppercase tracking-wider mb-4">Data Sources</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
@@ -892,6 +1031,7 @@ export default function CheckCalculator() {
               ))}
             </div>
           </div>
+          </ScrollReveal>
 
         </div>
       </div>
