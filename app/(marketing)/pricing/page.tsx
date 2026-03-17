@@ -1,14 +1,13 @@
 "use client";
 
 // =============================================================================
-// HarvestFile — /pricing Page (Complete Redesign)
-// Phase 11 Build 1: Premium Pricing Page
+// HarvestFile — /pricing Page
+// Phase 11 Build 2: 4-Tier Pricing with Reverse Trial Model
 //
-// Dark forest green + gold brand system matching homepage and /check.
-// Three tiers: Pro $49/mo, Team $149/mo, Enterprise (custom).
-// Monthly/Annual toggle with 20% savings.
-// Gold shimmer CTA, grain texture, scroll-reveal animations.
-// FAQ accordion, trust badges, final CTA.
+// Starter $29/mo, Pro $59/mo (Most Popular), Team $149/mo, Enterprise (Custom)
+// All trials get Pro-level access for 14 days (reverse trial pattern)
+// Dark forest green + gold brand system
+// Monthly/Annual toggle, FAQ accordion, trust badges, final CTA
 // =============================================================================
 
 import { useState, useEffect, useRef } from "react";
@@ -18,42 +17,63 @@ import Link from "next/link";
 
 const TIERS = [
   {
-    name: "Pro",
-    monthly: 49,
-    description: "Everything you need to optimize your farm program elections and maximize payments.",
+    name: "Starter",
+    monthly: 29,
+    description: "Essential tools for individual farmers making smarter program decisions.",
     features: [
       "ARC/PLC decision calculator",
-      "Save unlimited farm operations",
-      "Unlimited AI-generated reports",
+      "Save up to 5 farm operations",
+      "3 AI-generated reports/month",
       "Price & deadline alerts",
-      "Cross-program optimization engine",
       "County-level yield data (NASS)",
       "Export reports as PDF",
       "Email support",
     ],
-    cta: "Start 14-Day Free Trial",
+    cta: "Start Free Trial",
+    href: "/signup",
+    highlighted: false,
+    badge: null,
+    accentColor: "rgba(255,255,255,0.3)",
+  },
+  {
+    name: "Pro",
+    monthly: 59,
+    description: "Full-powered optimization for serious operations. The plan most farmers choose.",
+    features: [
+      "Everything in Starter",
+      "Unlimited farm operations",
+      "Unlimited AI reports",
+      "Multi-year payment projections",
+      "Scenario modeling engine",
+      "Crop insurance comparison",
+      "County election benchmarking",
+      "Priority email support",
+    ],
+    cta: "Start Free Trial",
     href: "/signup",
     highlighted: true,
     badge: "Most Popular",
+    accentColor: "#C9A84C",
   },
   {
     name: "Team",
     monthly: 149,
-    description: "For ag consultants and crop insurance agents managing multiple producers.",
+    description: "For ag consultants, crop insurance agents, and advisors managing multiple producers.",
     features: [
       "Everything in Pro",
       "Manage up to 25 producers",
       "Branded client reports",
       "Bulk operations import (CSV)",
       "Team member accounts (up to 3)",
-      "Priority support",
       "Client portfolio analytics",
       "Quarterly market briefings",
+      "Phone & priority support",
     ],
-    cta: "Start 14-Day Free Trial",
+    cta: "Start Free Trial",
     href: "/signup",
     highlighted: false,
     badge: null,
+    accentColor: "rgba(255,255,255,0.3)",
   },
   {
     name: "Enterprise",
@@ -73,6 +93,7 @@ const TIERS = [
     href: "mailto:hello@harvestfile.com",
     highlighted: false,
     badge: null,
+    accentColor: "rgba(255,255,255,0.3)",
   },
 ];
 
@@ -82,12 +103,16 @@ const FAQS = [
     a: "Yes. The ARC/PLC comparison calculator at /check is 100% free, uses real USDA county data, and requires no registration. It's free forever — no catch.",
   },
   {
-    q: "What does the 14-day trial include?",
-    a: "Full access to everything in your chosen plan. No credit card required to start. If you don't subscribe after 14 days, your data is saved and waiting for when you're ready.",
+    q: "What happens during the 14-day trial?",
+    a: "Every trial gets full Pro-level access for 14 days. No credit card required. After 14 days, choose the plan that fits — Starter, Pro, or Team. Your data is saved regardless.",
   },
   {
-    q: "Can I switch between monthly and annual?",
-    a: "Yes. You can switch at any time from your dashboard settings. When switching to annual, you'll get a prorated credit for the remainder of your current billing period.",
+    q: "What's the difference between Starter and Pro?",
+    a: "Starter covers the basics — save 5 operations, 3 AI reports per month, and price alerts. Pro unlocks unlimited everything plus multi-year projections, scenario modeling, crop insurance comparison, and county election benchmarking. Most farmers choose Pro because one better decision pays for a full year.",
+  },
+  {
+    q: "Can I switch plans anytime?",
+    a: "Yes. Upgrade, downgrade, or switch between monthly and annual at any time from your dashboard. When upgrading, you get a prorated credit. When switching to annual, you save 20%.",
   },
   {
     q: "I'm a Farm Credit lender. What's the Enterprise plan?",
@@ -99,7 +124,7 @@ const FAQS = [
   },
   {
     q: "What makes this different from university spreadsheets?",
-    a: "Those tools require you to find and input county-specific USDA data yourself. HarvestFile pulls it automatically for 3,000+ counties, runs the same formulas, and gives you a shareable result in 60 seconds. Plus multi-year projections, scenario modeling, and AI-powered reports.",
+    a: "Those tools require you to find and input county-specific USDA data yourself. HarvestFile pulls it automatically for 3,000+ counties, runs the same formulas, and gives you a shareable result in 60 seconds. Plus multi-year projections, scenario modeling, crop insurance comparison, and AI-powered reports no spreadsheet can match.",
   },
 ];
 
@@ -163,17 +188,15 @@ export default function PricingPage() {
       <div className="hf-grain" style={{ opacity: 0.035, zIndex: 1 }} />
 
       {/* ═══════════════════════════════════════════════════════════════
-           HERO SECTION
+           HERO
            ═══════════════════════════════════════════════════════════ */}
       <section className="relative pt-32 sm:pt-40 pb-8 sm:pb-12">
-        {/* Ambient gold glow */}
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] pointer-events-none"
           style={{ background: "radial-gradient(ellipse 60% 50% at 50% 20%, rgba(201,168,76,0.06) 0%, transparent 70%)" }}
         />
 
         <div className="relative z-10 mx-auto max-w-[900px] px-5 sm:px-6 text-center">
-          {/* Badge */}
           <ScrollReveal>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6" style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)" }}>
               <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-pulse" />
@@ -183,7 +206,6 @@ export default function PricingPage() {
             </div>
           </ScrollReveal>
 
-          {/* Headline */}
           <ScrollReveal delay={80}>
             <h1
               className="text-[clamp(32px,6vw,56px)] font-extrabold text-white tracking-[-0.04em] leading-[1.05] mb-5"
@@ -196,7 +218,6 @@ export default function PricingPage() {
             </h1>
           </ScrollReveal>
 
-          {/* Subheadline */}
           <ScrollReveal delay={160}>
             <p className="text-[16px] sm:text-[18px] text-white/35 leading-relaxed max-w-[600px] mx-auto mb-10">
               The average small farm misses $12,000+ in USDA payments every year.
@@ -204,7 +225,6 @@ export default function PricingPage() {
             </p>
           </ScrollReveal>
 
-          {/* Billing toggle */}
           <ScrollReveal delay={240}>
             <div className="inline-flex items-center rounded-[14px] p-1" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <button
@@ -238,19 +258,19 @@ export default function PricingPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-           PRICING CARDS
+           PRICING CARDS — 4 tiers
            ═══════════════════════════════════════════════════════════ */}
-      <section className="relative z-10 mx-auto max-w-[1100px] px-5 sm:px-6 pb-20 sm:pb-28">
-        <div className="grid md:grid-cols-3 gap-5 lg:gap-6">
+      <section className="relative z-10 mx-auto max-w-[1200px] px-5 sm:px-6 pb-16 sm:pb-24">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5">
           {TIERS.map((tier, idx) => {
             const monthly = tier.monthly ?? 0;
             const displayPrice = billing === "annual" && tier.monthly ? Math.round(monthly * 0.8) : monthly;
             const annualTotal = tier.monthly ? Math.round(monthly * 12 * 0.8) : 0;
 
             return (
-              <ScrollReveal key={tier.name} delay={idx * 100}>
+              <ScrollReveal key={tier.name} delay={idx * 80}>
                 <div
-                  className="relative rounded-[20px] p-7 sm:p-8 flex flex-col h-full transition-all duration-300 hover:translate-y-[-2px]"
+                  className="relative rounded-[20px] p-6 sm:p-7 flex flex-col h-full transition-all duration-300 hover:translate-y-[-2px]"
                   style={{
                     background: tier.highlighted
                       ? "linear-gradient(180deg, rgba(201,168,76,0.06) 0%, rgba(255,255,255,0.02) 100%)"
@@ -263,58 +283,53 @@ export default function PricingPage() {
                       : "none",
                   }}
                 >
-                  {/* Badge */}
                   {tier.badge && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="px-4 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider" style={{ background: "linear-gradient(135deg, #9E7E30, #C9A84C)", color: "#0C1F17" }}>
+                      <span className="px-4 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider whitespace-nowrap" style={{ background: "linear-gradient(135deg, #9E7E30, #C9A84C)", color: "#0C1F17" }}>
                         {tier.badge}
                       </span>
                     </div>
                   )}
 
-                  {/* Tier name + description */}
-                  <div className="mb-6">
-                    <h3 className="text-white font-bold text-[18px] mb-1.5">{tier.name}</h3>
-                    <p className="text-[13px] text-white/30 leading-relaxed">{tier.description}</p>
+                  <div className="mb-5">
+                    <h3 className="text-white font-bold text-[17px] mb-1">{tier.name}</h3>
+                    <p className="text-[12px] text-white/25 leading-relaxed">{tier.description}</p>
                   </div>
 
-                  {/* Price */}
-                  <div className="mb-7">
+                  <div className="mb-6">
                     {tier.monthly !== null ? (
                       <>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-[44px] font-extrabold text-white tracking-[-0.04em]" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[38px] font-extrabold text-white tracking-[-0.04em]" style={{ fontVariantNumeric: "tabular-nums" }}>
                             ${displayPrice}
                           </span>
-                          <span className="text-[14px] text-white/25 font-medium">/month</span>
+                          <span className="text-[13px] text-white/25 font-medium">/mo</span>
                         </div>
                         {billing === "annual" && (
-                          <p className="text-[12px] text-[#C9A84C]/70 mt-1 font-semibold">
-                            ${annualTotal}/year — save ${Math.round(monthly * 12 * 0.2)}/yr
+                          <p className="text-[11px] text-[#C9A84C]/60 mt-0.5 font-semibold">
+                            ${annualTotal}/yr — save ${Math.round(monthly * 12 * 0.2)}
                           </p>
                         )}
                       </>
                     ) : (
                       <div className="flex items-baseline">
-                        <span className="text-[44px] font-extrabold text-white tracking-[-0.04em]">Custom</span>
+                        <span className="text-[38px] font-extrabold text-white tracking-[-0.04em]">Custom</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Features */}
-                  <ul className="space-y-3 mb-8 flex-1">
+                  <ul className="space-y-2.5 mb-7 flex-1">
                     {tier.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3 text-[13px] text-white/50 leading-relaxed">
+                      <li key={feature} className="flex items-start gap-2.5 text-[12px] text-white/45 leading-relaxed">
                         <Check gold={tier.highlighted} />
                         {feature}
                       </li>
                     ))}
                   </ul>
 
-                  {/* CTA */}
                   <Link
                     href={tier.href}
-                    className="flex items-center justify-center w-full py-3.5 rounded-[12px] text-[14px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75"
+                    className="flex items-center justify-center w-full py-3 rounded-[12px] text-[13px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75"
                     style={
                       tier.highlighted
                         ? {
@@ -340,20 +355,27 @@ export default function PricingPage() {
         </div>
 
         {/* Trust line */}
-        <div className="mt-10 flex items-center justify-center gap-6 flex-wrap text-[11px] text-white/15">
-          {["No credit card required", "Cancel anytime", "Your data stays yours"].map((t) => (
+        <div className="mt-8 flex items-center justify-center gap-5 sm:gap-6 flex-wrap text-[11px] text-white/15">
+          {["No credit card required", "Cancel anytime", "Your data stays yours", "All trials get Pro features"].map((t) => (
             <span key={t} className="flex items-center gap-1.5">
               <Check />
               {t}
             </span>
           ))}
         </div>
+
+        {/* Reverse trial explainer */}
+        <div className="mt-6 text-center">
+          <p className="text-[12px] text-white/20 max-w-[500px] mx-auto leading-relaxed">
+            Every trial includes full Pro features for 14 days. After your trial, choose the plan that fits your operation. No credit card needed to start.
+          </p>
+        </div>
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
            FREE CALCULATOR CALLOUT
            ═══════════════════════════════════════════════════════════ */}
-      <section className="relative z-10 mx-auto max-w-[700px] px-5 sm:px-6 pb-20 sm:pb-28">
+      <section className="relative z-10 mx-auto max-w-[700px] px-5 sm:px-6 pb-16 sm:pb-24">
         <ScrollReveal>
           <div
             className="rounded-[20px] p-7 sm:p-10 text-center"
@@ -362,15 +384,15 @@ export default function PricingPage() {
               border: "1px solid rgba(255,255,255,0.06)",
             }}
           >
-            <div className="text-[13px] font-bold text-[#C9A84C]/60 uppercase tracking-wider mb-3">
-              Always Free
+            <div className="text-[12px] font-bold text-[#C9A84C]/60 uppercase tracking-wider mb-3">
+              Always Free · No Account Required
             </div>
             <h3 className="text-[22px] sm:text-[26px] font-extrabold text-white tracking-[-0.02em] mb-3">
               ARC/PLC Calculator
             </h3>
             <p className="text-[14px] text-white/30 leading-relaxed max-w-[440px] mx-auto mb-6">
               Compare ARC-CO vs PLC for your county using real USDA data.
-              No signup, no email gate, no catch. Free forever.
+              Shareable results, county-specific numbers, zero strings attached.
             </p>
             <Link
               href="/check"
@@ -388,10 +410,9 @@ export default function PricingPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════
-           FAQ SECTION
+           FAQ
            ═══════════════════════════════════════════════════════════ */}
       <section className="relative z-10">
-        {/* Gold separator */}
         <div className="mx-auto max-w-[400px] px-8 mb-12 sm:mb-16">
           <div className="h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.2), transparent)" }} />
         </div>
@@ -420,14 +441,7 @@ export default function PricingPage() {
                   >
                     <span className="text-[14px] font-semibold pr-4">{faq.q}</span>
                     <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                       className="shrink-0 transition-transform duration-200"
                       style={{ transform: openFaq === i ? "rotate(180deg)" : "rotate(0deg)", color: "rgba(255,255,255,0.2)" }}
                     >
@@ -456,7 +470,6 @@ export default function PricingPage() {
            FINAL CTA
            ═══════════════════════════════════════════════════════════ */}
       <section className="relative z-10 pb-24 sm:pb-32">
-        {/* Gold separator */}
         <div className="mx-auto max-w-[400px] px-8 mb-16 sm:mb-20">
           <div className="h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.2), transparent)" }} />
         </div>
@@ -486,7 +499,7 @@ export default function PricingPage() {
             </Link>
 
             <p className="text-[11px] text-white/15 mt-4">
-              No credit card required · Cancel anytime · $49/month after trial
+              No credit card required · Cancel anytime · Plans from $29/month
             </p>
           </ScrollReveal>
         </div>
