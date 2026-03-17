@@ -1,13 +1,11 @@
 // =============================================================================
 // HarvestFile — HowItWorks (Server Component)
-// Phase 9 Build 3: The Visceral Upgrade
+// Phase 9 Build 3.5: Final Homepage Polish
 //
-// CHANGES:
-//   - Dot grid background pattern (precision agriculture feel)
-//   - Radial mask so dots fade at edges
-//   - Step description text bumped to 18px
-//   - More generous spacing between steps
-//   - Grain texture overlay
+// REDESIGN: Each step now lives in its own elevated card with warm-tinted
+// shadows on cream #F7F3EC bg. Gold connecting dotted line between cards.
+// Step badges are forest green circles. Grain texture overlay.
+// No more "words on a screen" — every step feels like a designed moment.
 // =============================================================================
 
 import Link from 'next/link';
@@ -40,20 +38,20 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="relative py-[120px] lg:py-[160px] overflow-hidden" style={{ background: '#FAFAF7' }}>
-      {/* Dot grid background (precision agriculture feel) */}
+    <section
+      className="relative py-[120px] lg:py-[160px] overflow-hidden"
+      style={{ background: '#F7F3EC' }}
+    >
+      {/* Grain texture */}
+      <div className="hf-grain" />
+
+      {/* Subtle ambient glow */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: 'radial-gradient(circle, rgba(12,31,23,0.06) 0.75px, transparent 0.75px)',
-          backgroundSize: '24px 24px',
-          maskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 70%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 70%)',
+          backgroundImage: 'radial-gradient(ellipse 500px 400px at 70% 30%, rgba(201,168,76,0.05) 0%, transparent 70%)',
         }}
       />
-
-      {/* Grain texture */}
-      <div className="hf-grain" />
 
       <div className="relative z-10 mx-auto max-w-[900px] px-6">
         {/* Header */}
@@ -67,16 +65,21 @@ export function HowItWorks() {
           </div>
         </RevealOnScroll>
 
-        {/* Steps */}
+        {/* Steps — each in its own card */}
         <div className="relative">
-          {/* Connecting line */}
-          <div className="hidden sm:block absolute left-[39px] top-[60px] bottom-[60px] w-[2px] bg-gradient-to-b from-harvest-gold/30 via-harvest-gold/15 to-harvest-gold/30" />
+          {/* Gold dotted connecting line (desktop only) */}
+          <div
+            className="hidden sm:block absolute left-[39px] top-[60px] bottom-[60px] w-[2px]"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(to bottom, rgba(201,168,76,0.3) 0px, rgba(201,168,76,0.3) 4px, transparent 4px, transparent 12px)',
+            }}
+          />
 
-          <div className="space-y-12 sm:space-y-16">
+          <div className="space-y-8">
             {steps.map((step, i) => (
               <RevealOnScroll key={step.number} delay={i * 120}>
                 <div className="flex gap-6 sm:gap-8">
-                  {/* Step number badge */}
+                  {/* Step number badge — forest green circle */}
                   <div className="shrink-0">
                     <div
                       className="w-[80px] h-[80px] rounded-2xl bg-harvest-forest-950 flex items-center justify-center relative z-10"
@@ -90,8 +93,15 @@ export function HowItWorks() {
                     </div>
                   </div>
 
-                  {/* Content */}
-                  <div className="pt-2">
+                  {/* Step card */}
+                  <div
+                    className="flex-1 rounded-2xl p-7 sm:p-8"
+                    style={{
+                      background: '#FFFDF9',
+                      border: '1px solid rgba(12,31,23,0.05)',
+                      boxShadow: '0 1px 2px rgba(12,31,23,0.05), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03), 0 8px 16px rgba(12,31,23,0.02)',
+                    }}
+                  >
                     <h3 className="text-[22px] font-bold text-harvest-forest-950 tracking-[-0.02em] mb-3">
                       {step.title}
                     </h3>

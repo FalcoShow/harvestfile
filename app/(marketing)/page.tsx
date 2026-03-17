@@ -1,17 +1,15 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Phase 9 Build 3: The Visceral Upgrade
+// Phase 9 Build 3.5: Final Homepage Polish
 //
-// CHANGES FROM BUILD 2.5:
-//   - Light chapter: each section gets its own bg for variety
-//     Features: golden cream #F5F0E6 (warm)
-//     How It Works: base cream #FAFAF7 (clean)
-//     Report: base cream #FAFAF7
-//     Social Proof: green-tinted #EFF5F2 (differentiated)
-//   - Dark chapter: gold separators between Benchmark/Search/CTA
-//   - Light chapter wrapper removed bg (sections own their bg)
-//   - DarkToLight scrim destination updated to #F5F0E6
-//   - LightToDark scrim source updated to #EFF5F2
+// ALL cream backgrounds — zero white sections:
+//   Features: #F5F0E6 (golden cream)
+//   How It Works: #F7F3EC (warm cream)
+//   Report Product: #F5F0E6 (golden cream)
+//   Social Proof: #F7F3EC (warm cream)
+//
+// Scrim transitions updated to match first/last section colors.
+// Dark chapter gold separators between sections.
 // =============================================================================
 
 import { HeroSection } from '@/components/homepage/HeroSection';
@@ -24,10 +22,10 @@ import { SocialProof } from '@/components/homepage/SocialProof';
 import { CountySearchSection } from '@/components/marketing/CountySearchSection';
 import { FinalCTA } from '@/components/homepage/FinalCTA';
 
-// ─── Gold Separator (Light chapter) ──────────────────────────────────────────
+// ─── Gold Separator ──────────────────────────────────────────────────────────
 function GoldSeparator() {
   return (
-    <div className="mx-auto max-w-[1100px] px-6 bg-[#FAFAF7]" aria-hidden="true">
+    <div className="mx-auto max-w-[1100px] px-6" aria-hidden="true">
       <div
         className="h-[1px]"
         style={{
@@ -39,7 +37,7 @@ function GoldSeparator() {
   );
 }
 
-// ─── Gold Separator (Dark chapter) ───────────────────────────────────────────
+// ─── Dark Gold Separator ─────────────────────────────────────────────────────
 function DarkGoldSeparator() {
   return (
     <div className="mx-auto max-w-[1000px] px-6" aria-hidden="true">
@@ -54,8 +52,8 @@ function DarkGoldSeparator() {
   );
 }
 
-// ─── Scrim Transition: Dark → Light ──────────────────────────────────────────
-// Destination is now #F5F0E6 (golden cream — the FeatureShowcase bg)
+// ─── Scrim Transition: Dark → Golden Cream ───────────────────────────────────
+// Destination: #F5F0E6 (FeatureShowcase bg)
 function DarkToLightTransition() {
   return (
     <div
@@ -99,8 +97,8 @@ function DarkToLightTransition() {
   );
 }
 
-// ─── Scrim Transition: Light → Dark ──────────────────────────────────────────
-// Source is now #EFF5F2 (green tint — the SocialProof bg)
+// ─── Scrim Transition: Warm Cream → Dark ─────────────────────────────────────
+// Source: #F7F3EC (SocialProof bg)
 function LightToDarkTransition() {
   return (
     <div
@@ -112,22 +110,22 @@ function LightToDarkTransition() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background: `linear-gradient(to bottom,
-            rgba(239,245,242,1) 0%,
-            rgba(239,245,242,0.987) 8.1%,
-            rgba(239,245,242,0.951) 15.5%,
-            rgba(239,245,242,0.896) 22.5%,
-            rgba(239,245,242,0.825) 29%,
-            rgba(239,245,242,0.741) 35.3%,
-            rgba(239,245,242,0.648) 41.2%,
-            rgba(239,245,242,0.55) 47.1%,
-            rgba(239,245,242,0.45) 52.9%,
-            rgba(239,245,242,0.352) 58.8%,
-            rgba(239,245,242,0.259) 64.7%,
-            rgba(239,245,242,0.175) 71%,
-            rgba(239,245,242,0.104) 77.5%,
-            rgba(239,245,242,0.049) 84.5%,
-            rgba(239,245,242,0.013) 91.9%,
-            rgba(239,245,242,0) 100%
+            rgba(247,243,236,1) 0%,
+            rgba(247,243,236,0.987) 8.1%,
+            rgba(247,243,236,0.951) 15.5%,
+            rgba(247,243,236,0.896) 22.5%,
+            rgba(247,243,236,0.825) 29%,
+            rgba(247,243,236,0.741) 35.3%,
+            rgba(247,243,236,0.648) 41.2%,
+            rgba(247,243,236,0.55) 47.1%,
+            rgba(247,243,236,0.45) 52.9%,
+            rgba(247,243,236,0.352) 58.8%,
+            rgba(247,243,236,0.259) 64.7%,
+            rgba(247,243,236,0.175) 71%,
+            rgba(247,243,236,0.104) 77.5%,
+            rgba(247,243,236,0.049) 84.5%,
+            rgba(247,243,236,0.013) 91.9%,
+            rgba(247,243,236,0) 100%
           )`,
         }}
       />
@@ -159,8 +157,12 @@ export default function Home() {
       <DarkToLightTransition />
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          CHAPTER 2 — LIGHT: The Value Story
-          Sections own their backgrounds — no more flat cream wall.
+          CHAPTER 2 — CREAM: The Value Story
+          Alternating warm cream tones — zero white backgrounds.
+            Features: #F5F0E6 (golden cream)
+            How It Works: #F7F3EC (warm cream)
+            Report Product: #F5F0E6 (golden cream)
+            Social Proof: #F7F3EC (warm cream)
           ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="light">
         <FeatureShowcase />
@@ -168,10 +170,11 @@ export default function Home() {
         <HowItWorks />
         <GoldSeparator />
         <ReportProduct />
+        <GoldSeparator />
         <SocialProof />
       </div>
 
-      {/* ═══ TRANSITION: Green Tint → Dark ═══ */}
+      {/* ═══ TRANSITION: Warm Cream → Dark ═══ */}
       <LightToDarkTransition />
 
       {/* ═══════════════════════════════════════════════════════════════════════

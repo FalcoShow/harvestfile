@@ -1,23 +1,20 @@
 // =============================================================================
 // HarvestFile — SocialProof (Server Component)
-// Phase 9 Build 3: The Visceral Upgrade
+// Phase 9 Build 3.5: Final Homepage Polish
 //
-// CHANGES:
-//   - Section bg changed to green-tinted #EFF5F2 for differentiation
-//   - Stat card bg changed to white with premium green-tinted shadows
-//   - Stat numbers bumped to larger size with tighter tracking
-//   - Data sources section redesigned with icons
-//   - Grain texture overlay added
-//   - Trust badges with better visual treatment
+// FIX: Background changed from green-tinted #EFF5F2 to warm cream #F7F3EC
+// to eliminate ALL white backgrounds from the light chapter.
+// Cards use #FFFDF9 with warm-tinted layered shadows.
+// Grain texture overlay. Consistent cream palette throughout.
 // =============================================================================
 
 import { RevealOnScroll } from './shared/RevealOnScroll';
 
 const stats = [
-  { value: '50', suffix: '', label: 'States Covered', detail: 'Every state in the US' },
-  { value: '3,142', suffix: '', label: 'Counties', detail: 'Full USDA coverage' },
-  { value: '16', suffix: '', label: 'Crop Programs', detail: 'All covered commodities' },
-  { value: '$0', suffix: '', label: 'To Start', detail: 'Free calculator forever' },
+  { value: '50', label: 'States Covered', detail: 'Every state in the US' },
+  { value: '3,142', label: 'Counties', detail: 'Full USDA coverage' },
+  { value: '16', label: 'Crop Programs', detail: 'All covered commodities' },
+  { value: '$0', label: 'To Start', detail: 'Free calculator forever' },
 ];
 
 const dataSources = [
@@ -31,7 +28,7 @@ export function SocialProof() {
   return (
     <section
       className="relative py-[120px] lg:py-[140px] overflow-hidden"
-      style={{ background: '#EFF5F2' }}
+      style={{ background: '#F7F3EC' }}
     >
       {/* Grain texture */}
       <div className="hf-grain" />
@@ -40,7 +37,10 @@ export function SocialProof() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: 'radial-gradient(ellipse 600px 400px at 50% 30%, rgba(12,31,23,0.04) 0%, transparent 70%)',
+          backgroundImage: [
+            'radial-gradient(ellipse 500px 400px at 30% 40%, rgba(201,168,76,0.04) 0%, transparent 70%)',
+            'radial-gradient(ellipse 400px 300px at 70% 60%, rgba(12,31,23,0.03) 0%, transparent 70%)',
+          ].join(', '),
         }}
       />
 
@@ -51,10 +51,11 @@ export function SocialProof() {
             {stats.map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-2xl bg-white p-7 text-center transition-all duration-300 hover:-translate-y-1"
+                className="rounded-2xl p-7 text-center transition-all duration-300 hover:-translate-y-1"
                 style={{
-                  boxShadow: '0 1px 2px rgba(12,31,23,0.06), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03)',
+                  background: '#FFFDF9',
                   border: '1px solid rgba(12,31,23,0.04)',
+                  boxShadow: '0 1px 2px rgba(12,31,23,0.05), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03), 0 8px 16px rgba(12,31,23,0.02)',
                 }}
               >
                 <div className="text-[clamp(32px,4.5vw,48px)] font-extrabold text-harvest-forest-950 tracking-[-0.04em] leading-none">
@@ -63,7 +64,7 @@ export function SocialProof() {
                 <div className="text-[15px] font-semibold text-harvest-forest-800 mt-2">
                   {stat.label}
                 </div>
-                <div className="text-[13px] text-[#7A8A7E] mt-0.5">
+                <div className="text-[13px] text-[#8B9484] mt-0.5">
                   {stat.detail}
                 </div>
               </div>
@@ -74,10 +75,11 @@ export function SocialProof() {
         {/* Data Sources */}
         <RevealOnScroll delay={150}>
           <div
-            className="rounded-2xl bg-white p-8 sm:p-10"
+            className="rounded-2xl p-8 sm:p-10"
             style={{
-              boxShadow: '0 1px 2px rgba(12,31,23,0.06), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03)',
+              background: '#FFFDF9',
               border: '1px solid rgba(12,31,23,0.04)',
+              boxShadow: '0 1px 2px rgba(12,31,23,0.05), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03), 0 8px 16px rgba(12,31,23,0.02)',
             }}
           >
             <div className="text-center mb-10">
@@ -104,11 +106,11 @@ export function SocialProof() {
             </div>
 
             {/* Trust badges */}
-            <div className="flex items-center justify-center gap-6 mt-8 pt-6 border-t border-[#E2DDD3]/40 flex-wrap">
+            <div className="flex items-center justify-center gap-6 mt-8 pt-6 border-t border-[#E5DFD3] flex-wrap">
               {['256-bit encryption', 'We never sell your data', 'Ag Data Transparent aligned'].map((badge) => (
                 <div
                   key={badge}
-                  className="flex items-center gap-1.5 text-[12px] font-medium text-[#7A8A7E]"
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-[#8B9484]"
                 >
                   <svg className="w-3.5 h-3.5 text-emerald-500/70" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

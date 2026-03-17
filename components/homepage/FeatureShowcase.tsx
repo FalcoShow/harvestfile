@@ -1,14 +1,9 @@
 // =============================================================================
 // HarvestFile — FeatureShowcase (Client Component)
-// Phase 9 Build 3: The Visceral Upgrade
+// Phase 9 Build 3.5: Final Homepage Polish
 //
-// COMPLETE REWRITE. Changes:
-//   - Bento grid: hero card spans 2 columns with mini product mockup
-//   - Section bg: golden cream #F5F0E6 with ambient radial glows
-//   - Cards: layered green-tinted shadows, gradient border on hover
-//   - Each card has colored accent strip at top edge
-//   - "use client" for hover gradient tracking
-//   - Grain texture overlay on section
+// FIX: Accent bars changed from full-width (clipped rounded corners)
+//      to centered 40% width pill with rounded ends — clean on rounded cards
 // =============================================================================
 
 'use client';
@@ -88,19 +83,15 @@ function IconFileText({ className }: { className?: string }) {
 }
 
 // ─── Mini Product Mockup for Hero Card ───────────────────────────────────────
-// Shows a simplified ARC vs PLC comparison — the actual product experience
 
 function MiniCalculatorMockup() {
   return (
     <div className="rounded-xl bg-harvest-forest-950 border border-white/[0.08] p-4 shadow-lg shadow-black/10">
-      {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <div className="w-2 h-2 rounded-full bg-emerald-400" />
         <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Live Estimate</span>
       </div>
-      {/* County label */}
       <div className="text-[11px] text-white/30 mb-3">Darke County, OH · Corn · 500 acres</div>
-      {/* Program bars */}
       <div className="space-y-2">
         <div>
           <div className="flex justify-between mb-1">
@@ -121,7 +112,6 @@ function MiniCalculatorMockup() {
           </div>
         </div>
       </div>
-      {/* Advantage */}
       <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between">
         <span className="text-[10px] text-white/30">ARC-CO advantage</span>
         <span className="text-[12px] font-extrabold text-harvest-gold">+$8,200/yr</span>
@@ -169,9 +159,7 @@ function FeatureCard({
       ref={cardRef}
       onMouseMove={handleMouseMove}
       className={`group relative rounded-[20px] p-[1px] transition-all duration-300 hover:-translate-y-1.5 ${className}`}
-      style={{
-        background: 'rgba(12,31,23,0.04)',
-      }}
+      style={{ background: 'rgba(12,31,23,0.04)' }}
     >
       {/* Cursor-following gold glow border (on hover) */}
       <div
@@ -183,18 +171,21 @@ function FeatureCard({
 
       {/* Inner card */}
       <div
-        className="relative rounded-[19px] bg-white overflow-hidden h-full"
+        className="relative rounded-[19px] overflow-hidden h-full"
         style={{
+          background: '#FFFDF9',
           boxShadow: highlight
             ? '0 1px 2px rgba(12,31,23,0.06), 0 4px 8px rgba(12,31,23,0.04), 0 12px 24px rgba(12,31,23,0.03), 0 0 40px rgba(201,168,76,0.06)'
             : '0 1px 2px rgba(12,31,23,0.06), 0 2px 4px rgba(12,31,23,0.04), 0 4px 8px rgba(12,31,23,0.03)',
         }}
       >
-        {/* Top accent strip */}
-        <div
-          className="h-[3px] w-full"
-          style={{ background: accentColor }}
-        />
+        {/* Accent pill — centered at top, NOT full-width */}
+        <div className="flex justify-center pt-4">
+          <div
+            className="h-[3px] w-[40%] rounded-full"
+            style={{ background: accentColor }}
+          />
+        </div>
 
         {/* Highlight badge */}
         {highlight && (
@@ -207,23 +198,20 @@ function FeatureCard({
 
         {/* Content */}
         <div className="p-7 pb-8">
-          {/* Icon */}
           <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${iconBg} mb-5`}>
             <Icon className={iconColor} />
           </div>
 
-          {/* Title */}
           <h3 className="text-[18px] font-bold text-harvest-forest-950 tracking-[-0.01em] mb-3">
             {title}
           </h3>
 
-          {/* Description */}
-          <p className="text-[16px] text-[#5A6356] leading-[1.65]">
+          <p className="text-[16px] text-[#4A5E52] leading-[1.65]">
             {description}
           </p>
         </div>
 
-        {/* Optional visual content zone (used by hero card) */}
+        {/* Optional visual content zone */}
         {children && (
           <div className="px-7 pb-7">
             {children}
@@ -242,10 +230,9 @@ export function FeatureShowcase() {
       className="relative py-[120px] lg:py-[160px] overflow-hidden"
       style={{ background: '#F5F0E6' }}
     >
-      {/* Grain texture overlay */}
       <div className="hf-grain" />
 
-      {/* Ambient radial glows — create warmth zones */}
+      {/* Ambient radial glows */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -258,7 +245,6 @@ export function FeatureShowcase() {
       />
 
       <div className="relative z-10 mx-auto max-w-[1100px] px-6">
-        {/* Header */}
         <RevealOnScroll>
           <div className="mb-16">
             <SectionBadgeLight variant="gold" className="mb-5">
@@ -273,9 +259,8 @@ export function FeatureShowcase() {
           </div>
         </RevealOnScroll>
 
-        {/* Bento Grid — hero card spans 2 cols */}
+        {/* Bento Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {/* HERO CARD: ARC/PLC Calculator — 2 cols with product mockup */}
           <RevealOnScroll delay={0} className="md:col-span-2">
             <FeatureCard
               Icon={IconCalculator}
@@ -290,60 +275,24 @@ export function FeatureShowcase() {
             </FeatureCard>
           </RevealOnScroll>
 
-          {/* STANDARD CARDS */}
           <RevealOnScroll delay={80}>
-            <FeatureCard
-              Icon={IconMap}
-              title="County Election Intelligence"
-              description="7 years of FSA enrollment history for every farming county. See exactly how your neighbors have voted."
-              iconBg="bg-emerald-50"
-              iconColor="text-emerald-700"
-              accentColor="#10b981"
-            />
+            <FeatureCard Icon={IconMap} title="County Election Intelligence" description="7 years of FSA enrollment history for every farming county. See exactly how your neighbors have voted." iconBg="bg-emerald-50" iconColor="text-emerald-700" accentColor="#10b981" />
           </RevealOnScroll>
 
           <RevealOnScroll delay={160}>
-            <FeatureCard
-              Icon={IconTrendUp}
-              title="Multi-Year Scenario Modeler"
-              description="Project ARC vs PLC payments across 5 years with interactive price and yield sliders. Model any scenario."
-              iconBg="bg-blue-50"
-              iconColor="text-blue-700"
-              accentColor="#3b82f6"
-            />
+            <FeatureCard Icon={IconTrendUp} title="Multi-Year Scenario Modeler" description="Project ARC vs PLC payments across 5 years with interactive price and yield sliders. Model any scenario." iconBg="bg-blue-50" iconColor="text-blue-700" accentColor="#3b82f6" />
           </RevealOnScroll>
 
           <RevealOnScroll delay={240}>
-            <FeatureCard
-              Icon={IconBrain}
-              title="AI-Powered Farm Reports"
-              description="Our AI analyzes your operation and generates a professional PDF with projections and an FSA prep guide."
-              iconBg="bg-purple-50"
-              iconColor="text-purple-700"
-              accentColor="#8b5cf6"
-            />
+            <FeatureCard Icon={IconBrain} title="AI-Powered Farm Reports" description="Our AI analyzes your operation and generates a professional PDF with projections and an FSA prep guide." iconBg="bg-purple-50" iconColor="text-purple-700" accentColor="#8b5cf6" />
           </RevealOnScroll>
 
           <RevealOnScroll delay={320}>
-            <FeatureCard
-              Icon={IconBell}
-              title="Commodity Price Alerts"
-              description="Get notified instantly when corn, soybeans, or wheat prices cross your thresholds. Never miss a move."
-              iconBg="bg-orange-50"
-              iconColor="text-orange-700"
-              accentColor="#f59e0b"
-            />
+            <FeatureCard Icon={IconBell} title="Commodity Price Alerts" description="Get notified instantly when corn, soybeans, or wheat prices cross your thresholds. Never miss a move." iconBg="bg-orange-50" iconColor="text-orange-700" accentColor="#f59e0b" />
           </RevealOnScroll>
 
           <RevealOnScroll delay={400}>
-            <FeatureCard
-              Icon={IconFileText}
-              title="OBBBA Farm Bill Guide"
-              description="The most comprehensive guide to the 2025 farm bill changes. New reference prices, base acres, and ARC+SCO stacking."
-              iconBg="bg-teal-50"
-              iconColor="text-teal-700"
-              accentColor="#14b8a6"
-            />
+            <FeatureCard Icon={IconFileText} title="OBBBA Farm Bill Guide" description="The most comprehensive guide to the 2025 farm bill changes. New reference prices, base acres, and ARC+SCO stacking." iconBg="bg-teal-50" iconColor="text-teal-700" accentColor="#14b8a6" />
           </RevealOnScroll>
         </div>
       </div>
