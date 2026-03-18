@@ -2,17 +2,18 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Phase 10 Build 3: Premium Polish
+// Phase 13 Build 1: Calculator → Dashboard Bridge
 //
 // 3-step premium wizard: Location → Farm Details → Results
 // - Custom dark-themed dropdowns (DarkSelect component)
 // - SVG crop icons (no emojis)
 // - Animated results with staggered reveal, visual bar chart, plain-English explainer
 // - Expandable calculation breakdown table
-// - Conversion CTAs: Pro trial (primary) + See Plans (secondary)
+// - Conversion CTAs: "Save Your Results" primary + Pro trial secondary
 // - Below-fold: educational content, FAQ accordion, data sources
 // - Grain texture, gold separators, scroll-reveal animations matching homepage
 // - Mobile-first, 48dp touch targets, WCAG AAA contrast
+// - AUTO-SAVES results to localStorage for dashboard bridge on signup
 // =============================================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -422,6 +423,50 @@ export default function CheckCalculator() {
     } catch { /* Don't block on save failure */ }
     setEmailSaved(true);
   };
+
+  // ── Save results to localStorage for dashboard bridge (Phase 13 Build 1) ──
+
+  const BRIDGE_KEY = "hf_calculator_bridge";
+
+  const saveToBridge = useCallback(() => {
+    if (!results || !stateAbbr || !countyName) return;
+    const cropMatch = CROPS.find(c => c.code === cropCode);
+    const stateMatch = STATES.find(s => s.abbr === stateAbbr);
+
+    const bridgeData = {
+      stateAbbr,
+      stateName: stateMatch?.name || stateAbbr,
+      countyFips,
+      countyName,
+      cropCode,
+      cropName: cropMatch?.name || cropCode,
+      acres: parseInt(acres) || 100,
+      results: {
+        arc: results.arc,
+        plc: results.plc,
+        arcPerAcre: results.arcPerAcre,
+        plcPerAcre: results.plcPerAcre,
+        best: results.best,
+        diff: results.diff,
+        diffPerAcre: results.diffPerAcre,
+      },
+      isCountySpecific,
+      timestamp: Date.now(),
+    };
+
+    try {
+      localStorage.setItem(BRIDGE_KEY, JSON.stringify(bridgeData));
+    } catch {
+      // localStorage might be full or disabled — don't block
+    }
+  }, [results, stateAbbr, countyFips, countyName, cropCode, acres, isCountySpecific]);
+
+  // Auto-save to bridge whenever results change
+  useEffect(() => {
+    if (results && step === 3) {
+      saveToBridge();
+    }
+  }, [results, step, saveToBridge]);
 
   // ── Helper: state slug for county link ────────────────────────────────────
   const stateObj = STATES.find(s => s.abbr === stateAbbr);
@@ -866,7 +911,7 @@ export default function CheckCalculator() {
                   )}
                 </div>
 
-                {/* ── PRIMARY CTA: Pro Dashboard Trial ──────────────────── */}
+                {/* ── PRIMARY CTA: Save Results + Create Account (Phase 13 Build 1) ── */}
                 <Link
                   href="/signup"
                   className="flex items-center justify-center gap-2 w-full p-4 sm:p-[18px] rounded-[14px] text-[15px] sm:text-base font-bold border-none cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 mb-3 no-underline"
@@ -878,23 +923,39 @@ export default function CheckCalculator() {
                     boxShadow: "0 6px 28px rgba(201,168,76,0.2)",
                   }}
                 >
-                  Start Pro Trial — 14 Days Free →
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  Save Your Results — Create Free Account →
                 </Link>
-                <p className="text-[11px] text-white/20 text-center mb-5">
-                  $49/month after trial · Multi-year projections · Scenario modeling · Unlimited farms
+                <p className="text-[11px] text-white/20 text-center mb-3">
+                  Your {countyName} analysis will be saved to your dashboard automatically
                 </p>
 
-                {/* ── SECONDARY CTA: See Plans ───────────────────────────── */}
+                {/* ── SECONDARY CTA: Pro Trial ─────────────────────────── */}
                 <Link
-                  href="/pricing"
-                  className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[14px] font-bold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] active:scale-[0.98] active:duration-75 mb-6 no-underline"
+                  href="/signup"
+                  className="flex items-center justify-center gap-2 w-full p-3 sm:p-3.5 rounded-[12px] text-[13px] font-semibold no-underline transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
                   style={{
-                    border: "1.5px solid rgba(255,255,255,0.1)",
-                    background: "rgba(255,255,255,0.02)",
-                    color: "rgba(255,255,255,0.6)",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "rgba(255,255,255,0.5)",
                   }}
                 >
-                  See All Plans & Pricing →
+                  Start 14-Day Pro Trial · Multi-year projections + Scenario modeling
+                </Link>
+                <p className="text-[11px] text-white/15 text-center mb-5">
+                  $49/month after trial · Cancel anytime
+                </p>
+
+                {/* ── TERTIARY: See Plans ───────────────────────────────── */}
+                <Link
+                  href="/pricing"
+                  className="block text-center text-[12px] text-white/20 hover:text-white/40 transition-colors no-underline mb-6"
+                >
+                  Compare all plans →
                 </Link>
 
                 {/* ── County deep-dive link ─────────────────────────────── */}

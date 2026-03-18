@@ -1,5 +1,19 @@
+// =============================================================================
+// HarvestFile — Dashboard Overview
+// Phase 13 Build 1: Calculator → Dashboard Bridge
+//
+// Server Component that shows portfolio stats, recent activity, and quick
+// actions. Now includes the BridgeDetector client component that checks
+// localStorage for calculator results and auto-imports them.
+//
+// The BridgeDetector renders at the top of the page — if bridge data exists,
+// it shows a success card with the imported analysis. If no bridge data,
+// it renders nothing.
+// =============================================================================
+
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { BridgeDetector } from "./_components/BridgeDetector";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -8,12 +22,24 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Get the professional's org_id
-  const { data: professional } = await supabase
+  // Get the professional's org_id — handle both column names
+  let professional = null;
+  const { data: proById } = await supabase
     .from("professionals")
     .select("org_id, full_name")
-    .eq("auth_user_id", user!.id)
+    .eq("auth_id", user!.id)
     .single();
+
+  if (proById) {
+    professional = proById;
+  } else {
+    const { data: proByUserId } = await supabase
+      .from("professionals")
+      .select("org_id, full_name")
+      .eq("auth_user_id", user!.id)
+      .single();
+    professional = proByUserId;
+  }
 
   const orgId = professional?.org_id;
 
@@ -47,6 +73,20 @@ export default async function DashboardPage() {
     cropsResult.data?.reduce((sum, c) => sum + (c.acres || 0), 0) || 0;
   const totalCalcs = calcsResult.count || 0;
 
+  // Get the latest bridged calculation for the welcome card
+  let latestCalc = null;
+  if (orgId) {
+    const { data: calc } = await supabase
+      .from("calculations")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("is_latest", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    latestCalc = calc;
+  }
+
   // Format time ago
   function timeAgo(date: string) {
     const seconds = Math.floor(
@@ -67,19 +107,90 @@ export default async function DashboardPage() {
     crop_added: "🌿",
     calculation_run: "📊",
     report_generated: "📄",
+    calculator_bridge: "🔗",
   };
+
+  const firstName = professional?.full_name?.split(" ")[0] || "there";
 
   return (
     <div className="space-y-8">
+      {/* ── Bridge Detector (checks localStorage, renders only if data exists) ── */}
+      <BridgeDetector />
+
       {/* Welcome */}
       <div>
         <h2 className="text-2xl font-bold text-white">
-          Welcome back, {professional?.full_name?.split(" ")[0] || "there"}
+          Welcome back, {firstName}
         </h2>
         <p className="text-gray-400 mt-1">
-          Here&apos;s what&apos;s happening with your farmer portfolio.
+          Here&apos;s what&apos;s happening with your farm portfolio.
         </p>
       </div>
+
+      {/* ── Latest Analysis Card (shows if a calculation exists) ──────────── */}
+      {latestCalc && (
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(201,168,76,0.04) 0%, rgba(5,150,105,0.03) 100%)",
+            border: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          <div className="px-6 py-4 border-b border-white/[0.04] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
+                Latest Analysis
+              </span>
+            </div>
+            {latestCalc.farmer_id && (
+              <Link
+                href={`/dashboard/farmers/${latestCalc.farmer_id}`}
+                className="text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
+              >
+                View Details →
+              </Link>
+            )}
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-white/25 mb-1">
+                  Crop
+                </div>
+                <div className="text-sm font-semibold text-white capitalize">
+                  {latestCalc.crop_type}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-white/25 mb-1">
+                  Base Acres
+                </div>
+                <div className="text-sm font-semibold text-white">
+                  {(latestCalc.base_acres || 0).toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-white/25 mb-1">
+                  Recommendation
+                </div>
+                <div className="text-sm font-bold text-[#C9A84C]">
+                  {latestCalc.recommendation || "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-white/25 mb-1">
+                  Advantage
+                </div>
+                <div className="text-sm font-bold text-emerald-400">
+                  +${(latestCalc.difference_per_acre || 0).toFixed(2)}/ac
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -162,23 +273,14 @@ export default async function DashboardPage() {
               },
             ].map((action) => (
               <Link
-                key={action.href}
+                key={action.label}
                 href={action.href}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-white/[0.04] transition-all"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/[0.04] transition-colors group"
               >
-                <span>{action.icon}</span>
-                {action.label}
-                <svg
-                  className="ml-auto w-4 h-4 text-gray-600"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
+                <span className="text-lg">{action.icon}</span>
+                <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
+                  {action.label}
+                </span>
               </Link>
             ))}
           </div>
@@ -191,68 +293,66 @@ export default async function DashboardPage() {
           </h3>
           {recentActivity.data && recentActivity.data.length > 0 ? (
             <div className="space-y-3">
-              {recentActivity.data.map((activity) => (
+              {recentActivity.data.map((event: any) => (
                 <div
-                  key={activity.id}
-                  className="flex items-start gap-3 px-4 py-3 rounded-lg bg-white/[0.02]"
+                  key={event.id}
+                  className="flex items-start gap-3 py-2 border-b border-white/[0.04] last:border-0"
                 >
                   <span className="text-lg mt-0.5">
-                    {actionIcons[activity.action] || "📌"}
+                    {actionIcons[event.action] || "📌"}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-300 truncate">
-                      {activity.description}
+                      {event.description}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {timeAgo(activity.created_at)}
+                      {timeAgo(event.created_at)}
                     </p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-sm">No activity yet.</p>
-              <p className="text-gray-600 text-xs mt-1">
-                Add your first farmer to get started.
-              </p>
-            </div>
+            <p className="text-sm text-gray-500 py-4">
+              No recent activity. Start by adding a farmer or running a
+              calculation.
+            </p>
           )}
         </div>
       </div>
 
-      {/* Getting started card (shown when no farmers) */}
-      {totalFarmers === 0 && (
-        <div className="rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 p-8">
-          <div className="max-w-2xl">
-            <h3 className="text-xl font-bold text-white">
-              Get started with HarvestFile
-            </h3>
-            <p className="text-gray-400 mt-2 leading-relaxed">
-              Add your first farmer to begin running ARC/PLC calculations and
-              generating compliance reports. Each farmer can have multiple crops
-              with county-level yield data from USDA NASS.
-            </p>
-            <Link
-              href="/dashboard/farmers/new"
-              className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-lg bg-emerald-600 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-500 transition-all active:scale-[0.98]"
+      {/* Empty state — only shows when truly no farmers */}
+      {totalFarmers === 0 && !latestCalc && (
+        <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-10 text-center">
+          <div className="text-4xl mb-4">🌾</div>
+          <h3 className="text-lg font-semibold text-white mb-2">
+            Get started with your first farm
+          </h3>
+          <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
+            Add your farm operations to track ARC/PLC elections, run
+            calculations, and generate AI-powered reports.
+            Each farmer can have multiple crops
+            with county-level yield data from USDA NASS.
+          </p>
+          <Link
+            href="/dashboard/farmers/new"
+            className="inline-flex items-center gap-2 mt-1 px-5 py-2.5 rounded-lg bg-emerald-600 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-500 transition-all active:scale-[0.98]"
+          >
+            Add your first farmer
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              Add your first farmer
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </Link>
-          </div>
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </Link>
         </div>
       )}
     </div>
