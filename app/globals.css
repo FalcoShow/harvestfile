@@ -620,12 +620,12 @@
   }
 }
 
-/* ── Auth Input Styles ──────────────────────────────────────────────────────── */
+/* ── Auth Input Styles (v3 — more visible & substantial) ───────────────────── */
 .hf-auth-input {
   width: 100%;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 12px 16px;
   font-size: 15px;
   color: #F0EDE6;
@@ -635,23 +635,23 @@
 }
 
 .hf-auth-input::placeholder {
-  color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .hf-auth-input:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .hf-auth-input:focus {
-  border-color: rgba(201, 168, 76, 0.5);
-  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.08);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(201, 168, 76, 0.6);
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.1), 0 0 20px rgba(201, 168, 76, 0.05);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .hf-auth-input-error {
-  border-color: rgba(239, 68, 68, 0.4) !important;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.06) !important;
+  border-color: rgba(239, 68, 68, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.08) !important;
 }
 
 /* Prevent iOS zoom on focus (input font-size < 16px triggers zoom) */
@@ -720,28 +720,28 @@
   }
 }
 
-/* ── Google OAuth Button (Phase 12 v2 addition) ─────────────────────────────── */
+/* ── Google OAuth Button (v3 — more visible) ───────────────────────────────── */
 .hf-auth-google {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  height: 44px;
+  height: 46px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
   font-family: var(--font-sans);
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .hf-auth-google:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .hf-auth-google:active:not(:disabled) {
