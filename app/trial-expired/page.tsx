@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Trial Expired Page (Standalone)
-// Build 3: Trial Gating
+// Phase 13 Build 2: Auth Cleanup — auth_user_id → auth_id
 //
 // Full-page takeover when trial expires. No sidebar, no dashboard chrome.
 // Shows value recap of what user built during trial + upgrade CTA.
@@ -21,6 +21,7 @@ export default async function TrialExpiredPage() {
   if (!user) redirect('/login');
 
   // Check if user actually has an expired trial — if active, send to dashboard
+  // FIXED: column is auth_id (not auth_user_id)
   const { data: professional } = await supabase
     .from('professionals')
     .select(`
@@ -32,7 +33,7 @@ export default async function TrialExpiredPage() {
         trial_ends_at
       )
     `)
-    .eq('auth_user_id', user.id)
+    .eq('auth_id', user.id)
     .single();
 
   const org = professional?.organizations as unknown as {
@@ -154,7 +155,7 @@ export default async function TrialExpiredPage() {
             View Plans & Subscribe
           </Link>
           <p className="text-white/30 text-xs">
-            Plans start at $49/month. Cancel anytime.
+            Plans start at $29/month. Cancel anytime.
           </p>
         </div>
 

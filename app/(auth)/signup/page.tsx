@@ -1,6 +1,9 @@
 // =============================================================================
 // HarvestFile — Signup Page (Phase 12 v4.1)
-// Same structure as v4 but scaled up to fill the wider card.
+// Phase 13 Build 2: Auth Cleanup
+//   - auth_user_id → auth_id (matches actual DB column)
+//   - subscription_tier: 'free' → 'pro' with trialing status + trial_ends_at
+//   - max_farmers: 10 → 50 (matches OAuth callback behavior)
 // =============================================================================
 
 'use client';
@@ -85,22 +88,35 @@ export default function SignupPage() {
     }
 
     if (data.user && data.session) {
+      // FIXED: column is auth_id (not auth_user_id)
       const { data: existing } = await supabase
-        .from('professionals').select('id').eq('auth_user_id', data.user.id).single();
+        .from('professionals').select('id').eq('auth_id', data.user.id).single();
 
       if (!existing) {
+        // FIXED: Create Pro trial org (not free tier) — matches OAuth callback
+        const trialEndsAt = new Date();
+        trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
         const { data: org } = await supabase
           .from('organizations')
-          .insert({ name: `${fullName}'s Organization`, subscription_tier: 'free', max_farmers: 10, max_users: 1 })
+          .insert({
+            name: `${fullName}'s Organization`,
+            subscription_tier: 'pro',
+            subscription_status: 'trialing',
+            trial_ends_at: trialEndsAt.toISOString(),
+            max_farmers: 50,
+            max_users: 1,
+          })
           .select('id').single();
 
         if (org) {
+          // FIXED: column is auth_id (not auth_user_id)
           await supabase.from('professionals').insert({
-            org_id: org.id, auth_user_id: data.user.id, email, full_name: fullName, role: 'admin',
+            org_id: org.id, auth_id: data.user.id, email, full_name: fullName, role: 'admin',
           });
           await supabase.from('activity_log').insert({
             org_id: org.id, actor_id: data.user.id, action: 'user_signup',
-            entity_type: 'professional', description: `${email} created an account`,
+            entity_type: 'professional', description: `${email} created an account — 14-day Pro trial started`,
           });
         }
       }

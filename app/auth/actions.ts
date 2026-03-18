@@ -1,6 +1,8 @@
 // =============================================================================
 // HarvestFile — Server Actions (Auth)
-// Build 3: Trial Gating — New orgs get 14-day Pro trial (not free tier)
+// Phase 13 Build 2: Auth Cleanup
+//   - Fixed auth_user_id → auth_id to match actual DB column
+//   - Every new org starts with 14-day Pro trial (not free tier)
 // =============================================================================
 
 "use server";
@@ -51,14 +53,15 @@ export async function signup(formData: FormData) {
 
   // If email confirmation is disabled, create org + professional immediately
   if (authData.user && authData.session) {
+    // FIXED: column is auth_id (not auth_user_id)
     const { data: existingPro } = await supabase
       .from("professionals")
       .select("id")
-      .eq("auth_user_id", authData.user.id)
+      .eq("auth_id", authData.user.id)
       .single();
 
     if (!existingPro) {
-      // ── Build 3: Every new org starts with 14-day Pro trial ──────
+      // Every new org starts with 14-day Pro trial
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 14);
 
@@ -76,9 +79,10 @@ export async function signup(formData: FormData) {
         .single();
 
       if (org) {
+        // FIXED: column is auth_id (not auth_user_id)
         await supabase.from("professionals").insert({
           org_id: org.id,
-          auth_user_id: authData.user.id,
+          auth_id: authData.user.id,
           email,
           full_name: fullName,
           role: "admin",
@@ -100,26 +104,4 @@ export async function signup(formData: FormData) {
 
   // Email confirmation required
   return { success: "Check your email to confirm your account." };
-}
-
-export async function logout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  revalidatePath("/", "layout");
-  redirect("/login");
-}
-
-export async function forgotPassword(formData: FormData) {
-  const supabase = await createClient();
-  const email = formData.get("email") as string;
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/reset-password`,
-  });
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  return { success: "Check your email for a password reset link." };
 }
