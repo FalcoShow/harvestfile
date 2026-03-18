@@ -1,7 +1,6 @@
 // =============================================================================
-// HarvestFile — Login Page (Phase 12 v4)
-// Same split layout (inherited from layout). Simpler form.
-// Google OAuth → "or" → email + password → CTA → links
+// HarvestFile — Login Page (Phase 12 v4.1)
+// Scaled up to fill the wider card properly.
 // =============================================================================
 
 'use client';
@@ -73,30 +72,30 @@ function LoginForm() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* ── Logo icon + heading ─────────────────────── */}
+    <div className="space-y-6">
+      {/* ── Header ──────────────────────────────────── */}
       <div className="text-center hf-auth-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
-        <div className="flex justify-center mb-4">
-          <Logo size={32} />
+        <div className="flex justify-center mb-5">
+          <Logo size={38} />
         </div>
-        <h2 className="text-[22px] font-extrabold text-white tracking-[-0.02em] mb-1">
+        <h2 className="text-[24px] font-extrabold text-white tracking-[-0.02em] mb-1.5">
           Welcome back
         </h2>
-        <p className="text-[13px] text-white/40">
+        <p className="text-[14px] text-white/40">
           Sign in to your Harvest<span className="text-[#C9A84C] font-semibold">File</span> account
         </p>
       </div>
 
       {/* ── Alerts ─────────────────────────────────── */}
       {error && (
-        <div className="rounded-lg px-3.5 py-2.5 text-[12px] flex items-start gap-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#FF8A8A' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+        <div className="rounded-xl px-4 py-3 text-[13px] flex items-start gap-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#FF8A8A' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
           {error}
         </div>
       )}
       {resetSent && (
-        <div className="rounded-lg px-3.5 py-2.5 text-[12px] flex items-start gap-2" style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)', color: '#4ADE80' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+        <div className="rounded-xl px-4 py-3 text-[13px] flex items-start gap-2.5" style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)', color: '#4ADE80' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 mt-0.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
           Password reset sent! Check your inbox.
         </div>
       )}
@@ -112,31 +111,31 @@ function LoginForm() {
       {/* ── Divider ────────────────────────────────── */}
       <div className="flex items-center gap-3 hf-auth-stagger" style={{ '--stagger-index': 2 } as React.CSSProperties}>
         <div className="flex-1 h-px bg-white/[0.07]" />
-        <span className="text-[11px] text-white/20">or</span>
+        <span className="text-[12px] text-white/20">or</span>
         <div className="flex-1 h-px bg-white/[0.07]" />
       </div>
 
       {/* ── Form ───────────────────────────────────── */}
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="hf-auth-stagger" style={{ '--stagger-index': 3 } as React.CSSProperties}>
-          <label htmlFor="login_email" className="block text-[12px] font-semibold text-white/50 mb-1.5">Email address</label>
+          <label htmlFor="login_email" className="block text-[13px] font-semibold text-white/50 mb-1.5">Email address</label>
           <input id="login_email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="hf-auth-input" placeholder="you@example.com" />
         </div>
 
         <div className="hf-auth-stagger" style={{ '--stagger-index': 4 } as React.CSSProperties}>
           <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="login_pw" className="block text-[12px] font-semibold text-white/50">Password</label>
-            <button type="button" onClick={handleReset} className="text-[11px] text-[#C9A84C]/50 hover:text-[#C9A84C] transition-colors font-medium">
+            <label htmlFor="login_pw" className="block text-[13px] font-semibold text-white/50">Password</label>
+            <button type="button" onClick={handleReset} className="text-[12px] text-[#C9A84C]/50 hover:text-[#C9A84C] transition-colors font-medium">
               Forgot password?
             </button>
           </div>
           <div className="relative">
-            <input id="login_pw" type={showPw ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="hf-auth-input pr-10" placeholder="Enter your password" />
-            <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors" aria-label={showPw ? 'Hide' : 'Show'}>
+            <input id="login_pw" type={showPw ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="hf-auth-input pr-11" placeholder="Enter your password" />
+            <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors" aria-label={showPw ? 'Hide' : 'Show'}>
               {showPw ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
               ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
               )}
             </button>
           </div>
@@ -158,7 +157,7 @@ function LoginForm() {
 
       {/* ── Footer ─────────────────────────────────── */}
       <div className="text-center hf-auth-stagger" style={{ '--stagger-index': 6 } as React.CSSProperties}>
-        <p className="text-[13px] text-white/40">
+        <p className="text-[14px] text-white/40">
           Don&apos;t have an account?{' '}
           <Link href="/signup" className="text-[#C9A84C] hover:text-[#E2C366] font-semibold transition-colors">Create one free</Link>
         </p>
@@ -171,17 +170,17 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-white/[0.05] animate-pulse" />
-            <div className="h-7 w-40 rounded-lg bg-white/[0.04] animate-pulse" />
-            <div className="h-4 w-56 rounded bg-white/[0.03] animate-pulse" />
+            <div className="h-10 w-10 rounded-lg bg-white/[0.05] animate-pulse" />
+            <div className="h-7 w-44 rounded-lg bg-white/[0.04] animate-pulse" />
+            <div className="h-5 w-60 rounded bg-white/[0.03] animate-pulse" />
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="h-[48px] rounded-xl bg-white/[0.04] animate-pulse" />
             <div className="h-[46px] rounded-xl bg-white/[0.04] animate-pulse" />
-            <div className="h-[44px] rounded-xl bg-white/[0.04] animate-pulse" />
-            <div className="h-[44px] rounded-xl bg-white/[0.04] animate-pulse" />
             <div className="h-[46px] rounded-xl bg-white/[0.04] animate-pulse" />
+            <div className="h-[48px] rounded-xl bg-white/[0.04] animate-pulse" />
           </div>
         </div>
       }
