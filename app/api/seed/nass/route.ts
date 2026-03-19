@@ -1,17 +1,16 @@
 // =============================================================================
-// HarvestFile — Phase 16A Build 1: NASS Data Seeding + Historical Backfill
+// HarvestFile — Phase 16A Build 1 (Patch): NASS Data Seeding + Historical Backfill
 // app/api/seed/nass/route.ts
 //
-// One-time (or repeatable) endpoint to seed the monthly_prices table with:
-//   1. Hardcoded verified NASS monthly prices from USDA Agricultural Prices
-//   2. Live NASS Quick Stats API fetch for any missing data
-//   3. Futures-based projections for remaining months
-//   4. Historical backfill for 2020–2025 marketing years
-//
-// Phase 16A FIX: Added missing unit_desc parameter to fetchNASSPrices that
-// caused backfill to return only 4 records instead of 300+. Added retry
-// logic with exponential backoff, per-commodity logging, and filter for
-// MARKETING YEAR reference periods that were contaminating monthly results.
+// PATCH FIXES (Phase 16A v2):
+//   1. SORGHUM: Fixed commodity_desc ('SORGHUM' not 'SORGHUM, GRAIN') and
+//      unit_desc ('$ / BU' not '$ / CWT') to match constants.ts + Inngest cron
+//   2. WHEAT/BARLEY: De-duplicate NASS results before upsert — NASS returns
+//      multiple wheat classes (ALL CLASSES, WINTER, SPRING, DURUM) creating
+//      duplicate (commodity, marketing_year, month_num) keys that Supabase rejects
+//   3. ALL COMMODITIES: Fetch year-by-year instead of one 6-year request to avoid
+//      NASS response limits (was returning only 6 records for corn across 6 years)
+//   4. Error messages now included in response JSON for debugging
 //
 // Usage:
 //   GET /api/seed/nass?key=YOUR_SUPABASE_SERVICE_ROLE_KEY
@@ -42,15 +41,17 @@ const supabase = createClient(
 const NASS_API_KEY = process.env.NASS_API_KEY || '';
 
 // ─── NASS commodity name mapping ─────────────────────────────────────────────
-// CRITICAL: unit values must EXACTLY match NASS Quick Stats (spacing matters)
+// CRITICAL: These MUST match constants.ts nassName + nassPriceUnit values
+// Phase 16A v2 FIX: Sorghum was 'SORGHUM, GRAIN' + '$ / CWT' — wrong!
+// The Inngest cron and constants.ts use 'SORGHUM' + '$ / BU' which works.
 
 const NASS_COMMODITY_MAP: Record<string, { name: string; unit: string }> = {
-  CORN:     { name: 'CORN',           unit: '$ / BU' },
-  SOYBEANS: { name: 'SOYBEANS',       unit: '$ / BU' },
-  WHEAT:    { name: 'WHEAT',          unit: '$ / BU' },
-  SORGHUM:  { name: 'SORGHUM, GRAIN', unit: '$ / CWT' },
-  BARLEY:   { name: 'BARLEY',         unit: '$ / BU' },
-  OATS:     { name: 'OATS',           unit: '$ / BU' },
+  CORN:     { name: 'CORN',     unit: '$ / BU' },
+  SOYBEANS: { name: 'SOYBEANS', unit: '$ / BU' },
+  WHEAT:    { name: 'WHEAT',    unit: '$ / BU' },
+  SORGHUM:  { name: 'SORGHUM',  unit: '$ / BU' },
+  BARLEY:   { name: 'BARLEY',   unit: '$ / BU' },
+  OATS:     { name: 'OATS',     unit: '$ / BU' },
 };
 
 // Month name → number mapping
@@ -161,7 +162,6 @@ const VERIFIED_PRICES: Record<string, { marketing_year: string; prices: Record<n
 };
 
 // ─── Futures-based projection prices ─────────────────────────────────────────
-// Used for months not yet reported by NASS (current marketing year only)
 
 const FUTURES_PROJECTIONS: Record<string, number> = {
   CORN: 4.70,
@@ -177,8 +177,6 @@ const FUTURES_PROJECTIONS: Record<string, number> = {
 function getMyForMonthYear(commodity: string, month: number, calYear: number): string {
   const my = MARKETING_YEARS[commodity];
   if (!my) return '';
-  // If month >= start month, it's calYear/(calYear+1)
-  // If month < start month, it's (calYear-1)/calYear
   if (month >= my.startMonth) {
     return `${calYear}/${(calYear + 1).toString().slice(2)}`;
   } else {
@@ -186,116 +184,106 @@ function getMyForMonthYear(commodity: string, month: number, calYear: number): s
   }
 }
 
-// ─── Helper: sleep for a given number of milliseconds ────────────────────────
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ─── Helper: fetch NASS monthly prices with retry + exponential backoff ──────
-// Phase 16A FIX: Added unit_desc parameter (was missing, causing empty results)
-// Phase 16A NEW: Retry logic, exponential backoff, better filtering
+// ─── Fetch NASS monthly prices for ONE calendar year ─────────────────────────
 
-async function fetchNASSPrices(
+async function fetchNASSPricesForYear(
   commodity: string,
-  yearStart: number,
-  yearEnd: number
+  year: number
 ): Promise<{ month: number; year: number; price: number }[]> {
   const nassInfo = NASS_COMMODITY_MAP[commodity];
-  if (!nassInfo || !NASS_API_KEY) {
-    console.log(`[Backfill] Skipping ${commodity}: ${!nassInfo ? 'no NASS mapping' : 'no API key'}`);
-    return [];
-  }
+  if (!nassInfo || !NASS_API_KEY) return [];
 
   const results: { month: number; year: number; price: number }[] = [];
 
-  // ═══ Phase 16A FIX: Added unit_desc — this was the bug ═══
-  // Without unit_desc, NASS returns mixed-unit results or nothing for
-  // commodities like sorghum that have nonstandard units ($/CWT vs $/BU).
   const params = new URLSearchParams({
     key: NASS_API_KEY,
     source_desc: 'SURVEY',
     commodity_desc: nassInfo.name,
     statisticcat_desc: 'PRICE RECEIVED',
-    unit_desc: nassInfo.unit,            // ← THE FIX: was missing entirely
+    unit_desc: nassInfo.unit,
     freq_desc: 'MONTHLY',
     agg_level_desc: 'NATIONAL',
-    year__GE: yearStart.toString(),
-    year__LE: yearEnd.toString(),
+    year: year.toString(),
     format: 'JSON',
   });
 
   const url = `https://quickstats.nass.usda.gov/api/api_GET/?${params.toString()}`;
-
-  // Retry up to 3 times with exponential backoff
   const MAX_RETRIES = 3;
-  let lastError = '';
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[Backfill] Fetching ${commodity} ${yearStart}-${yearEnd} (attempt ${attempt}/${MAX_RETRIES})...`);
       const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
 
-      // Handle rate limiting with backoff
       if (res.status === 429) {
-        const backoffMs = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
-        console.warn(`[Backfill] Rate limited on ${commodity}, waiting ${backoffMs}ms...`);
-        await sleep(backoffMs);
+        await sleep(2000 * Math.pow(2, attempt - 1));
         continue;
       }
 
       if (!res.ok) {
-        lastError = `HTTP ${res.status}`;
-        console.error(`[Backfill] NASS API error for ${commodity}: ${res.status} (attempt ${attempt})`);
-        if (attempt < MAX_RETRIES) {
-          await sleep(2000 * attempt);
-          continue;
-        }
+        if (attempt < MAX_RETRIES) { await sleep(2000 * attempt); continue; }
         break;
       }
 
       const json = await res.json();
       const data = json.data || [];
 
-      console.log(`[Backfill] Raw NASS response for ${commodity}: ${data.length} records`);
-
       for (const row of data) {
-        // Filter out suppressed/unavailable values
         if (!row.Value || row.Value === '(D)' || row.Value === '(NA)' || row.Value === '(S)' || row.Value === '(Z)') continue;
 
-        // Filter to MONTHLY data only — NASS sometimes returns MARKETING YEAR
-        // and ANNUAL records even when freq_desc=MONTHLY is specified
         const refPeriod = (row.reference_period_desc || '').toUpperCase();
         if (refPeriod === 'MARKETING YEAR' || refPeriod === 'YEAR') continue;
 
-        const monthName = refPeriod;
-        const monthNum = MONTH_NAME_TO_NUM[monthName];
+        const monthNum = MONTH_NAME_TO_NUM[refPeriod];
         if (!monthNum) continue;
 
-        const year = parseInt(row.year);
         const price = parseFloat(row.Value.replace(',', ''));
-        if (isNaN(price) || isNaN(year)) continue;
+        if (isNaN(price)) continue;
 
         results.push({ month: monthNum, year, price });
       }
 
-      console.log(`[Backfill] Parsed ${results.length} valid monthly prices for ${commodity}`);
-      break; // Success — exit retry loop
-
+      break;
     } catch (err: any) {
-      lastError = err.message;
-      console.error(`[Backfill] Fetch error for ${commodity} (attempt ${attempt}):`, err.message);
-      if (attempt < MAX_RETRIES) {
-        await sleep(2000 * attempt);
-      }
+      if (attempt < MAX_RETRIES) await sleep(2000 * attempt);
     }
   }
 
-  if (results.length === 0 && lastError) {
-    console.error(`[Backfill] All attempts failed for ${commodity}: ${lastError}`);
+  return results;
+}
+
+// ─── Fetch + de-duplicate across year range ──────────────────────────────────
+
+async function fetchNASSPrices(
+  commodity: string,
+  yearStart: number,
+  yearEnd: number
+): Promise<{ month: number; year: number; price: number }[]> {
+  const allResults: { month: number; year: number; price: number }[] = [];
+
+  for (let year = yearStart; year <= yearEnd; year++) {
+    const yearData = await fetchNASSPricesForYear(commodity, year);
+    allResults.push(...yearData);
+    if (year < yearEnd) await sleep(1500);
   }
 
-  return results;
+  // De-duplicate by (month, year) — keeps first occurrence
+  const seen = new Map<string, number>();
+  const deduped: { month: number; year: number; price: number }[] = [];
+
+  for (const record of allResults) {
+    const key = `${record.month}-${record.year}`;
+    if (!seen.has(key)) {
+      seen.set(key, record.price);
+      deduped.push(record);
+    }
+  }
+
+  console.log(`[Backfill] ${commodity}: ${allResults.length} raw -> ${deduped.length} deduplicated (${yearStart}-${yearEnd})`);
+  return deduped;
 }
 
 // =============================================================================
@@ -370,7 +358,6 @@ export async function GET(request: NextRequest) {
     const currentMY = getMarketingYear(commodity);
     const myMonths = getMarketingYearMonths(commodity, currentMY);
 
-    // Get existing actual prices for this MY
     const { data: existingActual } = await supabase
       .from('monthly_prices')
       .select('month_num')
@@ -380,7 +367,6 @@ export async function GET(request: NextRequest) {
 
     const actualMonths = new Set((existingActual || []).map((r) => r.month_num));
 
-    // Create projection records for months without actual data
     const projRecords = myMonths
       .filter((m) => !actualMonths.has(m.month))
       .map((m) => ({
@@ -412,25 +398,28 @@ export async function GET(request: NextRequest) {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // STEP 3: Historical backfill via NASS API (2020–2025)
-  // Phase 16A: Fixed unit_desc bug, added retry logic, better logging
+  // STEP 3: Historical backfill via NASS API
   // ══════════════════════════════════════════════════════════════════════════
 
   let totalBackfilled = 0;
 
   if (doBackfill) {
+    const backfillErrors: Record<string, string[]> = {};
+
     for (const commodity of COMMODITY_ORDER) {
-      // 2s delay between commodities to avoid NASS throttling
-      if (totalBackfilled > 0) {
+      if (totalBackfilled > 0 || Object.keys(backfillErrors).length > 0) {
         await sleep(2000);
       }
+
+      backfillErrors[commodity] = [];
 
       const nassData = await fetchNASSPrices(commodity, yearStart, yearEnd);
       if (nassData.length === 0) {
         results[commodity] = {
           ...results[commodity],
           backfill_count: 0,
-          backfill_note: 'No NASS API data returned (check unit_desc match)',
+          backfill_raw_from_nass: 0,
+          backfill_note: 'No NASS API data returned',
           backfill_query: {
             commodity_desc: NASS_COMMODITY_MAP[commodity]?.name,
             unit_desc: NASS_COMMODITY_MAP[commodity]?.unit,
@@ -455,16 +444,28 @@ export async function GET(request: NextRequest) {
         };
       }).filter((r) => r.marketing_year !== '');
 
-      // Upsert in batches of 50 to avoid hitting Supabase limits
+      // De-duplicate by (commodity, marketing_year, month_num)
+      const recordMap = new Map<string, typeof records[0]>();
+      for (const rec of records) {
+        const key = `${rec.commodity}|${rec.marketing_year}|${rec.month_num}`;
+        if (!recordMap.has(key)) {
+          recordMap.set(key, rec);
+        }
+      }
+      const uniqueRecords = Array.from(recordMap.values());
+
+      // Upsert in batches of 50
       let backfilled = 0;
-      for (let i = 0; i < records.length; i += 50) {
-        const batch = records.slice(i, i + 50);
+      for (let i = 0; i < uniqueRecords.length; i += 50) {
+        const batch = uniqueRecords.slice(i, i + 50);
         const { error } = await supabase
           .from('monthly_prices')
           .upsert(batch, { onConflict: 'commodity,marketing_year,month_num' });
 
         if (error) {
-          console.error(`[Backfill] Error upserting ${commodity} batch:`, error);
+          const errMsg = `Batch ${Math.floor(i/50)+1}: ${error.message || JSON.stringify(error)}`;
+          console.error(`[Backfill] Error upserting ${commodity}:`, errMsg);
+          backfillErrors[commodity].push(errMsg);
         } else {
           backfilled += batch.length;
         }
@@ -472,14 +473,15 @@ export async function GET(request: NextRequest) {
 
       totalBackfilled += backfilled;
 
-      // Per-commodity detail in response
-      const marketingYears = Array.from(new Set(records.map((r) => r.marketing_year))).sort();
+      const marketingYears = Array.from(new Set(uniqueRecords.map((r) => r.marketing_year))).sort();
       results[commodity] = {
         ...results[commodity],
         backfill_count: backfilled,
         backfill_raw_from_nass: nassData.length,
+        backfill_after_dedup: uniqueRecords.length,
         backfill_marketing_years: marketingYears,
         backfill_year_range: `${yearStart}-${yearEnd}`,
+        backfill_errors: backfillErrors[commodity].length > 0 ? backfillErrors[commodity] : undefined,
       };
     }
 
@@ -491,10 +493,12 @@ export async function GET(request: NextRequest) {
     }
 
     let snapshotsCreated = 0;
+    const snapshotDetails: Record<string, string[]> = {};
 
     for (const commodity of COMMODITY_ORDER) {
+      snapshotDetails[commodity] = [];
+
       for (const my of completedMYs) {
-        // Fetch all monthly prices for this commodity + MY
         const { data: monthlyData } = await supabase
           .from('monthly_prices')
           .select('month_num, price, is_actual')
@@ -512,7 +516,6 @@ export async function GET(request: NextRequest) {
 
         if (actualMap.size < 6) continue;
 
-        // Fetch marketing weights
         const { data: weightRows } = await supabase
           .from('marketing_weights')
           .select('month_num, weight')
@@ -523,7 +526,6 @@ export async function GET(request: NextRequest) {
           weightMap.set(w.month_num, parseFloat(String(w.weight)));
         });
 
-        // Calculate MYA
         const calc = calculateMYA({
           commodity,
           marketingYear: my,
@@ -532,7 +534,6 @@ export async function GET(request: NextRequest) {
           weights: weightMap,
         });
 
-        // Upsert snapshot
         const { error: snapError } = await supabase
           .from('mya_snapshots')
           .upsert({
@@ -554,15 +555,24 @@ export async function GET(request: NextRequest) {
             onConflict: 'commodity,marketing_year',
           });
 
-        if (!snapError) snapshotsCreated++;
+        if (!snapError) {
+          snapshotsCreated++;
+          snapshotDetails[commodity].push(`${my}: MYA=$${calc.projectedMYA.toFixed(2)} (${actualMap.size} months)`);
+        }
       }
     }
 
     results._backfill_summary = {
       total_backfilled: totalBackfilled,
       snapshots_created: snapshotsCreated,
+      snapshot_details: snapshotDetails,
       year_range: `${yearStart}-${yearEnd}`,
-      fix_applied: 'Phase 16A — added unit_desc to NASS query, retry logic, ref_period filter',
+      fixes_applied: [
+        'Sorghum: commodity_desc=SORGHUM, unit_desc=$ / BU',
+        'Wheat/Barley: De-duplicate multi-class records before upsert',
+        'All: Year-by-year fetching instead of multi-year range query',
+        'All: Supabase error messages included in response',
+      ],
     };
   }
 
@@ -576,7 +586,6 @@ export async function GET(request: NextRequest) {
       const now = new Date();
       const nassData = await fetchNASSPrices(commodity, now.getFullYear() - 1, now.getFullYear());
 
-      // Only seed prices that map to the current marketing year
       const currentMyPrices = nassData.filter((d) => {
         return getMyForMonthYear(commodity, d.month, d.year) === currentMY;
       });
@@ -603,7 +612,6 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      // Delay between API calls
       await sleep(2000);
     }
   }
