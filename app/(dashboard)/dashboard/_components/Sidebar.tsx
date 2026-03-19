@@ -20,6 +20,14 @@ function IconDashboard({ className }: { className?: string }) {
   );
 }
 
+function IconMarkets({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  );
+}
+
 function IconIntelligence({ className }: { className?: string }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -134,6 +142,7 @@ function IconX({ className }: { className?: string }) {
 
 const mainNav = [
   { label: "Dashboard", href: "/dashboard", icon: IconDashboard },
+  { label: "Markets", href: "/dashboard/markets", icon: IconMarkets },
   { label: "Intelligence", href: "/dashboard/intelligence", icon: IconIntelligence },
   { label: "Farmers", href: "/dashboard/farmers", icon: IconFarmers },
   { label: "Calculator", href: "/dashboard/calculator", icon: IconCalculator },
