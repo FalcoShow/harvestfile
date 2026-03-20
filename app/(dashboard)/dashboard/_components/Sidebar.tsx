@@ -28,6 +28,14 @@ function IconMarkets({ className }: { className?: string }) {
   );
 }
 
+function IconInsurance({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
 function IconIntelligence({ className }: { className?: string }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -143,6 +151,7 @@ function IconX({ className }: { className?: string }) {
 const mainNav = [
   { label: "Dashboard", href: "/dashboard", icon: IconDashboard },
   { label: "Markets", href: "/dashboard/markets", icon: IconMarkets },
+  { label: "Insurance", href: "/dashboard/insurance", icon: IconInsurance },
   { label: "Intelligence", href: "/dashboard/intelligence", icon: IconIntelligence },
   { label: "Farmers", href: "/dashboard/farmers", icon: IconFarmers },
   { label: "Calculator", href: "/dashboard/calculator", icon: IconCalculator },
