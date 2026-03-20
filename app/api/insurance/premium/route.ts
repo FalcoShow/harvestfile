@@ -1,14 +1,6 @@
 // =============================================================================
 // HarvestFile — Phase 16B Build 2B-2: Premium Calculation API Route
 // app/api/insurance/premium/route.ts
-//
-// Calls the calculate_county_premium_batch() RPC function which returns
-// real USDA RMA actuarial premium data for all 8 coverage levels (50-85%)
-// in a single database call against 10.8M ADM records.
-//
-// GET /api/insurance/premium?state=19&county=169&commodity=0041&aph=190&acres=500&plan=02
-//
-// Returns: { success, data: AdmPremiumLevel[], meta }
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,13 +8,6 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import type { PremiumApiResponse } from '@/lib/insurance/types';
-
-// ─── Supabase client (anon key — ADM tables have public RLS policies) ────────
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
 
 // ─── Input validation schema ─────────────────────────────────────────────────
 
@@ -35,11 +20,29 @@ const premiumParamsSchema = z.object({
   plan: z.string().min(1).max(5).default('02'),
 });
 
+// ─── Force dynamic rendering ─────────────────────────────────────────────────
+export const dynamic = 'force-dynamic';
+
 // ─── GET handler ─────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
+  // Create client inside handler to ensure env vars are available
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json({
+      success: false,
+      data: null,
+      meta: { state_fips: '', county_fips: '', commodity_code: '', aph_yield: 0, acres: 0, plan_code: '', calculated_at: new Date().toISOString(), coverage_levels_returned: 0 },
+      error: 'Missing Supabase configuration',
+      debug: { hasUrl: !!supabaseUrl, hasKey: !!supabaseKey },
+    }, { status: 500 });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
   try {
-    // Parse query parameters
     const { searchParams } = request.nextUrl;
     const rawParams = {
       state: searchParams.get('state') || '',
@@ -50,113 +53,59 @@ export async function GET(request: NextRequest) {
       plan: searchParams.get('plan') || '02',
     };
 
-    // Validate
     const parsed = premiumParamsSchema.safeParse(rawParams);
     if (!parsed.success) {
       const errors = parsed.error.flatten().fieldErrors;
-      return NextResponse.json(
-        {
-          success: false,
-          data: null,
-          meta: {
-            state_fips: rawParams.state,
-            county_fips: rawParams.county,
-            commodity_code: rawParams.commodity,
-            aph_yield: Number(rawParams.aph) || 0,
-            acres: Number(rawParams.acres) || 0,
-            plan_code: rawParams.plan,
-            calculated_at: new Date().toISOString(),
-            coverage_levels_returned: 0,
-          },
-          error: `Validation failed: ${JSON.stringify(errors)}`,
-        } satisfies PremiumApiResponse,
-        { status: 400 },
-      );
+      return NextResponse.json({
+        success: false,
+        data: null,
+        meta: { state_fips: rawParams.state, county_fips: rawParams.county, commodity_code: rawParams.commodity, aph_yield: Number(rawParams.aph) || 0, acres: Number(rawParams.acres) || 0, plan_code: rawParams.plan, calculated_at: new Date().toISOString(), coverage_levels_returned: 0 },
+        error: `Validation failed: ${JSON.stringify(errors)}`,
+      }, { status: 400 });
     }
 
     const { state, county, commodity, aph, acres, plan } = parsed.data;
 
     // Call the batch RPC function
-    const { data, error } = await supabase.rpc('calculate_county_premium_batch', {
+    const rpcParams = {
       p_state_fips: state,
       p_county_fips: county,
       p_commodity_code: commodity,
       p_aph_yield: aph,
       p_acres: acres,
       p_plan_code: plan,
-    });
-
-    if (error) {
-      console.error('[Premium API] Supabase RPC error:', error);
-
-      // Map known PostgreSQL error codes
-      const status = error.code === '42883' ? 404 : error.code === '23503' ? 422 : 500;
-      return NextResponse.json(
-        {
-          success: false,
-          data: null,
-          meta: {
-            state_fips: state,
-            county_fips: county,
-            commodity_code: commodity,
-            aph_yield: aph,
-            acres,
-            plan_code: plan,
-            calculated_at: new Date().toISOString(),
-            coverage_levels_returned: 0,
-          },
-          error: status === 500
-            ? 'Internal server error — premium calculation failed'
-            : `Premium data not available for this county/commodity combination`,
-        } satisfies PremiumApiResponse,
-        { status },
-      );
-    }
-
-    // The RPC returns a JSONB array — parse if it's a string
-    const batchData = typeof data === 'string' ? JSON.parse(data) : (Array.isArray(data) ? data : []);
-
-    const response: PremiumApiResponse = {
-      success: true,
-      data: batchData,
-      meta: {
-        state_fips: state,
-        county_fips: county,
-        commodity_code: commodity,
-        aph_yield: aph,
-        acres,
-        plan_code: plan,
-        calculated_at: new Date().toISOString(),
-        coverage_levels_returned: batchData.length,
-      },
     };
 
-    // Cache for 24 hours — ADM data changes 2-4x per year
-    return NextResponse.json(response, {
-      status: 200,
-      headers: {
-        'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600',
-      },
-    });
-  } catch (err) {
-    console.error('[Premium API] Unexpected error:', err);
-    return NextResponse.json(
-      {
+    const { data, error } = await supabase.rpc('calculate_county_premium_batch', rpcParams);
+
+    if (error) {
+      return NextResponse.json({
         success: false,
         data: null,
-        meta: {
-          state_fips: '',
-          county_fips: '',
-          commodity_code: '',
-          aph_yield: 0,
-          acres: 0,
-          plan_code: '',
-          calculated_at: new Date().toISOString(),
-          coverage_levels_returned: 0,
-        },
-        error: 'Internal server error',
-      } satisfies PremiumApiResponse,
-      { status: 500 },
-    );
+        meta: { state_fips: state, county_fips: county, commodity_code: commodity, aph_yield: aph, acres, plan_code: plan, calculated_at: new Date().toISOString(), coverage_levels_returned: 0 },
+        error: `RPC error: ${error.message}`,
+        debug: { code: error.code, details: error.details, hint: error.hint, rpcParams },
+      }, { status: 500 });
+    }
+
+    // Parse the response
+    const batchData = typeof data === 'string' ? JSON.parse(data) : (Array.isArray(data) ? data : []);
+
+    return NextResponse.json({
+      success: true,
+      data: batchData,
+      meta: { state_fips: state, county_fips: county, commodity_code: commodity, aph_yield: aph, acres, plan_code: plan, calculated_at: new Date().toISOString(), coverage_levels_returned: batchData.length },
+    } satisfies PremiumApiResponse, {
+      status: 200,
+      headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600' },
+    });
+  } catch (err) {
+    return NextResponse.json({
+      success: false,
+      data: null,
+      meta: { state_fips: '', county_fips: '', commodity_code: '', aph_yield: 0, acres: 0, plan_code: '', calculated_at: new Date().toISOString(), coverage_levels_returned: 0 },
+      error: `Unexpected: ${err instanceof Error ? err.message : String(err)}`,
+      debug: { stack: err instanceof Error ? err.stack?.split('\n').slice(0, 3) : null },
+    }, { status: 500 });
   }
 }
