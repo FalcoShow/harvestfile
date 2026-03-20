@@ -1,12 +1,13 @@
 // =============================================================================
 // HarvestFile — Stripe Checkout Session Creator
-// Build 3: Trial Gating
+// Phase 18A: Live Mode — 3-Tier Pricing (Starter, Pro, Team)
 //
-// CHANGES:
-// 1. Passes organization_id in Stripe metadata (webhook uses this)
-// 2. Supports pro_monthly, pro_annual, team_monthly, team_annual
-// 3. NO trial_period_days — trial is tracked in database, not Stripe
-// 4. Stores stripe_customer_id on organizations table
+// Creates a Stripe Checkout Session for the authenticated user.
+// Supports: starter_monthly, starter_annual, pro_monthly, pro_annual,
+//           team_monthly, team_annual
+//
+// Auth chain: auth.users → professionals (auth_id) → organizations (org_id)
+// CRITICAL: professionals table uses `auth_id` column, NOT `auth_user_id`
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -36,11 +37,12 @@ export async function POST(request: Request) {
     }
 
     // ── Look up the professional's organization ───────────────────────────
-    // Auth chain: auth.users → professionals → organizations
+    // Auth chain: auth.users → professionals (auth_id) → organizations
+    // CRITICAL: Column is `auth_id`, NOT `auth_user_id`
     const { data: professional } = await supabase
       .from('professionals')
       .select('org_id')
-      .eq('auth_user_id', user.id)
+      .eq('auth_id', user.id)
       .single();
 
     if (!professional?.org_id) {
