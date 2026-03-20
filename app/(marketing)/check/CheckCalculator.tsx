@@ -20,6 +20,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { DarkSelect } from "./DarkSelect";
+import BenchmarkWidget from "@/components/calculator/BenchmarkWidget";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
@@ -891,6 +892,20 @@ export default function CheckCalculator() {
                       </div>
                     </div>
                   </details>
+                </StaggerItem>
+
+                {/* ── County Benchmark Widget — The Network Effect Engine ── */}
+                <StaggerItem index={4}>
+                  <div className="mb-6">
+                    <BenchmarkWidget
+                      countyFips={countyFips}
+                      countyName={countyName}
+                      stateAbbr={stateAbbr}
+                      cropCode={cropCode}
+                      cropName={cropObj?.name || cropCode}
+                      recommendedChoice={results.best}
+                    />
+                  </div>
                 </StaggerItem>
 
                 {/* Disclaimer */}
