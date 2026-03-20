@@ -33,3 +33,9 @@ yarn-error.log*
 next-env.d.ts
 
 /data/
+
+# Add these lines to your existing .gitignore
+# (at the bottom of the file)
+
+# RMA Actuarial Data Master files (2.7 GB+)
+data/adm-2026/
