@@ -309,9 +309,9 @@ export default function InsurancePage() {
               onChange={(e) => setSelectedState(e.target.value)}
               style={selectStyle}
             >
-              <option value="">Select a state...</option>
+              <option value="" style={optionStyle}>Select a state...</option>
               {states.map((s) => (
-                <option key={s.state_fips} value={s.state_fips}>
+                <option key={s.state_fips} value={s.state_fips} style={optionStyle}>
                   {s.state_name}
                 </option>
               ))}
@@ -448,7 +448,7 @@ export default function InsurancePage() {
               style={selectStyle}
             >
               {INSURANCE_COMMODITIES.map((c) => (
-                <option key={c} value={c}>{COMMODITY_DISPLAY[c]?.emoji} {COMMODITY_DISPLAY[c]?.name}</option>
+                <option key={c} value={c} style={optionStyle}>{COMMODITY_DISPLAY[c]?.emoji} {COMMODITY_DISPLAY[c]?.name}</option>
               ))}
             </select>
           </div>
@@ -927,4 +927,10 @@ const selectStyle: React.CSSProperties = {
   backgroundRepeat: 'no-repeat',
   backgroundPosition: 'right 12px center',
   paddingRight: 32,
+};
+
+const optionStyle: React.CSSProperties = {
+  background: '#1a2420',
+  color: '#f0fdf4',
+  padding: '8px 12px',
 };
