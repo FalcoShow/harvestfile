@@ -1,5 +1,5 @@
 // =============================================================================
-// HarvestFile — Phase 16B Build 1: Crop Insurance Constants
+// HarvestFile — Phase 16B Build 2B-2: Crop Insurance Constants
 // lib/insurance/constants.ts
 //
 // 2026 crop insurance reference data for the Coverage Optimizer.
@@ -12,15 +12,27 @@
 //   - Iowa State Extension SCO/ECO documentation
 //   - RMA 20-SCO Endorsement methodology
 //
-// IMPORTANT: These are ESTIMATED premium rates for Build 1. Build 2 will
-// replace these with actual ADM actuarial data for every US county.
-// Current estimates are based on Central Illinois (Logan County) data
-// and should be treated as representative Midwest rates.
-//
-// Premium rates vary significantly by county. The rates here are
-// reasonable for major Corn Belt counties but may be 30-50% different
-// for fringe production areas. Always note "estimates" in the UI.
+// Build 2B-2: Added COMMODITY_CODES for ADM actuarial table lookups.
+// Estimated rates remain as fallbacks when county-specific ADM data
+// is not available (user hasn't selected a county).
 // =============================================================================
+
+// ─── ADM Commodity Code Mapping ──────────────────────────────────────────────
+// Maps our internal commodity names to RMA actuarial commodity codes.
+// These codes are used in the calculate_county_premium_batch() RPC call.
+
+export const COMMODITY_CODES: Record<string, string> = {
+  CORN: '0041',
+  SOYBEANS: '0081',
+  WHEAT: '0011',
+};
+
+// Reverse lookup: commodity code → internal name
+export const COMMODITY_FROM_CODE: Record<string, string> = {
+  '0041': 'CORN',
+  '0081': 'SOYBEANS',
+  '0011': 'WHEAT',
+};
 
 // ─── 2026 Crop Insurance Projected Prices ────────────────────────────────────
 // Source: RMA price discovery period (February 2026 average)
@@ -125,8 +137,8 @@ export const SUBSIDY_RATES = {
 // These are ESTIMATED base rates for typical Midwest counties.
 // Source: Derived from farmdoc 2026 analysis (Logan County, IL baseline)
 //
-// RP premium rates by coverage level (enterprise unit, $/acre estimates
-// are implicit: rate × projected_price × aph_yield × coverage_level)
+// FALLBACK ONLY — when ADM county data is available (Build 2B-2+),
+// these are overridden by real actuarial rates.
 //
 // Format: rate per dollar of liability (before subsidy)
 
@@ -180,7 +192,7 @@ export type CoverageLevel = typeof COVERAGE_LEVELS[number];
 export const SCO_TRIGGER_2026 = 0.86;  // SCO covers up to 86% in 2026
 export const SCO_TRIGGER_2027 = 0.90;  // Rises to 90% starting 2027
 
-export const ECO_LEVELS = {
+export const ETO_LEVELS = {
   ECO_90: { label: 'ECO-90', trigger: 0.90 },
   ECO_95: { label: 'ECO-95', trigger: 0.95 },
 } as const;

@@ -1,12 +1,18 @@
 // =============================================================================
-// HarvestFile — Phase 16B Build 1: Crop Insurance Calculator Engine
+// HarvestFile — Phase 16B Build 2B-2: Crop Insurance Calculator Engine
 // lib/insurance/calculator.ts
 //
 // Implements the complete ARC/PLC + SCO/ECO + Individual RP calculation.
 // This is the feature NO COMPETITOR HAS — integrated safety net modeling.
 //
+// Build 2B-2 upgrade: When admBatchData is provided in FarmInputs, the RP
+// premium calculation uses REAL USDA RMA actuarial data from the county's
+// ADM tables (10.8M records) instead of estimated Midwest averages.
+// The county_reference_yield from ADM data also improves ARC accuracy.
+//
 // Calculation flow:
 //   1. Individual RP premium (by coverage level + unit structure)
+//      → Uses ADM data when available, estimated rates as fallback
 //   2. SCO premium (coverage band from underlying level to 86%)
 //   3. ECO premium (86% to 90% or 95%)
 //   4. ARC-CO expected payment (OBBBA 90% guarantee, 12% cap)
@@ -37,17 +43,23 @@ import {
   type ScenarioType,
 } from './constants';
 
+import type { AdmBatchResponse } from './types';
+
 // ─── Input Types ─────────────────────────────────────────────────────────────
 
 export interface FarmInputs {
-  commodity: string;          // 'CORN', 'SOYBEANS', 'WHEAT'
-  aphYield: number;           // Actual Production History yield (bu/acre)
-  plantedAcres: number;       // Acres planted this year
-  baseAcres: number;          // FSA base acres for this crop
-  coverageLevel: CoverageLevel; // 50-85
-  plcYield?: number;          // Farm-specific PLC yield (defaults to national)
+  commodity: string;              // 'CORN', 'SOYBEANS', 'WHEAT'
+  aphYield: number;               // Actual Production History yield (bu/acre)
+  plantedAcres: number;           // Acres planted this year
+  baseAcres: number;              // FSA base acres for this crop
+  coverageLevel: CoverageLevel;   // 50-85
+  plcYield?: number;              // Farm-specific PLC yield (defaults to national)
   isBeginningFarmer?: boolean;
-  countyYield?: number;       // Expected county yield (defaults to national)
+  countyYield?: number;           // Expected county yield (defaults to national)
+
+  // Build 2B-2: Real ADM actuarial data (all 8 coverage levels)
+  // When present, RP premium uses real county data instead of estimates.
+  admBatchData?: AdmBatchResponse | null;
 }
 
 // ─── Output Types ────────────────────────────────────────────────────────────
@@ -60,6 +72,7 @@ export interface RPPremiumResult {
   subsidyAmount: number;
   farmerPremium: number;        // What farmer pays
   farmerPremiumPerAcre: number;
+  dataSource: 'adm' | 'estimated';  // Build 2B-2: track data provenance
 }
 
 export interface SCOPremiumResult {
@@ -130,12 +143,43 @@ export interface ScenarioResult {
 /**
  * Calculate individual RP (Revenue Protection) premium.
  * Enterprise unit assumed (most common for row crops).
+ *
+ * Build 2B-2: When admBatchData is present in inputs, uses REAL actuarial
+ * data from USDA RMA for the selected county. Falls back to estimated
+ * Midwest rates when ADM data is not available.
  */
 export function calculateRPPremium(inputs: FarmInputs): RPPremiumResult {
-  const { commodity, aphYield, plantedAcres, coverageLevel, isBeginningFarmer } = inputs;
+  const { commodity, aphYield, plantedAcres, coverageLevel, isBeginningFarmer, admBatchData } = inputs;
   const price = PROJECTED_PRICES_2026[commodity];
   if (!price) throw new Error(`Unknown commodity: ${commodity}`);
 
+  // ── Build 2B-2: Check for real ADM data first ──────────────────────────
+  if (admBatchData && admBatchData.length > 0) {
+    const admLevel = admBatchData.find(
+      (d) => Math.round(d.coverage_level * 100) === coverageLevel
+    );
+
+    if (admLevel) {
+      // ADM data already has correct subsidy rates applied, including
+      // enterprise unit and OBBBA adjustments. Trust the actuarial tables.
+      const totalPremium = admLevel.total_premium_per_acre * plantedAcres;
+      const farmerPremium = admLevel.farmer_premium_per_acre * plantedAcres;
+      const subsidyAmount = totalPremium - farmerPremium;
+
+      return {
+        coverageLevel,
+        liability: round(admLevel.liability_per_acre * plantedAcres, 2),
+        guaranteePerAcre: round(admLevel.liability_per_acre, 2),
+        totalPremium: round(totalPremium, 2),
+        subsidyAmount: round(subsidyAmount, 2),
+        farmerPremium: round(farmerPremium, 2),
+        farmerPremiumPerAcre: round(admLevel.farmer_premium_per_acre, 2),
+        dataSource: 'adm',
+      };
+    }
+  }
+
+  // ── Fallback: Estimated rates ──────────────────────────────────────────
   const rates = ESTIMATED_RP_RATES[commodity];
   if (!rates) throw new Error(`No RP rates for: ${commodity}`);
 
@@ -167,6 +211,7 @@ export function calculateRPPremium(inputs: FarmInputs): RPPremiumResult {
     subsidyAmount,
     farmerPremium,
     farmerPremiumPerAcre: plantedAcres > 0 ? round(farmerPremium / plantedAcres, 2) : 0,
+    dataSource: 'estimated',
   };
 }
 
@@ -281,22 +326,26 @@ export function calculateECOPremium(
 
 /**
  * Calculate projected ARC-CO payment for 2026.
- * Uses national benchmark data (county-specific in Build 2).
+ * Build 2B-2: Uses county_reference_yield from ADM data when available,
+ * improving accuracy over national benchmark defaults.
  */
 export function calculateArcPayment(inputs: FarmInputs): ArcPaymentResult {
-  const { commodity, baseAcres, countyYield } = inputs;
+  const { commodity, baseAcres, countyYield, admBatchData } = inputs;
   const ref = ARC_PLC_REF_2026[commodity];
   const price = PROJECTED_PRICES_2026[commodity];
   if (!ref || !price) throw new Error(`Unknown commodity: ${commodity}`);
 
-  const yld = countyYield || ref.arcBenchmarkYieldNational;
+  // Use county reference yield from ADM data if available
+  let yld = countyYield || ref.arcBenchmarkYieldNational;
+  if (admBatchData && admBatchData.length > 0 && admBatchData[0].county_reference_yield) {
+    yld = admBatchData[0].county_reference_yield;
+  }
 
   // Benchmark revenue = Olympic avg price × Olympic avg yield
   const benchmarkRevenue = ref.arcBenchmarkPrice * yld;
   const guarantee = ARC_GUARANTEE_PCT * benchmarkRevenue;
 
   // Projected actual revenue = projected MYA × expected county yield
-  // Using current MYA projection from HarvestFile's MYA tracker
   const projectedRevenue = price.projectedPrice * yld;
 
   // Payment rate = min(guarantee - actual, 12% of benchmark)
@@ -337,14 +386,14 @@ export function calculatePlcPayment(inputs: FarmInputs): PlcPaymentResult {
   // Payment on 85% of base acres × PLC yield
   const paymentAcres = baseAcres * PLC_PAYMENT_ACRES_PCT;
   const paymentPerAcre = round(plcRate * yld * (1 - SEQUESTRATION_PCT), 2);
-  const totalPayment = round(paymentPerAcre * (paymentAcres / baseAcres) * baseAcres, 2);
+  const totalPayment = round(plcRate * yld * (1 - SEQUESTRATION_PCT) * paymentAcres, 2);
 
   return {
     effectiveRefPrice: ref.effectiveRefPrice,
     projectedMYA: price.projectedPrice,
     paymentRate: round(plcRate, 4),
     paymentPerAcre,
-    totalPayment: round(plcRate * yld * (1 - SEQUESTRATION_PCT) * paymentAcres, 2),
+    totalPayment,
     paymentAcres: round(paymentAcres, 2),
   };
 }

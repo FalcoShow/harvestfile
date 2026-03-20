@@ -1,8 +1,16 @@
 // =============================================================================
-// HarvestFile — Phase 16B Build 1: Coverage Optimizer
+// HarvestFile — Phase 16B Build 2B-2: Coverage Optimizer
 // app/(dashboard)/dashboard/insurance/page.tsx
 //
-// THE FEATURE NO COMPETITOR HAS.
+// THE FEATURE NO COMPETITOR HAS — now with REAL COUNTY DATA.
+//
+// Build 2B-2 upgrade:
+//   - State/County cascading selector (searchable county dropdown)
+//   - Real USDA RMA actuarial premium data via batch RPC (10.8M records)
+//   - "USDA Verified" / "Estimated" badge system
+//   - All 8 coverage levels fetched in one call — slider is zero-latency
+//   - County reference yield improves ARC-CO payment accuracy
+//   - Graceful fallback to estimated rates when no county selected
 //
 // Shows a farmer's COMPLETE safety net in one integrated view:
 //   - Individual Revenue Protection (RP)
@@ -18,7 +26,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 
 import {
   INSURANCE_COMMODITIES,
@@ -26,6 +34,7 @@ import {
   PROJECTED_PRICES_2026,
   COVERAGE_LEVELS,
   SCENARIO_LABELS,
+  COMMODITY_CODES,
   type CoverageLevel,
   type ScenarioType,
 } from '@/lib/insurance/constants';
@@ -38,6 +47,24 @@ import {
   type ScenarioResult,
   type CoverageBand,
 } from '@/lib/insurance/calculator';
+
+import type {
+  AdmState,
+  AdmCounty,
+  AdmBatchResponse,
+  PremiumApiResponse,
+} from '@/lib/insurance/types';
+
+import { createBrowserClient } from '@supabase/ssr';
+
+// ─── Supabase browser client ─────────────────────────────────────────────────
+
+function getSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+}
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 
@@ -68,10 +95,138 @@ export default function InsurancePage() {
   const [coverageLevel, setCoverageLevel] = useState<CoverageLevel>(75);
   const [isBeginningFarmer, setIsBeginningFarmer] = useState(false);
 
+  // ── Build 2B-2: County selection state ──
+  const [states, setStates] = useState<AdmState[]>([]);
+  const [counties, setCounties] = useState<AdmCounty[]>([]);
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [selectedCounty, setSelectedCounty] = useState<string>('');
+  const [countySearch, setCountySearch] = useState<string>('');
+  const [showCountyDropdown, setShowCountyDropdown] = useState(false);
+  const [admBatchData, setAdmBatchData] = useState<AdmBatchResponse | null>(null);
+  const [isLoadingCounties, setIsLoadingCounties] = useState(false);
+  const [isLoadingPremiums, setIsLoadingPremiums] = useState(false);
+  const [premiumError, setPremiumError] = useState<string | null>(null);
+  const countyDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Currently selected county/state display names
+  const selectedStateName = states.find(s => s.state_fips === selectedState)?.state_name || '';
+  const selectedCountyName = counties.find(c => c.county_fips === selectedCounty)?.county_name || '';
+  const dataSource: 'usda_verified' | 'estimated' = admBatchData && admBatchData.length > 0 ? 'usda_verified' : 'estimated';
+
+  // ── Fetch states on mount ──
+  useEffect(() => {
+    const fetchStates = async () => {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('adm_states')
+        .select('state_fips, state_name, state_abbreviation')
+        .order('state_name');
+      if (data && !error) {
+        setStates(data);
+      }
+    };
+    fetchStates();
+  }, []);
+
+  // ── Fetch counties when state changes ──
+  useEffect(() => {
+    if (!selectedState) {
+      setCounties([]);
+      setSelectedCounty('');
+      setCountySearch('');
+      setAdmBatchData(null);
+      return;
+    }
+
+    const fetchCounties = async () => {
+      setIsLoadingCounties(true);
+      setSelectedCounty('');
+      setCountySearch('');
+      setAdmBatchData(null);
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('adm_counties')
+        .select('state_fips, county_fips, county_name')
+        .eq('state_fips', selectedState)
+        .order('county_name');
+      if (data && !error) {
+        setCounties(data);
+      }
+      setIsLoadingCounties(false);
+    };
+    fetchCounties();
+  }, [selectedState]);
+
+  // ── Fetch premium data when county/commodity/yield/acres change ──
+  useEffect(() => {
+    if (!selectedState || !selectedCounty) {
+      setAdmBatchData(null);
+      setPremiumError(null);
+      return;
+    }
+
+    const commodityCode = COMMODITY_CODES[commodity];
+    if (!commodityCode) {
+      setAdmBatchData(null);
+      return;
+    }
+
+    const fetchPremiums = async () => {
+      setIsLoadingPremiums(true);
+      setPremiumError(null);
+      try {
+        const params = new URLSearchParams({
+          state: selectedState,
+          county: selectedCounty,
+          commodity: commodityCode,
+          aph: String(aphYield),
+          acres: String(plantedAcres),
+          plan: '02',
+        });
+        const res = await fetch(`/api/insurance/premium?${params}`);
+        const json: PremiumApiResponse = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+          setAdmBatchData(json.data);
+          setPremiumError(null);
+        } else {
+          setAdmBatchData(null);
+          setPremiumError(json.error || 'No premium data available for this county/crop combination');
+        }
+      } catch {
+        setAdmBatchData(null);
+        setPremiumError('Failed to fetch premium data');
+      }
+      setIsLoadingPremiums(false);
+    };
+
+    // Debounce to avoid rapid re-fetches during typing
+    const timer = setTimeout(fetchPremiums, 300);
+    return () => clearTimeout(timer);
+  }, [selectedState, selectedCounty, commodity, aphYield, plantedAcres]);
+
+  // ── Close county dropdown on outside click ──
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (countyDropdownRef.current && !countyDropdownRef.current.contains(e.target as Node)) {
+        setShowCountyDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtered counties for search
+  const filteredCounties = useMemo(() => {
+    if (!countySearch) return counties;
+    const q = countySearch.toLowerCase();
+    return counties.filter(c => c.county_name.toLowerCase().includes(q));
+  }, [counties, countySearch]);
+
   // Build inputs object
   const inputs: FarmInputs = useMemo(() => ({
     commodity, aphYield, plantedAcres, baseAcres, coverageLevel, isBeginningFarmer,
-  }), [commodity, aphYield, plantedAcres, baseAcres, coverageLevel, isBeginningFarmer]);
+    admBatchData,
+  }), [commodity, aphYield, plantedAcres, baseAcres, coverageLevel, isBeginningFarmer, admBatchData]);
 
   // Calculate all scenarios
   const scenarios = useMemo(() => {
@@ -105,21 +260,170 @@ export default function InsurancePage() {
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px 80px' }}>
       {/* ── Header ── */}
       <div style={{ marginBottom: 32 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: C.gold, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Coverage Optimizer
           </span>
           <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(236,72,153,0.15)', color: C.pink, fontWeight: 600 }}>
             NEW — OBBBA 2026
           </span>
+          <DataSourceBadge source={dataSource} isLoading={isLoadingPremiums} />
         </div>
         <h2 style={{ fontSize: 22, fontWeight: 800, color: C.textBright, letterSpacing: '-0.02em', margin: 0, lineHeight: 1.3 }}>
           Build Your Complete Safety Net
         </h2>
         <p style={{ fontSize: 13, color: C.textDim, marginTop: 4, lineHeight: 1.5 }}>
-          Compare ARC/PLC + SCO + ECO + Revenue Protection in one view.
-          First tool to model the new OBBBA stacking rules.
+          {dataSource === 'usda_verified'
+            ? `Real USDA actuarial data for ${selectedCountyName} County, ${selectedStateName}. Select your coverage level to compare scenarios.`
+            : 'Select your county for real USDA premium data, or use Midwest estimates below.'
+          }
         </p>
+      </div>
+
+      {/* ── County Selection Card (Build 2B-2) ── */}
+      <div style={{
+        background: dataSource === 'usda_verified'
+          ? 'linear-gradient(135deg, rgba(16,185,129,0.06), rgba(59,130,246,0.04))'
+          : C.card,
+        border: `1px solid ${dataSource === 'usda_verified' ? 'rgba(16,185,129,0.2)' : C.cardBorder}`,
+        borderRadius: 16, padding: 24, marginBottom: 24,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 14 }}>📍</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.textBright }}>
+            Your County
+          </span>
+          {dataSource === 'usda_verified' && (
+            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(16,185,129,0.15)', color: C.emerald, fontWeight: 600 }}>
+              Real Data Active
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          {/* State Select */}
+          <div>
+            <label style={labelStyle}>State</label>
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">Select a state...</option>
+              {states.map((s) => (
+                <option key={s.state_fips} value={s.state_fips}>
+                  {s.state_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* County Searchable Select */}
+          <div ref={countyDropdownRef} style={{ position: 'relative' }}>
+            <label style={labelStyle}>
+              County {isLoadingCounties && <span style={{ color: C.emerald }}>loading...</span>}
+            </label>
+            <input
+              type="text"
+              placeholder={selectedState ? (selectedCounty ? selectedCountyName : 'Search counties...') : 'Select state first'}
+              value={countySearch}
+              onChange={(e) => {
+                setCountySearch(e.target.value);
+                setShowCountyDropdown(true);
+              }}
+              onFocus={() => {
+                if (counties.length > 0) setShowCountyDropdown(true);
+              }}
+              disabled={!selectedState || isLoadingCounties}
+              style={{
+                ...inputStyle,
+                cursor: !selectedState ? 'not-allowed' : 'text',
+                opacity: !selectedState ? 0.5 : 1,
+              }}
+            />
+            {selectedCounty && !countySearch && (
+              <div style={{
+                position: 'absolute', top: 25, left: 0, right: 0,
+                padding: '8px 12px', pointerEvents: 'none',
+                color: C.textBright, fontSize: 15, fontWeight: 600,
+              }}>
+                {selectedCountyName}
+              </div>
+            )}
+
+            {/* County dropdown */}
+            {showCountyDropdown && filteredCounties.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                marginTop: 4, maxHeight: 240, overflowY: 'auto',
+                background: '#1a2420', border: `1px solid rgba(255,255,255,0.1)`,
+                borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              }}>
+                {filteredCounties.map((county) => (
+                  <button
+                    key={county.county_fips}
+                    onClick={() => {
+                      setSelectedCounty(county.county_fips);
+                      setCountySearch('');
+                      setShowCountyDropdown(false);
+                    }}
+                    style={{
+                      width: '100%', padding: '10px 14px', border: 'none',
+                      background: county.county_fips === selectedCounty ? 'rgba(16,185,129,0.15)' : 'transparent',
+                      color: county.county_fips === selectedCounty ? C.emerald : C.textBright,
+                      fontSize: 13, fontWeight: county.county_fips === selectedCounty ? 700 : 400,
+                      textAlign: 'left', cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    }}
+                    onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLElement).style.background =
+                        county.county_fips === selectedCounty ? 'rgba(16,185,129,0.15)' : 'transparent';
+                    }}
+                  >
+                    {county.county_name} ({county.county_fips})
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {showCountyDropdown && countySearch && filteredCounties.length === 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                marginTop: 4, padding: '12px 14px',
+                background: '#1a2420', border: `1px solid rgba(255,255,255,0.1)`,
+                borderRadius: 12, color: C.textDim, fontSize: 12,
+              }}>
+                No counties match &quot;{countySearch}&quot;
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Premium error message */}
+        {premiumError && selectedCounty && (
+          <div style={{
+            marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+            fontSize: 12, color: '#FCA5A5',
+          }}>
+            {premiumError}. Using estimated rates instead.
+          </div>
+        )}
+
+        {/* County data summary */}
+        {admBatchData && admBatchData.length > 0 && (
+          <div style={{
+            marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap',
+            padding: '10px 14px', borderRadius: 10,
+            background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)',
+          }}>
+            <MiniInfo label="County Yield" value={`${admBatchData[0].county_reference_yield} ${price?.unit || 'bu'}/ac`} />
+            <MiniInfo label="Projected Price" value={`$${admBatchData[0].projected_price.toFixed(2)}/${price?.unit || 'bu'}`} />
+            <MiniInfo label="Data Source" value={admBatchData[0].data_source.replace('_', ' ')} />
+            <MiniInfo label="Coverage Levels" value={`${admBatchData.length} loaded`} />
+          </div>
+        )}
       </div>
 
       {/* ── Farm Inputs Card ── */}
@@ -213,10 +517,43 @@ export default function InsurancePage() {
           ))}
         </div>
 
+        {/* Show real premium for current level when ADM data active */}
+        {admBatchData && admBatchData.length > 0 && (
+          <div style={{
+            marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 12, color: C.textMid }}>
+              RP farmer premium at {coverageLevel}%
+            </span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: C.blue }}>
+              ${(admBatchData.find(d => Math.round(d.coverage_level * 100) === coverageLevel)?.farmer_premium_per_acre ?? 0).toFixed(2)}/ac
+            </span>
+          </div>
+        )}
+
         <p style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
           Lower RP + SCO + ECO often beats higher RP alone. Slide to compare.
         </p>
       </div>
+
+      {/* ── Loading State ── */}
+      {isLoadingPremiums && (
+        <div style={{
+          padding: 20, textAlign: 'center', marginBottom: 24,
+          color: C.textDim, fontSize: 13,
+        }}>
+          <div style={{
+            width: 24, height: 24, border: '2px solid rgba(255,255,255,0.1)',
+            borderTopColor: C.emerald, borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 8px',
+          }} />
+          Calculating real premiums for {selectedCountyName} County...
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
 
       {/* ── Coverage Layer Cake Visualization ── */}
       {bands.length > 0 && (
@@ -341,12 +678,84 @@ export default function InsurancePage() {
         padding: 16, borderRadius: 12,
         border: `1px solid ${C.cardBorder}`, background: 'rgba(255,255,255,0.01)',
       }}>
-        <strong style={{ color: C.textMid }}>Disclaimer:</strong> Premium estimates use representative
-        Midwest rates and may differ from your county&apos;s actual rates. SCO and ECO use county-level
-        triggers that may not align with farm-level losses. ARC/PLC payments are projections based on
-        current MYA price estimates. Always consult your crop insurance agent for exact premium quotes
-        and your local FSA office for program enrollment. This tool does not replace professional advice.
+        <strong style={{ color: C.textMid }}>
+          {dataSource === 'usda_verified' ? 'Data Source:' : 'Disclaimer:'}
+        </strong>{' '}
+        {dataSource === 'usda_verified' ? (
+          <>
+            RP premiums use official USDA RMA actuarial data for {selectedCountyName} County, {selectedStateName} (Crop Year 2026, Enterprise Unit, Revenue Protection).
+            SCO and ECO premiums use representative Midwest rates. ARC/PLC payments are projections based
+            on current MYA price estimates and county reference yields. Estimates only — contact your crop
+            insurance agent for binding premium quotes and your local FSA office for program enrollment.
+          </>
+        ) : (
+          <>
+            Premium estimates use representative Midwest rates and may differ from your county&apos;s actual rates.
+            Select your state and county above for real USDA actuarial data.
+            SCO and ECO use county-level triggers that may not align with farm-level losses. ARC/PLC payments
+            are projections based on current MYA price estimates. Always consult your crop insurance agent for
+            exact premium quotes and your local FSA office for program enrollment. This tool does not replace professional advice.
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+// ─── Data Source Badge Component ─────────────────────────────────────────────
+
+function DataSourceBadge({ source, isLoading }: { source: 'usda_verified' | 'estimated'; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <span style={{
+        fontSize: 10, padding: '2px 10px', borderRadius: 20,
+        background: 'rgba(59,130,246,0.12)', color: C.blue,
+        fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4,
+      }}>
+        <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: C.blue, animation: 'pulse 1s infinite' }} />
+        Loading...
+        <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
+      </span>
+    );
+  }
+
+  if (source === 'usda_verified') {
+    return (
+      <span style={{
+        fontSize: 10, padding: '2px 10px', borderRadius: 20,
+        background: 'rgba(16,185,129,0.15)', color: '#34D399',
+        fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4,
+      }}>
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+          <path d="M8 0L9.8 2.4L12.7 1.6L12.8 4.6L15.6 5.8L14 8.4L15.6 11L12.8 12.2L12.7 15.2L9.8 14.4L8 16.8L6.2 14.4L3.3 15.2L3.2 12.2L0.4 11L2 8.4L0.4 5.8L3.2 4.6L3.3 1.6L6.2 2.4L8 0Z" fill="#10B981"/>
+          <path d="M5.5 8L7 9.5L10.5 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        USDA Verified
+      </span>
+    );
+  }
+
+  return (
+    <span style={{
+      fontSize: 10, padding: '2px 10px', borderRadius: 20,
+      background: 'rgba(245,158,11,0.12)', color: '#FBBF24',
+      fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4,
+    }}>
+      <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+        <circle cx="4" cy="4" r="3" fill="#FBBF24"/>
+      </svg>
+      Estimated
+    </span>
+  );
+}
+
+// ─── Mini Info Component ─────────────────────────────────────────────────────
+
+function MiniInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.textBright }}>{value}</div>
     </div>
   );
 }
@@ -431,7 +840,12 @@ function ScenarioCard({ scenario: s, rank, isBest }: {
             {/* Component breakdown */}
             <div style={{ fontSize: 11, color: C.textDim }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <span>RP ({s.rpPremium.coverageLevel}%) premium</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  RP ({s.rpPremium.coverageLevel}%) premium
+                  {s.rpPremium.dataSource === 'adm' && (
+                    <span style={{ fontSize: 8, color: C.emerald, fontWeight: 700 }}>ADM</span>
+                  )}
+                </span>
                 <span style={{ color: C.textMid }}>${s.rpPremium.farmerPremiumPerAcre.toFixed(2)}/ac</span>
               </div>
               {s.scoPremium && s.scoPremium.farmerPremium > 0 && (
