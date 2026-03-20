@@ -102,6 +102,7 @@ export default function InsurancePage() {
   const [selectedCounty, setSelectedCounty] = useState<string>('');
   const [countySearch, setCountySearch] = useState<string>('');
   const [showCountyDropdown, setShowCountyDropdown] = useState(false);
+  const [countyInputFocused, setCountyInputFocused] = useState(false);
   const [admBatchData, setAdmBatchData] = useState<AdmBatchResponse | null>(null);
   const [isLoadingCounties, setIsLoadingCounties] = useState(false);
   const [isLoadingPremiums, setIsLoadingPremiums] = useState(false);
@@ -325,14 +326,19 @@ export default function InsurancePage() {
             </label>
             <input
               type="text"
-              placeholder={selectedState ? (selectedCounty ? selectedCountyName : 'Search counties...') : 'Select state first'}
-              value={countySearch}
+              placeholder={selectedState ? 'Search counties...' : 'Select state first'}
+              value={countyInputFocused ? countySearch : (selectedCounty ? selectedCountyName : countySearch)}
               onChange={(e) => {
                 setCountySearch(e.target.value);
                 setShowCountyDropdown(true);
               }}
               onFocus={() => {
+                setCountyInputFocused(true);
+                setCountySearch('');
                 if (counties.length > 0) setShowCountyDropdown(true);
+              }}
+              onBlur={() => {
+                setCountyInputFocused(false);
               }}
               disabled={!selectedState || isLoadingCounties}
               style={{
@@ -341,15 +347,6 @@ export default function InsurancePage() {
                 opacity: !selectedState ? 0.5 : 1,
               }}
             />
-            {selectedCounty && !countySearch && (
-              <div style={{
-                position: 'absolute', top: 25, left: 0, right: 0,
-                padding: '8px 12px', pointerEvents: 'none',
-                color: C.textBright, fontSize: 15, fontWeight: 600,
-              }}>
-                {selectedCountyName}
-              </div>
-            )}
 
             {/* County dropdown */}
             {showCountyDropdown && filteredCounties.length > 0 && (
