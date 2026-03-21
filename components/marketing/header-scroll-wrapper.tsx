@@ -1,15 +1,15 @@
 // =============================================================================
 // HarvestFile — HeaderScrollWrapper (Client Component)
-// Phase 23 Build 1: Added dropdown CSS custom properties
+// Phase 23 Build 1.1: iOS Safari backdrop-filter touch fix
+//
+// FIX: Added pointer-events-none to header, pointer-events-auto to container.
+// iOS Safari's backdrop-filter on fixed elements creates a compositing layer
+// that swallows touch events. This ensures only the visible pill captures
+// pointer events while the invisible header area passes them through.
 //
 // ADAPTIVE NAVIGATION that changes appearance based on:
 //   1. Scroll position (has user scrolled past hero?)
 //   2. Current section theme (dark vs light background)
-//
-// States:
-//   - Initial (hero visible): Fully transparent, white text
-//   - Scrolled + dark section: Dark frosted glass, white text
-//   - Scrolled + light section: Light frosted glass, dark text
 // =============================================================================
 
 'use client';
@@ -21,14 +21,12 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
   const [navTheme, setNavTheme] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
-    // Track scroll position
     const handleScroll = () => {
       setScrolled(window.scrollY > 30);
     };
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Track which section is behind the nav using Intersection Observer
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -59,10 +57,13 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
   const useDarkMode = !scrolled || isOnDark;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-[999] px-4 sm:px-6">
+    // pointer-events-none on header: the invisible full-width fixed bar
+    // passes through all touch/click events to content below
+    <header className="fixed top-0 left-0 right-0 z-[999] px-4 sm:px-6 pointer-events-none">
+      {/* pointer-events-auto on container: only the visible pill captures events */}
       <div
         className={`
-          mx-auto max-w-[1200px] mt-3 rounded-2xl
+          mx-auto max-w-[1200px] mt-3 rounded-2xl pointer-events-auto
           transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
           ${scrolled
             ? isOnDark
@@ -71,6 +72,8 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
             : 'bg-transparent border border-transparent'
           }
         `}
+        // Force GPU compositing for iOS Safari backdrop-filter reliability
+        style={{ WebkitTransform: 'translateZ(0)' }}
       >
         <div className="px-5 sm:px-6">
           {/* Inject CSS custom properties for child text colors + dropdown */}
@@ -81,8 +84,6 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
               ['--nav-cta-bg' as string]: useDarkMode ? '#C9A84C' : '#1B4332',
               ['--nav-cta-text' as string]: useDarkMode ? '#0C1F17' : '#FFFFFF',
               ['--nav-cta-hover' as string]: useDarkMode ? '#E2C366' : '#2D6A4F',
-              // Dropdown always renders dark regardless of nav scroll state
-              // This ensures readability and premium feel
               ['--dropdown-bg' as string]: 'rgba(12,31,23,0.97)',
               ['--dropdown-border' as string]: 'rgba(255,255,255,0.08)',
               ['--dropdown-text' as string]: 'rgba(255,255,255,0.85)',

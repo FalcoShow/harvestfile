@@ -1,10 +1,10 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// Phase 23 Build 1: Navigation Overhaul
+// Phase 23 Build 1.1: iOS touch fix + z-index fix
 //
-// Full-screen overlay with all 6 free tools, Election Map, OBBBA Guide,
-// Pricing, and About. Tools are grouped in a "Free Tools" section with
-// descriptions for discoverability.
+// FIX: z-index bumped from z-[100] to z-[1100] — ABOVE the header (z-[999])
+// so the overlay and its close button always receive touch events on iOS.
+// Added -webkit-overflow-scrolling: touch for smooth iOS scrolling.
 // =============================================================================
 
 "use client";
@@ -40,11 +40,26 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
+      // iOS Safari: prevent background scroll-through
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.top = `-${window.scrollY}px`;
     } else {
+      const scrollY = document.body.style.top;
       document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
+      // Restore scroll position when closing
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
     return () => {
       document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
     };
   }, [open]);
 
@@ -53,7 +68,7 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
       {/* Hamburger button — uses adaptive var(--nav-text) for visibility */}
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden p-2 -mr-2 rounded-lg transition-colors hover:bg-white/10"
+        className="md:hidden p-2 -mr-2 rounded-lg transition-colors hover:bg-white/10 relative z-10"
         style={{ color: 'var(--nav-text, rgba(255,255,255,0.8))' }}
         aria-label="Open menu"
       >
@@ -73,14 +88,15 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
         </svg>
       </button>
 
-      {/* Full-screen overlay */}
+      {/* Full-screen overlay — z-[1100] to sit ABOVE header z-[999] */}
       {open && (
         <div
-          className="fixed inset-0 z-[100] bg-[#0a0f0d]/98 backdrop-blur-xl md:hidden"
+          className="fixed inset-0 z-[1100] bg-[#0a0f0d]/98 backdrop-blur-xl md:hidden"
           onClick={() => setOpen(false)}
         >
           <div
             className="flex flex-col h-full overflow-y-auto"
+            style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top bar with logo + close */}
