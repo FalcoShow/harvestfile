@@ -1,33 +1,26 @@
 // =============================================================================
-// HarvestFile — Phase 20 Build 4B-1: Coverage Optimizer + Monte Carlo + Scatter
+// HarvestFile — Phase 20 Build 4B-2: Coverage Optimizer + Monte Carlo + Drawer
 // app/(dashboard)/dashboard/insurance/page.tsx
 //
 // THE FEATURE THAT MAKES HARVESTFILE WORTH BILLIONS.
 //
-// Build 4B-1 adds:
+// Build 4B-2 adds:
+//   - Strategy Detail Drawer — click any scatter dot or strategy card to open
+//   - Right-side slide-in panel with backdrop overlay (zero dependencies)
+//   - Tabs: Overview (key metrics), Percentiles (P5-P95 table), Distribution
+//   - Per-strategy histogram inside the drawer
+//   - Escape key + backdrop click to close
+//   - Smooth 300ms CSS transition animations
+//
+// Build 4B-1 preserved:
 //   - Interactive risk-reward scatter plot (Recharts ScatterChart)
-//   - Payment probability vs Expected Net Benefit per strategy
-//   - Diamond shapes for ARC strategies, circles for PLC strategies
-//   - Glow effects on hover/select, quadrant shading for "sweet spot"
-//   - Hover tooltips with full strategy metrics
-//   - Break-even reference line and average quadrant markers
-//   - Interactive legend with hover highlight sync
+//   - Diamond/circle shapes, glow effects, quadrant shading
 //
 // Build 4A preserved:
-//   - "Run 10,000 Simulations" button with premium staged loading animation
-//   - Monte Carlo results dashboard with Recharts probability histograms
-//   - Percentile bands (P5/P10/P25/P50/P75/P90/P95) for all strategies
-//   - Payment probability gauges (e.g. "78% chance of ARC payment")
-//   - AI-backed "Recommended Strategy" hero card with confidence score
-//   - Side-by-side scenario comparison with risk-reward metrics
+//   - Monte Carlo engine, histogram, percentile table, probability gauges
 //
 // Previous builds preserved:
-//   - State/County cascading selector with ADM batch data
-//   - Real USDA RMA actuarial premium data (10.8M records)
-//   - USDA Verified / Estimated badge system
-//   - Coverage level slider (zero-latency with cached ADM data)
-//   - 4-scenario deterministic comparison
-//   - Coverage layer cake visualization
+//   - State/County selector, ADM data, coverage slider, scenario cards
 //
 // No university tool, no ag-tech platform, no competitor does this.
 // =============================================================================
@@ -161,6 +154,9 @@ export default function InsurancePage() {
   const [simVisible, setSimVisible] = useState(false);
   const simResultsRef = useRef<HTMLDivElement>(null);
 
+  // ── Build 4B-2: Strategy detail drawer state ──
+  const [drawerScenario, setDrawerScenario] = useState<string | null>(null);
+
   // Currently selected county/state display names
   const selectedStateName = states.find(s => s.state_fips === selectedState)?.state_name || '';
   const selectedCountyName = counties.find(c => c.county_fips === selectedCounty)?.county_name || '';
@@ -271,6 +267,7 @@ export default function InsurancePage() {
   useEffect(() => {
     setSimResults(null);
     setSimVisible(false);
+    setDrawerScenario(null);
   }, [commodity, aphYield, plantedAcres, baseAcres, coverageLevel, selectedCounty]);
 
   // Filtered counties for search
@@ -982,12 +979,20 @@ export default function InsurancePage() {
                 rank={i + 1}
                 isBest={s.scenario === simResults.bestScenario}
                 acres={simResults.inputs.plantedAcres || 1}
+                onSelect={() => setDrawerScenario(s.scenario)}
               />
             ))}
           </div>
 
           {/* ── Risk-Reward Scatter Plot (Build 4B) ── */}
-          <SimScatterPlot simResults={simResults} />
+          <SimScatterPlot simResults={simResults} onSelectScenario={setDrawerScenario} />
+
+          {/* ── Strategy Detail Drawer (Build 4B-2) ── */}
+          <StrategyDetailDrawer
+            simResults={simResults}
+            scenarioId={drawerScenario}
+            onClose={() => setDrawerScenario(null)}
+          />
 
           {/* ── Best Scenario Histogram ── */}
           <SimHistogramChart simResults={simResults} />
@@ -1197,19 +1202,26 @@ function MetricCard({ label, value, color, sublabel }: {
 
 // ─── Strategy Comparison Card ────────────────────────────────────────────────
 
-function SimStrategyCard({ sim, rank, isBest, acres }: {
-  sim: ScenarioSimResult; rank: number; isBest: boolean; acres: number;
+function SimStrategyCard({ sim, rank, isBest, acres, onSelect }: {
+  sim: ScenarioSimResult; rank: number; isBest: boolean; acres: number; onSelect?: () => void;
 }) {
   const label = SCENARIO_LABELS[sim.scenario];
   const color = SCENARIO_COLORS[sim.scenario] || C.textDim;
   const pctPay = Math.round(sim.paymentProbability);
 
   return (
-    <div style={{
-      background: isBest ? `${color}08` : C.card,
-      border: `1px solid ${isBest ? `${color}40` : C.cardBorder}`,
-      borderRadius: 14, padding: 16, position: 'relative',
-    }}>
+    <div
+      onClick={onSelect}
+      style={{
+        background: isBest ? `${color}08` : C.card,
+        border: `1px solid ${isBest ? `${color}40` : C.cardBorder}`,
+        borderRadius: 14, padding: 16, position: 'relative',
+        cursor: onSelect ? 'pointer' : 'default',
+        transition: 'border-color 0.2s, transform 0.15s',
+      }}
+      onMouseEnter={(e) => { if (onSelect) (e.currentTarget as HTMLElement).style.borderColor = `${color}60`; }}
+      onMouseLeave={(e) => { if (onSelect) (e.currentTarget as HTMLElement).style.borderColor = isBest ? `${color}40` : C.cardBorder; }}
+    >
       {/* Rank badge */}
       <div style={{
         position: 'absolute', top: 12, right: 12,
@@ -1265,13 +1277,20 @@ function SimStrategyCard({ sim, rank, isBest, acres }: {
         <span>P50: ${(sim.netBenefit.p50 / acres).toFixed(0)}</span>
         <span>P95: ${(sim.netBenefit.p95 / acres).toFixed(0)}</span>
       </div>
+
+      {/* View Details link */}
+      {onSelect && (
+        <div style={{ marginTop: 10, fontSize: 10, fontWeight: 600, color, textAlign: 'center', opacity: 0.7 }}>
+          View Details →
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Risk-Reward Scatter Plot (Build 4B-1) ──────────────────────────────────
 
-function SimScatterPlot({ simResults }: { simResults: SimulationResult }) {
+function SimScatterPlot({ simResults, onSelectScenario }: { simResults: SimulationResult; onSelectScenario?: (scenario: string) => void }) {
   const [hoveredScenario, setHoveredScenario] = useState<string | null>(null);
   const acres = simResults.inputs.plantedAcres || 1;
 
@@ -1505,6 +1524,10 @@ function SimScatterPlot({ simResults }: { simResults: SimulationResult }) {
                   if (data?.scenario) setHoveredScenario(data.scenario);
                 }}
                 onMouseLeave={() => setHoveredScenario(null)}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onClick={(data: any) => {
+                  if (data?.scenario && onSelectScenario) onSelectScenario(data.scenario);
+                }}
               />
             </ScatterChart>
           </ResponsiveContainer>
@@ -1525,6 +1548,7 @@ function SimScatterPlot({ simResults }: { simResults: SimulationResult }) {
               }}
               onMouseEnter={() => setHoveredScenario(d.scenario)}
               onMouseLeave={() => setHoveredScenario(null)}
+              onClick={() => onSelectScenario?.(d.scenario)}
             >
               {/* Shape indicator */}
               {d.scenario.startsWith('arc') ? (
@@ -1580,6 +1604,492 @@ function TooltipRow({ label, value, valueColor }: { label: string; value: string
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
       <span style={{ fontSize: 11, color: C.textDim }}>{label}</span>
       <span style={{ fontSize: 11, fontWeight: 700, color: valueColor, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUILD 4B-2 — STRATEGY DETAIL DRAWER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function StrategyDetailDrawer({ simResults, scenarioId, onClose }: {
+  simResults: SimulationResult;
+  scenarioId: string | null;
+  onClose: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'percentiles' | 'distribution'>('overview');
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const isOpen = scenarioId !== null;
+  const sim = simResults.scenarios.find(s => s.scenario === scenarioId);
+  const acres = simResults.inputs.plantedAcres || 1;
+
+  // Reset tab when drawer opens with new scenario
+  useEffect(() => {
+    if (scenarioId) setActiveTab('overview');
+  }, [scenarioId]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
+  if (!sim) {
+    // Render nothing but keep the backdrop animation smooth
+    return (
+      <>
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 998,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
+        }} onClick={onClose} />
+      </>
+    );
+  }
+
+  const label = SCENARIO_LABELS[sim.scenario];
+  const color = SCENARIO_COLORS[sim.scenario] || C.emerald;
+  const isBest = sim.scenario === simResults.bestScenario;
+  const pctKeys = ['p5', 'p10', 'p25', 'p50', 'p75', 'p90', 'p95'] as const;
+  const pctLabels: Record<string, { label: string; risk: string }> = {
+    p5: { label: 'P5 (Worst Case)', risk: 'high' },
+    p10: { label: 'P10', risk: 'high' },
+    p25: { label: 'P25', risk: 'medium' },
+    p50: { label: 'P50 (Median)', risk: 'neutral' },
+    p75: { label: 'P75', risk: 'low' },
+    p90: { label: 'P90', risk: 'low' },
+    p95: { label: 'P95 (Best Case)', risk: 'low' },
+  };
+
+  const tabs: { id: 'overview' | 'percentiles' | 'distribution'; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'percentiles', label: 'Percentiles' },
+    { id: 'distribution', label: 'Distribution' },
+  ];
+
+  // Per-acre histogram for this strategy
+  const perAcreHistogram = sim.histogram?.map(h => ({
+    bin: Math.round((h.bin / acres) * 100) / 100,
+    count: h.count,
+  })) || [];
+  const meanPerAcre = sim.netBenefit.mean / acres;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 998,
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? 'auto' : 'none',
+        transition: 'opacity 0.3s ease',
+      }} onClick={onClose} />
+
+      {/* Drawer panel */}
+      <div
+        ref={drawerRef}
+        style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0,
+          width: 'min(580px, 90vw)',
+          zIndex: 999,
+          background: '#0d1411',
+          borderLeft: `1px solid ${color}30`,
+          boxShadow: `-8px 0 40px rgba(0,0,0,0.6), 0 0 60px ${color}08`,
+          transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
+          overflowY: 'auto',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* ── Drawer Header ── */}
+        <div style={{
+          padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          position: 'sticky', top: 0, zIndex: 1,
+          background: '#0d1411',
+        }}>
+          {/* Close + badges row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {isBest && (
+                <span style={{
+                  fontSize: 9, padding: '3px 10px', borderRadius: 20,
+                  background: `${color}20`, color, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                }}>
+                  ★ Recommended
+                </span>
+              )}
+              <span style={{
+                fontSize: 9, padding: '3px 10px', borderRadius: 20,
+                background: 'rgba(255,255,255,0.04)', color: C.textDim, fontWeight: 600,
+              }}>
+                {simResults.iterations.toLocaleString()} simulations
+              </span>
+            </div>
+            <button onClick={onClose} style={{
+              width: 32, height: 32, borderRadius: 8, border: 'none',
+              background: 'rgba(255,255,255,0.04)', color: C.textDim,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 16, fontWeight: 400, flexShrink: 0,
+              transition: 'background 0.2s',
+            }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Strategy name */}
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.textBright, letterSpacing: '-0.02em', marginBottom: 2 }}>
+            {label?.shortLabel}
+          </div>
+          <div style={{ fontSize: 12, color: C.textDim }}>
+            {label?.label}
+          </div>
+
+          {/* Tab bar */}
+          <div style={{
+            display: 'flex', gap: 0, marginTop: 16,
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            {tabs.map(tab => (
+              <button key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '8px 16px', border: 'none', background: 'none',
+                  color: activeTab === tab.id ? color : C.textDim,
+                  fontSize: 12, fontWeight: activeTab === tab.id ? 700 : 500,
+                  cursor: 'pointer', position: 'relative',
+                  transition: 'color 0.2s',
+                }}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div style={{
+                    position: 'absolute', bottom: -1, left: 0, right: 0, height: 2,
+                    background: color, borderRadius: 1,
+                  }} />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Tab Content ── */}
+        <div style={{ padding: '20px 24px 32px', flex: 1 }}>
+
+          {/* OVERVIEW TAB */}
+          {activeTab === 'overview' && (
+            <div>
+              {/* Key metrics row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+                <DrawerMetric
+                  label="Expected Net Benefit"
+                  value={`${sim.expectedNetBenefitPerAcre >= 0 ? '+' : ''}$${sim.expectedNetBenefitPerAcre.toFixed(2)}/ac`}
+                  color={sim.expectedNetBenefitPerAcre >= 0 ? C.green : C.red}
+                  sublabel="probability-weighted average"
+                />
+                <DrawerMetric
+                  label="Payment Probability"
+                  value={`${Math.round(sim.paymentProbability)}%`}
+                  color={sim.paymentProbability >= 60 ? C.green : sim.paymentProbability >= 30 ? C.amber : C.textDim}
+                  sublabel={`${Math.round(sim.paymentProbability)} of 100 simulations`}
+                />
+                <DrawerMetric
+                  label="Worst Case (P5)"
+                  value={`$${(sim.netBenefit.p5 / acres).toFixed(2)}/ac`}
+                  color={sim.netBenefit.p5 >= 0 ? C.green : C.red}
+                  sublabel="5th percentile floor"
+                />
+                <DrawerMetric
+                  label="Best Case (P95)"
+                  value={`+$${(sim.netBenefit.p95 / acres).toFixed(2)}/ac`}
+                  color={C.green}
+                  sublabel="95th percentile ceiling"
+                />
+              </div>
+
+              {/* Premium breakdown */}
+              <div style={{
+                fontSize: 12, fontWeight: 700, color: C.textBright, marginBottom: 10,
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>
+                Premium Breakdown
+              </div>
+              <div style={{
+                padding: '14px 16px', borderRadius: 12,
+                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                marginBottom: 20,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: C.textMid }}>Total Premium</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.red, fontVariantNumeric: 'tabular-nums' }}>
+                    ${sim.totalPremium.toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: C.textMid }}>Per Acre</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: C.textMid, fontVariantNumeric: 'tabular-nums' }}>
+                    ${(sim.totalPremium / acres).toFixed(2)}/ac
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, color: C.textMid }}>Expected Total Net Benefit</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: sim.expectedNetBenefit >= 0 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>
+                    {sim.expectedNetBenefit >= 0 ? '+' : ''}${sim.expectedNetBenefit.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Component payment probabilities */}
+              <div style={{
+                fontSize: 12, fontWeight: 700, color: C.textBright, marginBottom: 10,
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>
+                Component Probabilities
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sim.rpPaymentProbability !== undefined && (
+                  <DrawerProbBar label="RP Indemnity" pct={sim.rpPaymentProbability} color={C.blue} />
+                )}
+                {sim.arcPaymentProbability !== undefined && (
+                  <DrawerProbBar label="ARC-CO" pct={sim.arcPaymentProbability} color={C.emerald} />
+                )}
+                {sim.plcPaymentProbability !== undefined && (
+                  <DrawerProbBar label="PLC" pct={sim.plcPaymentProbability} color={C.purple} />
+                )}
+                {sim.scoPaymentProbability !== undefined && (
+                  <DrawerProbBar label="SCO" pct={sim.scoPaymentProbability} color={C.amber} />
+                )}
+                {sim.ecoPaymentProbability !== undefined && (
+                  <DrawerProbBar label="ECO" pct={sim.ecoPaymentProbability} color={C.pink} />
+                )}
+              </div>
+
+              {/* Strategy description */}
+              <div style={{
+                marginTop: 20, padding: '12px 16px', borderRadius: 10,
+                background: `${color}08`, border: `1px solid ${color}15`,
+              }}>
+                <p style={{ fontSize: 12, color: C.textMid, lineHeight: 1.6, margin: 0 }}>
+                  {label?.description}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* PERCENTILES TAB */}
+          {activeTab === 'percentiles' && (
+            <div>
+              <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, lineHeight: 1.5 }}>
+                What this strategy pays per acre at different probability levels across {simResults.iterations.toLocaleString()} simulated market outcomes.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {pctKeys.map(pct => {
+                  const val = sim.netBenefit[pct] / acres;
+                  const riskLevel = pctLabels[pct].risk;
+                  const bgColor = riskLevel === 'high' ? 'rgba(239,68,68,0.06)'
+                    : riskLevel === 'medium' ? 'rgba(245,158,11,0.06)'
+                    : riskLevel === 'neutral' ? 'rgba(255,255,255,0.04)'
+                    : 'rgba(16,185,129,0.06)';
+                  const borderColor = riskLevel === 'high' ? 'rgba(239,68,68,0.1)'
+                    : riskLevel === 'medium' ? 'rgba(245,158,11,0.1)'
+                    : riskLevel === 'neutral' ? 'rgba(255,255,255,0.06)'
+                    : 'rgba(16,185,129,0.1)';
+
+                  return (
+                    <div key={pct} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '10px 14px', borderRadius: 10,
+                      background: pct === 'p50' ? `${color}10` : bgColor,
+                      border: `1px solid ${pct === 'p50' ? `${color}25` : borderColor}`,
+                    }}>
+                      <div>
+                        <div style={{
+                          fontSize: 12, fontWeight: pct === 'p50' ? 700 : 500,
+                          color: pct === 'p50' ? C.textBright : C.textMid,
+                        }}>
+                          {pctLabels[pct].label}
+                        </div>
+                        {pct === 'p50' && (
+                          <div style={{ fontSize: 9, color, fontWeight: 600, marginTop: 1 }}>
+                            Most likely outcome
+                          </div>
+                        )}
+                      </div>
+                      <div style={{
+                        fontSize: pct === 'p50' ? 18 : 14,
+                        fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+                        color: val >= 0 ? C.green : C.red,
+                      }}>
+                        {val >= 0 ? '+' : ''}${val.toFixed(2)}/ac
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Mean row */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '12px 14px', borderRadius: 10, marginTop: 4,
+                  background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.amber }}>Mean (Expected)</div>
+                    <div style={{ fontSize: 9, color: C.textDim }}>probability-weighted average</div>
+                  </div>
+                  <div style={{
+                    fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+                    color: sim.expectedNetBenefitPerAcre >= 0 ? C.green : C.red,
+                  }}>
+                    {sim.expectedNetBenefitPerAcre >= 0 ? '+' : ''}${sim.expectedNetBenefitPerAcre.toFixed(2)}/ac
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DISTRIBUTION TAB */}
+          {activeTab === 'distribution' && (
+            <div>
+              <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, lineHeight: 1.5 }}>
+                Net benefit per acre (payments minus premiums) for {label?.shortLabel} across {simResults.iterations.toLocaleString()} simulations.
+              </div>
+
+              {perAcreHistogram.length > 0 ? (
+                <div style={{ width: '100%', height: 220, marginBottom: 20 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={perAcreHistogram} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                      <XAxis
+                        dataKey="bin"
+                        tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9 }}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                        tickLine={false}
+                        tickFormatter={(v: number) => `$${Math.round(v)}`}
+                      />
+                      <YAxis
+                        tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9 }}
+                        axisLine={false} tickLine={false}
+                      />
+                      <Tooltip content={<HistogramTooltip />} />
+                      <ReferenceLine x={meanPerAcre} stroke={C.amber} strokeDasharray="4 4" strokeWidth={1.5}
+                        label={{ value: 'Mean', position: 'top', fill: C.amber, fontSize: 9, fontWeight: 700 }}
+                      />
+                      <ReferenceLine x={0} stroke="rgba(255,255,255,0.15)" strokeDasharray="2 2" />
+                      <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={16}>
+                        {perAcreHistogram.map((entry, index) => (
+                          <Cell key={`dcell-${index}`} fill={entry.bin >= 0 ? color : C.red} fillOpacity={0.7} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div style={{ padding: 20, textAlign: 'center', color: C.textDim, fontSize: 12 }}>
+                  No histogram data available
+                </div>
+              )}
+
+              {/* Quick stats below chart */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>Worst (P5)</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: C.red, fontVariantNumeric: 'tabular-nums' }}>
+                    ${(sim.netBenefit.p5 / acres).toFixed(2)}
+                  </div>
+                </div>
+                <div style={{ padding: '10px 12px', borderRadius: 10, background: `${color}08`, border: `1px solid ${color}15` }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>Median (P50)</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: C.textBright, fontVariantNumeric: 'tabular-nums' }}>
+                    ${(sim.netBenefit.p50 / acres).toFixed(2)}
+                  </div>
+                </div>
+                <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.1)' }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>Best (P95)</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: C.green, fontVariantNumeric: 'tabular-nums' }}>
+                    +${(sim.netBenefit.p95 / acres).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: C.textDim }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: color, opacity: 0.7 }} />
+                  Positive net benefit
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: C.textDim }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: C.red, opacity: 0.7 }} />
+                  Net loss
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: C.textDim }}>
+                  <div style={{ width: 8, height: 2, background: C.amber }} />
+                  Mean
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Drawer Sub-Components ──────────────────────────────────────────────────
+
+function DrawerMetric({ label, value, color, sublabel }: {
+  label: string; value: string; color: string; sublabel: string;
+}) {
+  return (
+    <div style={{
+      padding: '14px 16px', borderRadius: 12,
+      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+    }}>
+      <div style={{ fontSize: 10, color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>{sublabel}</div>
+    </div>
+  );
+}
+
+function DrawerProbBar({ label, pct, color }: { label: string; pct: number; color: string }) {
+  const pctRound = Math.round(pct);
+  return (
+    <div style={{
+      padding: '8px 14px', borderRadius: 10,
+      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontSize: 12, color: C.textMid, fontWeight: 500 }}>{label}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>{pctRound}%</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', borderRadius: 3, background: color,
+          width: `${pctRound}%`, transition: 'width 0.6s ease-out',
+        }} />
+      </div>
     </div>
   );
 }
