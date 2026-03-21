@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const routeLabels: Record<string, string> = {
   "/dashboard": "Overview",
   "/dashboard/markets": "Markets",
+  "/dashboard/payments": "Payment Hunter",
   "/dashboard/insurance": "Coverage Optimizer",
   "/dashboard/intelligence": "Intelligence Hub",
   "/dashboard/farmers": "Farmers",
