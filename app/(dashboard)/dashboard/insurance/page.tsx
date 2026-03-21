@@ -972,6 +972,7 @@ export default function InsurancePage() {
                 sim={s}
                 rank={i + 1}
                 isBest={s.scenario === simResults.bestScenario}
+                acres={simResults.inputs.plantedAcres || 1}
               />
             ))}
           </div>
@@ -1031,7 +1032,9 @@ function SimRecommendedCard({ simResults }: { simResults: SimulationResult }) {
 
   const label = SCENARIO_LABELS[best.scenario];
   const color = SCENARIO_COLORS[best.scenario] || C.emerald;
-  const pctWins = Math.round(best.paymentProbability * 100);
+  // paymentProbability comes from the engine as a percentage (e.g., 47.4), not a decimal
+  const pctWins = Math.round(best.paymentProbability);
+  const acres = simResults.inputs.plantedAcres || 1; // For per-acre conversion
 
   return (
     <div style={{
@@ -1090,13 +1093,13 @@ function SimRecommendedCard({ simResults }: { simResults: SimulationResult }) {
           />
           <MetricCard
             label="Worst Case (P5)"
-            value={`$${best.netBenefit.p5.toFixed(2)}/ac`}
+            value={`$${(best.netBenefit.p5 / acres).toFixed(2)}/ac`}
             color={best.netBenefit.p5 >= 0 ? C.green : C.red}
             sublabel="5th percentile floor"
           />
           <MetricCard
             label="Best Case (P95)"
-            value={`+$${best.netBenefit.p95.toFixed(2)}/ac`}
+            value={`${best.netBenefit.p95 >= 0 ? '+' : ''}$${(best.netBenefit.p95 / acres).toFixed(2)}/ac`}
             color={C.green}
             sublabel="95th percentile ceiling"
           />
@@ -1136,7 +1139,8 @@ function SimRecommendedCard({ simResults }: { simResults: SimulationResult }) {
 // ─── Probability Gauge ───────────────────────────────────────────────────────
 
 function ProbGauge({ label, pct }: { label: string; pct: number }) {
-  const pctRound = Math.round(pct * 100);
+  // pct comes from the engine as a percentage (e.g., 47.4), not a decimal
+  const pctRound = Math.round(pct);
   const color = pctRound >= 60 ? C.green : pctRound >= 30 ? C.amber : C.textDim;
 
   return (
@@ -1181,12 +1185,12 @@ function MetricCard({ label, value, color, sublabel }: {
 
 // ─── Strategy Comparison Card ────────────────────────────────────────────────
 
-function SimStrategyCard({ sim, rank, isBest }: {
-  sim: ScenarioSimResult; rank: number; isBest: boolean;
+function SimStrategyCard({ sim, rank, isBest, acres }: {
+  sim: ScenarioSimResult; rank: number; isBest: boolean; acres: number;
 }) {
   const label = SCENARIO_LABELS[sim.scenario];
   const color = SCENARIO_COLORS[sim.scenario] || C.textDim;
-  const pctPay = Math.round(sim.paymentProbability * 100);
+  const pctPay = Math.round(sim.paymentProbability);
 
   return (
     <div style={{
@@ -1245,9 +1249,9 @@ function SimStrategyCard({ sim, rank, isBest }: {
 
       {/* P5-P95 range */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textDim }}>
-        <span>P5: ${sim.netBenefit.p5.toFixed(0)}</span>
-        <span>P50: ${sim.netBenefit.p50.toFixed(0)}</span>
-        <span>P95: ${sim.netBenefit.p95.toFixed(0)}</span>
+        <span>P5: ${(sim.netBenefit.p5 / acres).toFixed(0)}</span>
+        <span>P50: ${(sim.netBenefit.p50 / acres).toFixed(0)}</span>
+        <span>P95: ${(sim.netBenefit.p95 / acres).toFixed(0)}</span>
       </div>
     </div>
   );
@@ -1261,6 +1265,14 @@ function SimHistogramChart({ simResults }: { simResults: SimulationResult }) {
 
   const color = SCENARIO_COLORS[best.scenario] || C.emerald;
   const label = SCENARIO_LABELS[best.scenario];
+  const acres = simResults.inputs.plantedAcres || 1;
+
+  // Convert histogram bins to per-acre values
+  const perAcreHistogram = best.histogram.map(h => ({
+    bin: Math.round((h.bin / acres) * 100) / 100,
+    count: h.count,
+  }));
+  const meanPerAcre = best.netBenefit.mean / acres;
 
   return (
     <div style={{
@@ -1279,19 +1291,19 @@ function SimHistogramChart({ simResults }: { simResults: SimulationResult }) {
         </span>
       </div>
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 20 }}>
-        How net benefit (payments minus premiums) is distributed across {simResults.iterations.toLocaleString()} simulated market outcomes
+        Net benefit per acre (payments minus premiums) across {simResults.iterations.toLocaleString()} simulated market outcomes
       </div>
 
       <div style={{ width: '100%', height: 240 }}>
         <ResponsiveContainer>
-          <BarChart data={best.histogram} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <BarChart data={perAcreHistogram} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
             <XAxis
               dataKey="bin"
               tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
               axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
               tickLine={false}
-              tickFormatter={(v: number) => `$${v >= 0 ? '' : ''}${Math.round(v)}`}
+              tickFormatter={(v: number) => `$${Math.round(v)}`}
             />
             <YAxis
               tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
@@ -1301,7 +1313,7 @@ function SimHistogramChart({ simResults }: { simResults: SimulationResult }) {
             />
             <Tooltip content={<HistogramTooltip />} />
             <ReferenceLine
-              x={best.netBenefit.mean}
+              x={meanPerAcre}
               stroke={C.amber}
               strokeDasharray="4 4"
               strokeWidth={1.5}
@@ -1313,7 +1325,7 @@ function SimHistogramChart({ simResults }: { simResults: SimulationResult }) {
               strokeDasharray="2 2"
             />
             <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={20}>
-              {best.histogram.map((entry, index) => (
+              {perAcreHistogram.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.bin >= 0 ? color : C.red}
@@ -1355,7 +1367,7 @@ function HistogramTooltip({ active, payload }: { active?: boolean; payload?: Arr
       borderRadius: 8, padding: '8px 12px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
     }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.textBright }}>
-        ${data.bin.toFixed(0)}/acre range
+        ${data.bin.toFixed(2)}/acre range
       </div>
       <div style={{ fontSize: 11, color: C.textDim }}>
         {data.count} simulations
@@ -1372,6 +1384,7 @@ function SimPercentileTable({ simResults }: { simResults: SimulationResult }) {
     p5: 'P5 (Worst)', p10: 'P10', p25: 'P25',
     p50: 'P50 (Median)', p75: 'P75', p90: 'P90', p95: 'P95 (Best)',
   };
+  const acres = simResults.inputs.plantedAcres || 1;
 
   return (
     <div style={{
@@ -1403,7 +1416,7 @@ function SimPercentileTable({ simResults }: { simResults: SimulationResult }) {
                 {pctLabels[pct]}
               </td>
               {simResults.scenarios.map(s => {
-                const val = s.netBenefit[pct];
+                const val = s.netBenefit[pct] / acres;
                 return (
                   <td key={s.scenario} style={{
                     ...tdStyle, textAlign: 'right', fontWeight: 600,
