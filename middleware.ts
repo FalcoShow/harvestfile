@@ -1,10 +1,10 @@
 // =============================================================================
 // HarvestFile — Consolidated Middleware
-// Phase 8A: Revenue Plumbing Fix
+// Phase 19: Added SMS webhook route exclusions
 //
 // Handles: auth session refresh, dashboard route protection, auth redirects
-// CRITICAL: Stripe webhook route is EXCLUDED from the matcher to prevent
-// 307 redirects that kill webhook delivery.
+// CRITICAL: Stripe webhook + SMS webhooks are EXCLUDED from the matcher to
+// prevent 307 redirects that kill webhook delivery.
 // =============================================================================
 
 import { createServerClient } from '@supabase/ssr';
@@ -14,18 +14,17 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── EARLY RETURN: Skip auth logic for Stripe webhook ──────────────────
-  // Stripe POSTs have no Supabase cookies. Running the SSR cookie logic
-  // on them corrupts the response into a 307 redirect.
   if (pathname.startsWith('/api/stripe/webhook') || pathname.startsWith('/api/webhooks/stripe')) {
     return NextResponse.next();
   }
 
   // ── EARLY RETURN: Skip auth logic for public API routes ───────────────
-  // These are called from client components or external services
   if (
     pathname.startsWith('/api/benchmarks') ||
     pathname.startsWith('/api/counties') ||
-    pathname.startsWith('/api/inngest')
+    pathname.startsWith('/api/inngest') ||
+    pathname.startsWith('/api/sms/status') ||   // Phase 19: Twilio delivery status
+    pathname.startsWith('/api/sms/inbound')      // Phase 19: Twilio inbound SMS
   ) {
     return NextResponse.next();
   }
@@ -60,18 +59,20 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ── Protect dashboard routes — redirect to login if no session ────────
-  if (!user && pathname.startsWith('/dashboard')) {
+  // ── Protect dashboard routes ──────────────────────────────────────────
+  if (pathname.startsWith('/dashboard') && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 
-  // ── Redirect logged-in users away from auth pages ─────────────────────
-  if (user && (pathname === '/login' || pathname === '/signup')) {
+  // ── Redirect authenticated users away from auth pages ─────────────────
+  if ((pathname === '/login' || pathname === '/signup') && user) {
+    const redirect = request.nextUrl.searchParams.get('redirect') || '/dashboard';
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = redirect;
+    url.search = '';
     return NextResponse.redirect(url);
   }
 
@@ -80,15 +81,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match dashboard routes (protected)
-    '/dashboard/:path*',
-    // Match auth pages (redirect if logged in)
-    '/login',
-    '/signup',
-    // Match API routes that need session refresh
-    // NOTE: Stripe webhook, benchmarks, counties, and inngest are excluded
-    // via early returns above (they still match here for session refresh
-    // on authenticated API calls like /api/stripe/checkout)
-    '/api/:path*',
+    // Match all routes except static files, _next, and API routes that need to be public
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|json)$).*)',
   ],
 };

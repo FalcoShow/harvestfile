@@ -1,6 +1,6 @@
 // =============================================================================
-// HarvestFile - Inngest Client
-// Phase 3D: Background job orchestration
+// HarvestFile — Inngest Client
+// Phase 19: Added SMS alert event types
 // =============================================================================
 
 import { Inngest } from 'inngest';
@@ -11,6 +11,7 @@ export const inngest = new Inngest({
 });
 
 export type HarvestFileEvents = {
+  // ── Existing events ─────────────────────────────────────────────────────
   'app/alert.triggered': {
     data: {
       alertId: string;
@@ -36,6 +37,34 @@ export type HarvestFileEvents = {
   'app/user.converted': {
     data: {
       userId: string;
+    };
+  };
+
+  // ── Phase 19: SMS alert events ──────────────────────────────────────────
+  'app/sms.alert.send': {
+    data: {
+      subscriptionId: string;
+      phone: string;
+      timezone: string;
+      alertType: string;
+      commodity?: string;
+      currentPrice?: number;
+      threshold?: number;
+      condition?: string;
+      priceUnit?: string;
+      message?: string;
+    };
+  };
+  'app/wasde.released': {
+    data: {
+      summary: string;
+      reportDate?: string;
+    };
+  };
+  'app/enrollment.deadline.reminder': {
+    data: {
+      daysUntil: number;
+      deadlineDate: string;
     };
   };
 };
