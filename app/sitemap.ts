@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Dynamic Sitemap Generator
-// Phase 5A-2 → Phase 21A: Added /fba, /payments, /elections, OBBBA pages
+// Phase 5A-2 → Phase 21B: Added /sdrp to core pages
 //
 // Next.js App Router automatically serves this at /sitemap.xml
 // Now generates ~2,500+ URLs for county SEO pages + election map + OBBBA
@@ -29,6 +29,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/fba`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.95,
+    },
+    {
+      url: `${baseUrl}/sdrp`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.95,
