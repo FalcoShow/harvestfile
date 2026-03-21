@@ -1,15 +1,18 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// Phase 23 Build 1.1: iOS touch fix + z-index fix
+// Phase 23 Build 1.2: Reverted body lock to overflow:hidden (iOS safe)
 //
-// FIX: z-index bumped from z-[100] to z-[1100] — ABOVE the header (z-[999])
-// so the overlay and its close button always receive touch events on iOS.
-// Added -webkit-overflow-scrolling: touch for smooth iOS scrolling.
+// FIX: The position:fixed body lock from Build 1.1 caused the page to jump
+// to top on menu open and prevented the menu from rendering visibly.
+// Reverted to simple overflow:hidden + overscrollBehavior:contain which
+// works on both Safari and Chrome on iOS.
+//
+// KEPT from 1.1: z-[1100] (above header z-[999]), relative z-10 on hamburger
 // =============================================================================
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Logo } from "./logo";
 
@@ -36,36 +39,38 @@ const OTHER_LINKS = [
 export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
 
-  // Lock body scroll when menu is open
+  // Prevent background scroll on iOS — touchmove blocker approach
+  // This is the most reliable iOS Safari method, avoids position:fixed entirely
+  const preventTouchMove = useCallback((e: TouchEvent) => {
+    // Allow scrolling inside the menu overlay itself
+    const target = e.target as HTMLElement;
+    const menuContent = document.getElementById('hf-mobile-menu-content');
+    if (menuContent && menuContent.contains(target)) {
+      // Allow scroll inside menu content
+      return;
+    }
+    e.preventDefault();
+  }, []);
+
   useEffect(() => {
     if (open) {
+      // Simple overflow hidden — no position:fixed, no scroll jump
       document.body.style.overflow = "hidden";
-      // iOS Safari: prevent background scroll-through
-      document.body.style.position = "fixed";
-      document.body.style.width = "100%";
-      document.body.style.top = `-${window.scrollY}px`;
+      // Prevent iOS rubber-band scrolling on background
+      document.addEventListener('touchmove', preventTouchMove, { passive: false });
     } else {
-      const scrollY = document.body.style.top;
       document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
-      document.body.style.top = "";
-      // Restore scroll position when closing
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || "0") * -1);
-      }
+      document.removeEventListener('touchmove', preventTouchMove);
     }
     return () => {
       document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
-      document.body.style.top = "";
+      document.removeEventListener('touchmove', preventTouchMove);
     };
-  }, [open]);
+  }, [open, preventTouchMove]);
 
   return (
     <>
-      {/* Hamburger button — uses adaptive var(--nav-text) for visibility */}
+      {/* Hamburger button — relative z-10 keeps it above any sibling elements */}
       <button
         onClick={() => setOpen(true)}
         className="md:hidden p-2 -mr-2 rounded-lg transition-colors hover:bg-white/10 relative z-10"
@@ -88,15 +93,15 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
         </svg>
       </button>
 
-      {/* Full-screen overlay — z-[1100] to sit ABOVE header z-[999] */}
+      {/* Full-screen overlay — z-[1100] sits ABOVE header (z-[999]) */}
       {open && (
         <div
-          className="fixed inset-0 z-[1100] bg-[#0a0f0d]/98 backdrop-blur-xl md:hidden"
+          className="fixed inset-0 z-[1100] bg-[#0a0f0d] md:hidden"
           onClick={() => setOpen(false)}
         >
           <div
-            className="flex flex-col h-full overflow-y-auto"
-            style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+            id="hf-mobile-menu-content"
+            className="flex flex-col h-full overflow-y-auto overscroll-contain"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top bar with logo + close */}
