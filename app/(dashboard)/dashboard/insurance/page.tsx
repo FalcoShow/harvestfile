@@ -1,17 +1,25 @@
 // =============================================================================
-// HarvestFile — Phase 20 Build 4A: Coverage Optimizer + Monte Carlo Simulation
+// HarvestFile — Phase 20 Build 4B-1: Coverage Optimizer + Monte Carlo + Scatter
 // app/(dashboard)/dashboard/insurance/page.tsx
 //
 // THE FEATURE THAT MAKES HARVESTFILE WORTH BILLIONS.
 //
-// Build 4A adds:
+// Build 4B-1 adds:
+//   - Interactive risk-reward scatter plot (Recharts ScatterChart)
+//   - Payment probability vs Expected Net Benefit per strategy
+//   - Diamond shapes for ARC strategies, circles for PLC strategies
+//   - Glow effects on hover/select, quadrant shading for "sweet spot"
+//   - Hover tooltips with full strategy metrics
+//   - Break-even reference line and average quadrant markers
+//   - Interactive legend with hover highlight sync
+//
+// Build 4A preserved:
 //   - "Run 10,000 Simulations" button with premium staged loading animation
 //   - Monte Carlo results dashboard with Recharts probability histograms
 //   - Percentile bands (P5/P10/P25/P50/P75/P90/P95) for all strategies
 //   - Payment probability gauges (e.g. "78% chance of ARC payment")
 //   - AI-backed "Recommended Strategy" hero card with confidence score
 //   - Side-by-side scenario comparison with risk-reward metrics
-//   - Natural-language strategy explanations
 //
 // Previous builds preserved:
 //   - State/County cascading selector with ADM batch data
@@ -30,6 +38,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, Cell, CartesianGrid, AreaChart, Area,
+  ScatterChart, Scatter, ZAxis, ReferenceArea,
 } from 'recharts';
 
 import {
@@ -977,6 +986,9 @@ export default function InsurancePage() {
             ))}
           </div>
 
+          {/* ── Risk-Reward Scatter Plot (Build 4B) ── */}
+          <SimScatterPlot simResults={simResults} />
+
           {/* ── Best Scenario Histogram ── */}
           <SimHistogramChart simResults={simResults} />
 
@@ -1253,6 +1265,321 @@ function SimStrategyCard({ sim, rank, isBest, acres }: {
         <span>P50: ${(sim.netBenefit.p50 / acres).toFixed(0)}</span>
         <span>P95: ${(sim.netBenefit.p95 / acres).toFixed(0)}</span>
       </div>
+    </div>
+  );
+}
+
+// ─── Risk-Reward Scatter Plot (Build 4B-1) ──────────────────────────────────
+
+function SimScatterPlot({ simResults }: { simResults: SimulationResult }) {
+  const [hoveredScenario, setHoveredScenario] = useState<string | null>(null);
+  const acres = simResults.inputs.plantedAcres || 1;
+
+  // Build scatter data: one point per strategy
+  const scatterData = simResults.scenarios.map((s, i) => ({
+    scenario: s.scenario,
+    paymentProbability: s.paymentProbability,
+    expectedBenefit: s.expectedNetBenefitPerAcre,
+    worstCase: s.netBenefit.p5 / acres,
+    bestCase: s.netBenefit.p95 / acres,
+    premium: s.totalPremium / acres,
+    rank: i + 1,
+    label: SCENARIO_LABELS[s.scenario]?.shortLabel || s.scenario,
+    color: SCENARIO_COLORS[s.scenario] || C.textDim,
+    isBest: s.scenario === simResults.bestScenario,
+  }));
+
+  // Compute axis bounds with padding
+  const minX = Math.max(0, Math.min(...scatterData.map(d => d.paymentProbability)) - 8);
+  const maxX = Math.min(100, Math.max(...scatterData.map(d => d.paymentProbability)) + 8);
+  const minY = Math.min(0, Math.min(...scatterData.map(d => d.expectedBenefit)) - 5);
+  const maxY = Math.max(...scatterData.map(d => d.expectedBenefit)) + 8;
+
+  // Average lines for quadrant reference
+  const avgProb = scatterData.reduce((a, d) => a + d.paymentProbability, 0) / scatterData.length;
+  const avgBenefit = scatterData.reduce((a, d) => a + d.expectedBenefit, 0) / scatterData.length;
+
+  // Custom dot renderer with glow on best/hover
+  const renderDot = (props: {
+    cx: number; cy: number; payload: typeof scatterData[0];
+  }) => {
+    const { cx, cy, payload } = props;
+    const isHovered = hoveredScenario === payload.scenario;
+    const isBest = payload.isBest;
+    const r = isBest ? 14 : 11;
+    const glowR = r + 6;
+
+    // Shape by strategy type
+    const isArc = payload.scenario.startsWith('arc');
+
+    return (
+      <g key={payload.scenario}>
+        {/* Glow ring for best/hovered */}
+        {(isBest || isHovered) && (
+          <circle cx={cx} cy={cy} r={glowR}
+            fill="none" stroke={payload.color} strokeWidth={1.5}
+            strokeOpacity={0.35} strokeDasharray="3 3"
+          />
+        )}
+        {/* Outer halo */}
+        {(isBest || isHovered) && (
+          <circle cx={cx} cy={cy} r={r + 3}
+            fill={payload.color} fillOpacity={0.08}
+          />
+        )}
+        {/* Main dot — diamond for ARC, circle for PLC */}
+        {isArc ? (
+          <polygon
+            points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`}
+            fill={payload.color} fillOpacity={isHovered ? 0.95 : 0.85}
+            stroke={isHovered || isBest ? '#fff' : payload.color}
+            strokeWidth={isHovered || isBest ? 2 : 1}
+            strokeOpacity={isHovered || isBest ? 0.5 : 0.3}
+            style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+          />
+        ) : (
+          <circle cx={cx} cy={cy} r={r}
+            fill={payload.color} fillOpacity={isHovered ? 0.95 : 0.85}
+            stroke={isHovered || isBest ? '#fff' : payload.color}
+            strokeWidth={isHovered || isBest ? 2 : 1}
+            strokeOpacity={isHovered || isBest ? 0.5 : 0.3}
+            style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+          />
+        )}
+        {/* Rank number inside dot */}
+        <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
+          fill="#fff" fontSize={10} fontWeight={800}
+          style={{ pointerEvents: 'none' }}
+        >
+          {payload.rank}
+        </text>
+        {/* Best badge */}
+        {isBest && (
+          <text x={cx} y={cy - r - 8} textAnchor="middle"
+            fill={payload.color} fontSize={9} fontWeight={700}
+          >
+            ★ BEST
+          </text>
+        )}
+      </g>
+    );
+  };
+
+  // Custom tooltip
+  const ScatterTooltipContent = ({ active, payload }: {
+    active?: boolean;
+    payload?: Array<{ payload: typeof scatterData[0] }>;
+  }) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const d = payload[0].payload;
+    return (
+      <div style={{
+        background: 'rgba(17,25,22,0.97)', backdropFilter: 'blur(12px)',
+        border: `1px solid ${d.color}30`, borderRadius: 12,
+        padding: '12px 16px', boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${d.color}15`,
+        minWidth: 200, maxWidth: 260,
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: d.scenario.startsWith('arc') ? 1 : 4, background: d.color }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.textBright }}>{d.label}</span>
+          {d.isBest && (
+            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: `${d.color}20`, color: d.color, fontWeight: 700 }}>
+              ★ BEST
+            </span>
+          )}
+        </div>
+        {/* Metrics */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <TooltipRow label="Expected Benefit" value={`${d.expectedBenefit >= 0 ? '+' : ''}$${d.expectedBenefit.toFixed(2)}/ac`}
+            valueColor={d.expectedBenefit >= 0 ? C.green : C.red} />
+          <TooltipRow label="Payment Probability" value={`${Math.round(d.paymentProbability)}%`}
+            valueColor={d.paymentProbability >= 60 ? C.green : d.paymentProbability >= 30 ? C.amber : C.textDim} />
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '2px 0' }} />
+          <TooltipRow label="Worst Case (P5)" value={`$${d.worstCase.toFixed(2)}/ac`}
+            valueColor={d.worstCase >= 0 ? C.green : C.red} />
+          <TooltipRow label="Best Case (P95)" value={`+$${d.bestCase.toFixed(2)}/ac`} valueColor={C.green} />
+          <TooltipRow label="Premium Cost" value={`$${d.premium.toFixed(2)}/ac`} valueColor={C.textMid} />
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.cardBorder}`,
+      borderRadius: 16, padding: 24, marginBottom: 24,
+      position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Subtle background gradient */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse at 70% 30%, rgba(16,185,129,0.03) 0%, transparent 60%)',
+      }} />
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.textBright }}>
+            Risk vs. Reward
+          </span>
+          <span style={{
+            fontSize: 9, padding: '2px 8px', borderRadius: 20,
+            background: 'rgba(139,92,246,0.15)', color: C.purple, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+          }}>
+            Build 4B
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 20, maxWidth: 520 }}>
+          Each dot is a strategy. Upper-right = higher expected return with higher payment likelihood.
+          Diamonds = ARC-CO strategies · Circles = PLC strategies
+        </div>
+
+        {/* Chart */}
+        <div style={{ width: '100%', height: 320 }}>
+          <ResponsiveContainer>
+            <ScatterChart margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
+              <defs>
+                {/* Quadrant gradient for "sweet spot" zone */}
+                <linearGradient id="sweetSpot" x1="0.5" y1="1" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#10B981" stopOpacity={0} />
+                  <stop offset="100%" stopColor="#10B981" stopOpacity={0.04} />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+
+              {/* Sweet spot zone: high prob + high benefit */}
+              <ReferenceArea
+                x1={avgProb} x2={maxX} y1={avgBenefit} y2={maxY}
+                fill="url(#sweetSpot)" stroke="rgba(16,185,129,0.08)"
+                strokeDasharray="4 4"
+              />
+
+              <XAxis
+                dataKey="paymentProbability" type="number"
+                domain={[minX, maxX]}
+                tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
+                axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                tickLine={false}
+                tickFormatter={(v: number) => `${Math.round(v)}%`}
+                label={{
+                  value: 'Payment Probability →',
+                  position: 'insideBottom', offset: -8,
+                  fill: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600,
+                }}
+              />
+              <YAxis
+                dataKey="expectedBenefit" type="number"
+                domain={[minY, maxY]}
+                tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
+                axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                tickLine={false}
+                tickFormatter={(v: number) => `$${Math.round(v)}`}
+                label={{
+                  value: 'Expected Net Benefit ($/ac) →',
+                  angle: -90, position: 'insideLeft', offset: 10,
+                  fill: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600,
+                }}
+              />
+              <ZAxis range={[800, 800]} />
+
+              {/* Break-even reference line */}
+              <ReferenceLine y={0} stroke="rgba(239,68,68,0.3)" strokeDasharray="5 5"
+                label={{ value: 'Break Even', position: 'right', fill: 'rgba(239,68,68,0.4)', fontSize: 9, fontWeight: 600 }}
+              />
+
+              {/* Average reference lines (subtle) */}
+              <ReferenceLine x={avgProb} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+              <ReferenceLine y={avgBenefit} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+
+              <Tooltip content={<ScatterTooltipContent />} cursor={{ stroke: 'rgba(255,255,255,0.08)', strokeDasharray: '4 4' }} />
+
+              <Scatter
+                data={scatterData}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                shape={(props: any) => renderDot(props as { cx: number; cy: number; payload: typeof scatterData[0] })}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onMouseEnter={(data: any) => {
+                  if (data?.scenario) setHoveredScenario(data.scenario);
+                }}
+                onMouseLeave={() => setHoveredScenario(null)}
+              />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Legend */}
+        <div style={{
+          display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8,
+          flexWrap: 'wrap',
+        }}>
+          {scatterData.map(d => (
+            <div key={d.scenario}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', borderRadius: 8,
+                background: hoveredScenario === d.scenario ? 'rgba(255,255,255,0.05)' : 'transparent',
+                cursor: 'pointer', transition: 'background 0.2s',
+              }}
+              onMouseEnter={() => setHoveredScenario(d.scenario)}
+              onMouseLeave={() => setHoveredScenario(null)}
+            >
+              {/* Shape indicator */}
+              {d.scenario.startsWith('arc') ? (
+                <svg width="10" height="10" viewBox="0 0 10 10">
+                  <polygon points="5,0 10,5 5,10 0,5" fill={d.color} fillOpacity={0.8} />
+                </svg>
+              ) : (
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, opacity: 0.8 }} />
+              )}
+              <span style={{
+                fontSize: 10, color: hoveredScenario === d.scenario ? C.textBright : C.textDim,
+                fontWeight: hoveredScenario === d.scenario ? 600 : 400,
+                transition: 'all 0.2s',
+              }}>
+                {d.label}
+              </span>
+              {d.isBest && (
+                <span style={{ fontSize: 8, color: d.color, fontWeight: 700 }}>★</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Quadrant labels */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 4px' }}>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>
+            ← Lower probability
+          </span>
+          <span style={{ fontSize: 9, color: 'rgba(16,185,129,0.3)', fontWeight: 600 }}>
+            Sweet Spot →
+          </span>
+        </div>
+      </div>
+
+      {/* Annotation */}
+      <div style={{
+        marginTop: 12, fontSize: 10, color: C.textDim, lineHeight: 1.5,
+        padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.03)',
+      }}>
+        Based on {simResults.iterations.toLocaleString()} Monte Carlo simulations
+        {simResults.inputs.countyYield ? ` · County yield: ${simResults.inputs.countyYield} bu/ac` : ''}
+        {' · '}Coverage: {simResults.inputs.coverageLevel}% RP
+      </div>
+    </div>
+  );
+}
+
+// ─── Tooltip Row Helper ─────────────────────────────────────────────────────
+
+function TooltipRow({ label, value, valueColor }: { label: string; value: string; valueColor: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+      <span style={{ fontSize: 11, color: C.textDim }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: valueColor, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     </div>
   );
 }
