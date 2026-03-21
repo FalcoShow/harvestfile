@@ -1,17 +1,15 @@
 // =============================================================================
 // HarvestFile — HeaderScrollWrapper (Client Component)
-// Phase 9 Build 1.5: Cinematic Homepage Polish
+// Phase 23 Build 1: Added dropdown CSS custom properties
 //
 // ADAPTIVE NAVIGATION that changes appearance based on:
 //   1. Scroll position (has user scrolled past hero?)
 //   2. Current section theme (dark vs light background)
 //
 // States:
-//   - Initial (hero visible): Fully transparent, white text, no border
+//   - Initial (hero visible): Fully transparent, white text
 //   - Scrolled + dark section: Dark frosted glass, white text
 //   - Scrolled + light section: Light frosted glass, dark text
-//
-// This eliminates the "hard white strip" problem on the dark hero.
 // =============================================================================
 
 'use client';
@@ -33,7 +31,6 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
     // Track which section is behind the nav using Intersection Observer
     const observer = new IntersectionObserver(
       (entries) => {
-        // Find the entry that is most visible at the top of viewport
         for (const entry of entries) {
           if (entry.isIntersecting) {
             const theme = entry.target.getAttribute('data-nav-theme');
@@ -44,13 +41,11 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
         }
       },
       {
-        // Only observe the top 100px of the viewport (where the nav sits)
         rootMargin: '0px 0px -90% 0px',
         threshold: [0, 0.1],
       }
     );
 
-    // Observe all sections with data-nav-theme
     const sections = document.querySelectorAll('[data-nav-theme]');
     sections.forEach((section) => observer.observe(section));
 
@@ -60,8 +55,8 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Determine nav visual state
   const isOnDark = navTheme === 'dark';
+  const useDarkMode = !scrolled || isOnDark;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-[999] px-4 sm:px-6">
@@ -71,26 +66,28 @@ export function HeaderScrollWrapper({ children }: { children: ReactNode }) {
           transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
           ${scrolled
             ? isOnDark
-              // Scrolled + dark section: dark frosted glass
               ? 'bg-[#0C1F17]/80 backdrop-blur-2xl border border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.3)]'
-              // Scrolled + light section: light frosted glass  
               : 'bg-white/80 backdrop-blur-2xl border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.06)]'
-            // Not scrolled: fully transparent, no border
             : 'bg-transparent border border-transparent'
           }
         `}
       >
         <div className="px-5 sm:px-6">
-          {/* Inject CSS custom properties for child text colors */}
+          {/* Inject CSS custom properties for child text colors + dropdown */}
           <div
             style={{
-              // When not scrolled OR on dark background: white text
-              // When scrolled on light background: dark text
-              ['--nav-text' as string]: (!scrolled || isOnDark) ? 'rgba(255,255,255,0.85)' : '#1A1A1A',
-              ['--nav-text-muted' as string]: (!scrolled || isOnDark) ? 'rgba(255,255,255,0.5)' : 'rgba(26,26,26,0.55)',
-              ['--nav-cta-bg' as string]: (!scrolled || isOnDark) ? '#C9A84C' : '#1B4332',
-              ['--nav-cta-text' as string]: (!scrolled || isOnDark) ? '#0C1F17' : '#FFFFFF',
-              ['--nav-cta-hover' as string]: (!scrolled || isOnDark) ? '#E2C366' : '#2D6A4F',
+              ['--nav-text' as string]: useDarkMode ? 'rgba(255,255,255,0.85)' : '#1A1A1A',
+              ['--nav-text-muted' as string]: useDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(26,26,26,0.55)',
+              ['--nav-cta-bg' as string]: useDarkMode ? '#C9A84C' : '#1B4332',
+              ['--nav-cta-text' as string]: useDarkMode ? '#0C1F17' : '#FFFFFF',
+              ['--nav-cta-hover' as string]: useDarkMode ? '#E2C366' : '#2D6A4F',
+              // Dropdown always renders dark regardless of nav scroll state
+              // This ensures readability and premium feel
+              ['--dropdown-bg' as string]: 'rgba(12,31,23,0.97)',
+              ['--dropdown-border' as string]: 'rgba(255,255,255,0.08)',
+              ['--dropdown-text' as string]: 'rgba(255,255,255,0.85)',
+              ['--dropdown-muted' as string]: 'rgba(255,255,255,0.35)',
+              ['--dropdown-icon' as string]: 'rgba(255,255,255,0.4)',
             } as React.CSSProperties}
           >
             {children}

@@ -1,12 +1,13 @@
 // =============================================================================
 // HarvestFile — Marketing Header (Server Component)
-// Phase 9 Build 1.5: Cinematic Homepage Polish
+// Phase 23 Build 1: Navigation Overhaul
 //
-// ADAPTIVE HEADER — text colors are driven by CSS custom properties
-// injected by HeaderScrollWrapper based on scroll position and section theme.
-// This means nav text is white on dark backgrounds and dark on light backgrounds.
-//
-// Auth-aware: shows "Go to Dashboard" when logged in, "Log in" + "Get Started" when not.
+// CHANGES:
+//   - "Free Tools" dropdown replaces single "Calculator" link
+//   - All 6 free tools visible with icons and descriptions
+//   - Clean nav: Free Tools | Election Map | OBBBA Guide | Pricing | About
+//   - Auth-aware CTA (Dashboard vs Get Started)
+//   - Adaptive text colors via CSS custom properties from HeaderScrollWrapper
 // =============================================================================
 
 import Link from 'next/link';
@@ -14,6 +15,7 @@ import { createClient } from '@/lib/supabase/server';
 import { HeaderScrollWrapper } from './header-scroll-wrapper';
 import { MobileMenu } from './mobile-menu';
 import { Logo } from './logo';
+import { ToolsDropdown } from './tools-dropdown';
 
 export async function MarketingHeader() {
   const supabase = await createClient();
@@ -38,13 +40,14 @@ export async function MarketingHeader() {
         </Link>
 
         {/* Desktop nav links */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-7">
+          {/* Free Tools dropdown — client component */}
+          <ToolsDropdown />
+
           {[
-            { href: '/check', label: 'Calculator' },
             { href: '/elections', label: 'Election Map' },
             { href: '/obbba', label: 'OBBBA Guide' },
             { href: '/pricing', label: 'Pricing' },
-            { href: '/programs/arc-co', label: 'Programs' },
             { href: '/about', label: 'About' },
           ].map((link) => (
             <Link

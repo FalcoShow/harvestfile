@@ -1,24 +1,29 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Build 2 → Phase 8C Build 4: Added Election Map + OBBBA Guide links
+// Phase 23 Build 1: Navigation Overhaul — All 6 free tools in footer
 // =============================================================================
 
 import Link from "next/link";
 import { Logo } from "./logo";
 
 const footerLinks = {
-  Tools: [
+  "Free Tools": [
+    { label: "Election Optimizer", href: "/optimize" },
     { label: "ARC/PLC Calculator", href: "/check" },
-    { label: "Election Map", href: "/elections" },
-    { label: "Pricing", href: "/pricing" },
+    { label: "Payment Scanner", href: "/payments" },
+    { label: "Base Acre Calculator", href: "/fba" },
+    { label: "SDRP Checker", href: "/sdrp" },
+    { label: "Policy Calendar", href: "/calendar" },
   ],
   Learn: [
     { label: "OBBBA Guide", href: "/obbba" },
+    { label: "Election Map", href: "/elections" },
     { label: "How ARC-CO Works", href: "/programs/arc-co" },
     { label: "How PLC Works", href: "/programs/plc" },
     { label: "EQIP Guide", href: "/programs/eqip" },
   ],
   Company: [
+    { label: "Pricing", href: "/pricing" },
     { label: "About", href: "/about" },
     { label: "Contact", href: "mailto:hello@harvestfile.com" },
     { label: "Privacy Policy", href: "/privacy" },
@@ -43,7 +48,7 @@ export function MarketingFooter() {
               </span>
             </Link>
             <p className="text-[13px] text-white/20 leading-relaxed max-w-[240px]">
-              Making USDA farm program data work for American farmers.
+              The TurboTax of USDA farm programs. Free tools powered by live USDA data.
             </p>
           </div>
 
@@ -59,7 +64,7 @@ export function MarketingFooter() {
                     <a
                       key={link.label}
                       href={link.href}
-                      className="block text-[13px] text-white/20 hover:text-white/50 transition-colors"
+                      className="block text-[13px] text-white/30 hover:text-harvest-gold transition-colors duration-200"
                     >
                       {link.label}
                     </a>
@@ -67,7 +72,7 @@ export function MarketingFooter() {
                     <Link
                       key={link.label}
                       href={link.href}
-                      className="block text-[13px] text-white/20 hover:text-white/50 transition-colors"
+                      className="block text-[13px] text-white/30 hover:text-harvest-gold transition-colors duration-200"
                     >
                       {link.label}
                     </Link>
@@ -79,13 +84,13 @@ export function MarketingFooter() {
         </div>
 
         {/* Bottom bar */}
-        <div className="border-t border-white/[0.04] pt-5 flex flex-wrap justify-between gap-3">
-          <span className="text-[11px] text-white/[0.12]">
-            © 2026 HarvestFile LLC. All rights reserved.
-          </span>
-          <span className="text-[10px] text-white/[0.08] max-w-[420px]">
-            Uses NASS API. Not endorsed by NASS or affiliated with USDA/FSA.
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.06] pt-6">
+          <p className="text-[11px] text-white/15">
+            © {new Date().getFullYear()} HarvestFile LLC. All rights reserved.
+          </p>
+          <p className="text-[11px] text-white/15">
+            Not affiliated with USDA or any government agency.
+          </p>
         </div>
       </div>
     </footer>

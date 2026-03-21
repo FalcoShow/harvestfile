@@ -16,7 +16,7 @@
 //   invoice.paid                    — confirms successful payment
 //   invoice.payment_failed          — marks account past_due
 //
-// Auth chain: auth.users → professionals (auth_user_id) → organizations (org_id)
+// Auth chain: auth.users → professionals (auth_id) → organizations (org_id)
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -54,11 +54,12 @@ function getSubFields(sub: any) {
 }
 
 // ── Helper: Find organization by Supabase user ID ───────────────────────────
+// FIXED Phase 23 Build 1: auth_user_id → auth_id (the actual column name)
 async function findOrgByUserId(userId: string): Promise<string | null> {
   const { data: professional } = await supabaseAdmin
     .from('professionals')
     .select('org_id')
-    .eq('auth_user_id', userId)
+    .eq('auth_id', userId)
     .single();
 
   return professional?.org_id || null;
