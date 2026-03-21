@@ -1,5 +1,5 @@
 // =============================================================================
-// HarvestFile — Phase 20 Build 4B-2: Coverage Optimizer + Monte Carlo + Drawer
+// HarvestFile — Phase 20 Build 4B-3: Coverage Optimizer + AI Strategy Insights
 // app/(dashboard)/dashboard/insurance/page.tsx
 //
 // THE FEATURE THAT MAKES HARVESTFILE WORTH BILLIONS.
@@ -1617,16 +1617,73 @@ function StrategyDetailDrawer({ simResults, scenarioId, onClose }: {
   scenarioId: string | null;
   onClose: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'percentiles' | 'distribution'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'percentiles' | 'distribution' | 'ai'>('overview');
   const drawerRef = useRef<HTMLDivElement>(null);
   const isOpen = scenarioId !== null;
   const sim = simResults.scenarios.find(s => s.scenario === scenarioId);
   const acres = simResults.inputs.plantedAcres || 1;
 
-  // Reset tab when drawer opens with new scenario
+  // ── Build 4B-3: AI explanation state ──
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSource, setAiSource] = useState<'ai' | 'template' | 'cache' | null>(null);
+
+  // Reset tab and AI state when drawer opens with new scenario
   useEffect(() => {
-    if (scenarioId) setActiveTab('overview');
+    if (scenarioId) {
+      setActiveTab('overview');
+      setAiExplanation(null);
+      setAiSource(null);
+    }
   }, [scenarioId]);
+
+  // Fetch AI explanation when AI tab is selected
+  useEffect(() => {
+    if (activeTab !== 'ai' || !sim || aiExplanation || aiLoading) return;
+
+    const fetchExplanation = async () => {
+      setAiLoading(true);
+      try {
+        const res = await fetch('/api/insurance/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scenario: sim.scenario,
+            scenarioLabel: SCENARIO_LABELS[sim.scenario]?.shortLabel || sim.scenario,
+            commodity: simResults.inputs.commodity,
+            coverageLevel: simResults.inputs.coverageLevel,
+            expectedNetBenefitPerAcre: sim.expectedNetBenefitPerAcre,
+            paymentProbability: sim.paymentProbability,
+            p5PerAcre: sim.netBenefit.p5 / acres,
+            p50PerAcre: sim.netBenefit.p50 / acres,
+            p95PerAcre: sim.netBenefit.p95 / acres,
+            rpProbability: sim.rpPaymentProbability,
+            arcProbability: sim.arcPaymentProbability,
+            plcProbability: sim.plcPaymentProbability,
+            scoProbability: sim.scoPaymentProbability,
+            ecoProbability: sim.ecoPaymentProbability,
+            totalPremiumPerAcre: sim.totalPremium / acres,
+            isBest: sim.scenario === simResults.bestScenario,
+            iterations: simResults.iterations,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && data.explanation) {
+          setAiExplanation(data.explanation);
+          setAiSource(data.source || 'ai');
+        } else {
+          setAiExplanation('Unable to generate explanation at this time. Please try again.');
+          setAiSource('template');
+        }
+      } catch {
+        setAiExplanation('Unable to connect to the AI service. The strategy data above tells the full story.');
+        setAiSource('template');
+      }
+      setAiLoading(false);
+    };
+
+    fetchExplanation();
+  }, [activeTab, sim, aiExplanation, aiLoading, simResults, acres]);
 
   // Close on Escape key
   useEffect(() => {
@@ -1676,10 +1733,11 @@ function StrategyDetailDrawer({ simResults, scenarioId, onClose }: {
     p95: { label: 'P95 (Best Case)', risk: 'low' },
   };
 
-  const tabs: { id: 'overview' | 'percentiles' | 'distribution'; label: string }[] = [
+  const tabs: { id: 'overview' | 'percentiles' | 'distribution' | 'ai'; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'percentiles', label: 'Percentiles' },
     { id: 'distribution', label: 'Distribution' },
+    { id: 'ai', label: '✨ AI Insights' },
   ];
 
   // Per-acre histogram for this strategy
@@ -2044,6 +2102,139 @@ function StrategyDetailDrawer({ simResults, scenarioId, onClose }: {
                   Mean
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* AI INSIGHTS TAB (Build 4B-3) */}
+          {activeTab === 'ai' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 18 }}>✨</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.textBright }}>
+                    AI Strategy Analysis
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim }}>
+                    Powered by Claude AI · Plain-English explanation
+                  </div>
+                </div>
+              </div>
+
+              {/* Loading state */}
+              {aiLoading && (
+                <div style={{
+                  padding: 32, textAlign: 'center',
+                  background: `${color}05`, borderRadius: 16,
+                  border: `1px solid ${color}15`,
+                }}>
+                  <div style={{
+                    width: 40, height: 40, margin: '0 auto 16px',
+                    borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)',
+                    borderTopColor: color, animation: 'spin 0.8s linear infinite',
+                  }} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color }}>
+                    Generating your personalized analysis…
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
+                    Claude AI is analyzing {simResults.iterations.toLocaleString()} simulation results
+                  </div>
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                </div>
+              )}
+
+              {/* AI explanation result */}
+              {aiExplanation && !aiLoading && (
+                <div>
+                  {/* Main explanation card */}
+                  <div style={{
+                    padding: '24px 20px', borderRadius: 16,
+                    background: `linear-gradient(135deg, ${color}08, ${color}03)`,
+                    border: `1px solid ${color}20`,
+                    position: 'relative', overflow: 'hidden',
+                  }}>
+                    {/* Ambient glow */}
+                    <div style={{
+                      position: 'absolute', top: -20, right: -20, width: 100, height: 100,
+                      background: `radial-gradient(circle, ${color}10 0%, transparent 70%)`,
+                      borderRadius: '50%', pointerEvents: 'none',
+                    }} />
+
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                      <div style={{
+                        fontSize: 28, color: `${color}30`, fontFamily: 'Georgia, serif',
+                        lineHeight: 1, marginBottom: 8,
+                      }}>
+                        &ldquo;
+                      </div>
+
+                      <p style={{
+                        fontSize: 15, lineHeight: 1.8, color: C.textBright,
+                        fontWeight: 400, margin: 0, letterSpacing: '0.01em',
+                      }}>
+                        {aiExplanation}
+                      </p>
+
+                      <div style={{
+                        marginTop: 16, display: 'flex', alignItems: 'center', gap: 8,
+                        justifyContent: 'space-between', flexWrap: 'wrap',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{
+                            width: 20, height: 20, borderRadius: 6,
+                            background: `${color}20`, display: 'flex',
+                            alignItems: 'center', justifyContent: 'center', fontSize: 10,
+                          }}>
+                            ✨
+                          </div>
+                          <span style={{ fontSize: 10, color: C.textDim, fontWeight: 500 }}>
+                            HarvestFile AI Advisor
+                          </span>
+                        </div>
+                        <span style={{
+                          fontSize: 9, padding: '2px 8px', borderRadius: 10,
+                          background: aiSource === 'ai' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
+                          color: aiSource === 'ai' ? C.emerald : C.amber,
+                          fontWeight: 600,
+                        }}>
+                          {aiSource === 'ai' ? 'AI Generated' : aiSource === 'cache' ? 'Cached' : 'Template'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick context cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>Strategy</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color }}>{label?.shortLabel}</div>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>Confidence</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.textBright }}>{simResults.iterations.toLocaleString()} sims</div>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>Expected Return</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: sim.expectedNetBenefitPerAcre >= 0 ? C.green : C.red }}>
+                        {sim.expectedNetBenefitPerAcre >= 0 ? '+' : ''}${sim.expectedNetBenefitPerAcre.toFixed(2)}/ac
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', marginBottom: 3 }}>Pays In</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.textBright }}>{Math.round(sim.paymentProbability)} of 100 scenarios</div>
+                    </div>
+                  </div>
+
+                  {/* Disclaimer */}
+                  <div style={{
+                    marginTop: 16, fontSize: 10, color: C.textDim, lineHeight: 1.5,
+                    padding: '8px 12px', borderRadius: 8,
+                    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.03)',
+                  }}>
+                    AI-generated analysis based on Monte Carlo simulation results. This is decision support — not financial advice.
+                    Always consult your crop insurance agent and local FSA office before making program elections.
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
