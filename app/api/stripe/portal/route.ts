@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const { data: professional } = await supabase
       .from('professionals')
       .select('org_id')
-      .eq('auth_user_id', user.id)
+      .eq('auth_id', user.id)
       .single();
 
     if (!professional?.org_id) {
