@@ -258,10 +258,10 @@ export default function PricingPage() {
       return (
         <a
           href="mailto:hello@harvestfile.com"
-          className="flex items-center justify-center w-full py-3 rounded-[12px] text-[13px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75"
+          className="flex items-center justify-center w-full py-3.5 rounded-[12px] text-[15px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
         >
-          Contact Sales &rarr;
+          Contact Sales
         </a>
       );
     }
@@ -271,10 +271,10 @@ export default function PricingPage() {
         <button
           onClick={handlePortal}
           disabled={loadingTier === "portal"}
-          className="flex items-center justify-center w-full py-3 rounded-[12px] text-[13px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 cursor-pointer disabled:opacity-50"
+          className="flex items-center justify-center w-full py-3.5 rounded-[12px] text-[15px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 cursor-pointer disabled:opacity-50"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
         >
-          {loadingTier === "portal" ? "Opening..." : "Manage Subscription \u2192"}
+          {loadingTier === "portal" ? "Opening..." : "Manage Subscription"}
         </button>
       );
     }
@@ -285,14 +285,14 @@ export default function PricingPage() {
         <button
           onClick={() => handleCheckout(tier.name)}
           disabled={isLoading}
-          className="flex items-center justify-center w-full py-3 rounded-[12px] text-[13px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 cursor-pointer disabled:opacity-50"
+          className="flex items-center justify-center w-full py-3.5 rounded-[12px] text-[15px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 cursor-pointer disabled:opacity-50"
           style={
             tier.highlighted
               ? { background: "linear-gradient(90deg, #9E7E30, #C9A84C, #E2C366, #C9A84C, #9E7E30)", backgroundSize: "200% auto", animation: isLoading ? "none" : "hf-shimmer 3s linear infinite", color: "#0C1F17", boxShadow: "0 4px 20px rgba(201,168,76,0.2)" }
               : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }
           }
         >
-          {isLoading ? "Redirecting to Checkout..." : "Subscribe \u2192"}
+          {isLoading ? "Redirecting to Checkout..." : "Subscribe"}
         </button>
       );
     }
@@ -300,14 +300,14 @@ export default function PricingPage() {
     return (
       <Link
         href="/signup"
-        className="flex items-center justify-center w-full py-3 rounded-[12px] text-[13px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75"
+        className="flex items-center justify-center w-full py-3.5 rounded-[12px] text-[15px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 active:scale-[0.98] active:duration-75"
         style={
           tier.highlighted
             ? { background: "linear-gradient(90deg, #9E7E30, #C9A84C, #E2C366, #C9A84C, #9E7E30)", backgroundSize: "200% auto", animation: "hf-shimmer 3s linear infinite", color: "#0C1F17", boxShadow: "0 4px 20px rgba(201,168,76,0.2)" }
             : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }
         }
       >
-        Start Free Trial &rarr;
+        Start Free Trial
       </Link>
     );
   }
