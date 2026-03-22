@@ -1,10 +1,11 @@
 // =============================================================================
 // HarvestFile — Marketing Header (Server Component)
-// Phase 23 Build 1: Navigation Overhaul
+// Phase 25 Build 2: Added "Find County" search trigger (Cmd+K command palette)
 //
 // CHANGES:
 //   - "Free Tools" dropdown replaces single "Calculator" link
-//   - All 6 free tools visible with icons and descriptions
+//   - All 7 free tools visible with icons and descriptions
+//   - "Find County" search icon + Cmd+K shortcut hint between nav and CTAs
 //   - Clean nav: Free Tools | Election Map | OBBBA Guide | Pricing | About
 //   - Auth-aware CTA (Dashboard vs Get Started)
 //   - Adaptive text colors via CSS custom properties from HeaderScrollWrapper
@@ -16,6 +17,7 @@ import { HeaderScrollWrapper } from './header-scroll-wrapper';
 import { MobileMenu } from './mobile-menu';
 import { Logo } from './logo';
 import { ToolsDropdown } from './tools-dropdown';
+import { HeaderCountySearch } from './header-county-search';
 
 export async function MarketingHeader() {
   const supabase = await createClient();
@@ -61,8 +63,14 @@ export async function MarketingHeader() {
           ))}
         </div>
 
-        {/* Desktop CTAs */}
+        {/* Desktop: Search + CTAs */}
         <div className="hidden md:flex items-center gap-3">
+          {/* County search trigger — Cmd+K command palette */}
+          <HeaderCountySearch />
+
+          {/* Subtle divider */}
+          <div className="w-px h-5 bg-current opacity-10" style={{ color: 'var(--nav-text)' }} />
+
           {isAuthenticated ? (
             <Link
               href="/dashboard"
@@ -97,8 +105,11 @@ export async function MarketingHeader() {
           )}
         </div>
 
-        {/* Mobile menu */}
-        <MobileMenu isAuthenticated={isAuthenticated} />
+        {/* Mobile: Search icon + hamburger */}
+        <div className="flex md:hidden items-center gap-1">
+          <HeaderCountySearch />
+          <MobileMenu isAuthenticated={isAuthenticated} />
+        </div>
       </nav>
     </HeaderScrollWrapper>
   );
