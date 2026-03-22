@@ -1,194 +1,149 @@
 // =============================================================================
-// HarvestFile — Dynamic Sitemap Generator
-// Phase 24A Build 2: Added /insurance to core pages (7 free tools)
+// HarvestFile — Segmented Sitemap Generator
+// Phase 25 Build 2 Part 2: Segmented sitemaps for better GSC monitoring
 //
-// Next.js App Router automatically serves this at /sitemap.xml
-// Now generates ~2,500+ URLs for county SEO pages + election map + OBBBA
+// Next.js 14.2+ supports generateSitemaps() which creates a sitemap index
+// at /sitemap.xml pointing to /sitemap/0.xml, /sitemap/1.xml, etc.
+//
+// Segments:
+//   0 = Core pages (tools, programs, OBBBA, auth, legal)
+//   1 = State hub pages (/{state}/arc-plc)
+//   2+ = County pages (paginated in batches of 2,000)
+//
+// Google ignores <priority> and <changefreq> but we keep lastmod accurate.
 // =============================================================================
 
 import { MetadataRoute } from 'next';
 import { supabasePublic } from '@/lib/supabase/public';
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+// ── Generate sitemap index entries ──────────────────────────────────────
+export async function generateSitemaps() {
+  // Count total counties for pagination
+  let totalCounties = 0;
+  try {
+    const { count } = await supabasePublic
+      .from('counties')
+      .select('*', { count: 'exact', head: true })
+      .eq('has_arc_plc_data', true);
+    totalCounties = count || 0;
+  } catch {
+    totalCounties = 2500; // Fallback estimate
+  }
+
+  const countySitemapCount = Math.ceil(totalCounties / 2000);
+
+  // Segment 0 = core pages, Segment 1 = state hubs, Segment 2+ = counties
+  const ids = [
+    { id: 0 },  // Core pages
+    { id: 1 },  // State hubs
+  ];
+
+  for (let i = 0; i < countySitemapCount; i++) {
+    ids.push({ id: 2 + i });
+  }
+
+  return ids;
+}
+
+// ── Generate sitemap for each segment ───────────────────────────────────
+export default async function sitemap({
+  id,
+}: {
+  id: number;
+}): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://harvestfile.com';
   const now = new Date();
 
-  // ── Core marketing pages (highest priority) ───────────────────────────
-  const corePages: MetadataRoute.Sitemap = [
-    {
-      url: baseUrl,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 1.0,
-    },
-    {
-      url: `${baseUrl}/check`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.95,
-    },
-    {
-      url: `${baseUrl}/insurance`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.95,
-    },
-    {
-      url: `${baseUrl}/fba`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.95,
-    },
-    {
-      url: `${baseUrl}/sdrp`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.95,
-    },
-    {
-      url: `${baseUrl}/calendar`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.95,
-    },
-    {
-      url: `${baseUrl}/optimize`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.95,
-    },
-    {
-      url: `${baseUrl}/payments`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/elections`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/obbba`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/pricing`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.85,
-    },
-    {
-      url: `${baseUrl}/about`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/report`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.75,
-    },
-  ];
+  // ── Segment 0: Core pages ─────────────────────────────────────────────
+  if (id === 0) {
+    return [
+      // Homepage
+      { url: baseUrl, lastModified: now, changeFrequency: 'weekly', priority: 1.0 },
 
-  // ── USDA program guide pages ──────────────────────────────────────────
-  const programPages: MetadataRoute.Sitemap = [
-    'arc-co', 'plc', 'eqip', 'crp', 'csp',
-  ].map((program) => ({
-    url: `${baseUrl}/programs/${program}`,
-    lastModified: now,
-    changeFrequency: 'monthly' as const,
-    priority: 0.8,
-  }));
+      // Free tools (highest value pages)
+      { url: `${baseUrl}/check`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
+      { url: `${baseUrl}/insurance`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
+      { url: `${baseUrl}/optimize`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
+      { url: `${baseUrl}/payments`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+      { url: `${baseUrl}/fba`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+      { url: `${baseUrl}/sdrp`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+      { url: `${baseUrl}/calendar`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
 
-  // ── OBBBA content cluster pages ───────────────────────────────────────
-  const obbbaPages: MetadataRoute.Sitemap = [
-    'new-base-acres', 'arc-sco-stacking',
-  ].map((slug) => ({
-    url: `${baseUrl}/obbba/${slug}`,
-    lastModified: now,
-    changeFrequency: 'monthly' as const,
-    priority: 0.8,
-  }));
+      // Data pages
+      { url: `${baseUrl}/elections`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
 
-  // ── Auth pages ────────────────────────────────────────────────────────
-  const authPages: MetadataRoute.Sitemap = [
-    { url: `${baseUrl}/login`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-  ];
+      // OBBBA content hub
+      { url: `${baseUrl}/obbba`, lastModified: now, changeFrequency: 'monthly', priority: 0.85 },
+      { url: `${baseUrl}/obbba/arc-sco-stacking`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
+      { url: `${baseUrl}/obbba/new-base-acres`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
 
-  // ── Legal pages ───────────────────────────────────────────────────────
-  const legalPages: MetadataRoute.Sitemap = [
-    { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
-    { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
-  ];
+      // Program guides
+      { url: `${baseUrl}/programs/arc-co`, lastModified: now, changeFrequency: 'monthly', priority: 0.75 },
+      { url: `${baseUrl}/programs/plc`, lastModified: now, changeFrequency: 'monthly', priority: 0.75 },
+      { url: `${baseUrl}/programs/eqip`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+      { url: `${baseUrl}/programs/crp`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+      { url: `${baseUrl}/programs/csp`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
 
-  // ── State hub pages (high priority — hub in hub-and-spoke) ────────────
-  let statePages: MetadataRoute.Sitemap = [];
+      // Company pages
+      { url: `${baseUrl}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+      { url: `${baseUrl}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+
+      // Auth pages
+      { url: `${baseUrl}/login`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+      { url: `${baseUrl}/signup`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+
+      // Legal
+      { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
+      { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
+    ];
+  }
+
+  // ── Segment 1: State hub pages ────────────────────────────────────────
+  if (id === 1) {
+    try {
+      const { data: states } = await supabasePublic
+        .from('states')
+        .select('slug')
+        .gt('county_count', 0);
+
+      if (states) {
+        return states.map((s) => ({
+          url: `${baseUrl}/${s.slug}/arc-plc`,
+          lastModified: now,
+          changeFrequency: 'weekly' as const,
+          priority: 0.85,
+        }));
+      }
+    } catch (err) {
+      console.error('Sitemap segment 1 (states) error:', err);
+    }
+    return [];
+  }
+
+  // ── Segment 2+: County pages (paginated) ──────────────────────────────
+  const countyBatchIndex = id - 2;
+  const batchSize = 2000;
+  const offset = countyBatchIndex * batchSize;
+
   try {
-    const { data: states } = await supabasePublic
-      .from('states')
-      .select('slug')
-      .gt('county_count', 0);
+    const { data } = await supabasePublic
+      .from('counties')
+      .select('slug, states!inner(slug)')
+      .eq('has_arc_plc_data', true)
+      .order('county_fips')
+      .range(offset, offset + batchSize - 1);
 
-    if (states) {
-      statePages = states.map((s) => ({
-        url: `${baseUrl}/${s.slug}/arc-plc`,
+    if (data) {
+      return data.map((c: any) => ({
+        url: `${baseUrl}/${c.states.slug}/${c.slug}/arc-plc`,
         lastModified: now,
         changeFrequency: 'weekly' as const,
-        priority: 0.85,
+        priority: 0.7,
       }));
     }
   } catch (err) {
-    console.error('Sitemap: Failed to fetch states:', err);
+    console.error(`Sitemap segment ${id} (counties batch ${countyBatchIndex}) error:`, err);
   }
 
-  // ── County pages (the 2,000+ SEO pages) ───────────────────────────────
-  let countyPages: MetadataRoute.Sitemap = [];
-  try {
-    // Fetch all counties with their state slug via a join
-    // Supabase JS client limits to 1000 rows, so we paginate
-    let allCounties: { slug: string; states: { slug: string } }[] = [];
-    let offset = 0;
-    const pageSize = 1000;
-    let hasMore = true;
-
-    while (hasMore) {
-      const { data } = await supabasePublic
-        .from('counties')
-        .select('slug, states!inner(slug)')
-        .eq('has_arc_plc_data', true)
-        .range(offset, offset + pageSize - 1);
-
-      if (data && data.length > 0) {
-        allCounties = allCounties.concat(data as any);
-        offset += pageSize;
-        if (data.length < pageSize) hasMore = false;
-      } else {
-        hasMore = false;
-      }
-    }
-
-    countyPages = allCounties.map((c: any) => ({
-      url: `${baseUrl}/${c.states.slug}/${c.slug}/arc-plc`,
-      lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-    }));
-  } catch (err) {
-    console.error('Sitemap: Failed to fetch counties:', err);
-  }
-
-  return [
-    ...corePages,
-    ...programPages,
-    ...obbbaPages,
-    ...statePages,
-    ...countyPages,
-    ...authPages,
-    ...legalPages,
-  ];
+  return [];
 }

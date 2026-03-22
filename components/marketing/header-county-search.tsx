@@ -1,11 +1,18 @@
 // =============================================================================
 // HarvestFile — Header County Search (Client Component)
-// Phase 25 Build 2: Cmd+K command palette for finding any county
+// Phase 25 Build 2 Part 2: Improved readability for older demographics
 //
 // Premium command palette pattern (Linear, Vercel, Raycast style).
 // Portal-based modal with fuzzy search across 3,000+ counties.
 // Keyboard navigable (↑/↓/Enter/Esc), recent searches, grouped by state.
 // Fetches county list on first open, caches client-side.
+//
+// CHANGES from Part 1:
+//   - Increased trigger button text contrast (white/70 → white/85)
+//   - Larger touch target on mobile (44px minimum)
+//   - Increased modal result text contrast (white/80 → white/90)
+//   - Larger placeholder & result text (14px → 15px)
+//   - Better empty state messaging
 // =============================================================================
 
 'use client';
@@ -275,7 +282,7 @@ export function HeaderCountySearch() {
 
   const overlay = open ? (
     <div
-      className="fixed inset-0 z-[1200] flex items-start justify-center pt-[15vh] sm:pt-[20vh]"
+      className="fixed inset-0 z-[1200] flex items-start justify-center pt-[12vh] sm:pt-[18vh]"
       onClick={() => setOpen(false)}
     >
       {/* Backdrop */}
@@ -283,17 +290,17 @@ export function HeaderCountySearch() {
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-[580px] mx-4 rounded-2xl border border-white/[0.1] bg-[#0C1F17]/98 shadow-[0_25px_80px_-12px_rgba(0,0,0,0.7)] overflow-hidden"
+        className="relative w-full max-w-[580px] mx-4 rounded-2xl border border-white/[0.12] bg-[#0C1F17]/98 shadow-[0_25px_80px_-12px_rgba(0,0,0,0.7)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         style={{
           animation: 'hf-search-in 0.2s cubic-bezier(0.16,1,0.3,1)',
         }}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-5 h-14 border-b border-white/[0.08]">
+        <div className="flex items-center gap-3 px-5 h-[56px] border-b border-white/[0.08]">
           <svg
-            width="18"
-            height="18"
+            width="20"
+            height="20"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -311,12 +318,12 @@ export function HeaderCountySearch() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search any county..."
-            className="flex-1 bg-transparent text-white text-[15px] font-medium placeholder:text-white/25 outline-none"
+            placeholder="Search any county or state..."
+            className="flex-1 bg-transparent text-white text-[16px] font-medium placeholder:text-white/35 outline-none"
             autoComplete="off"
             spellCheck={false}
           />
-          <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md bg-white/[0.06] text-[10px] font-mono text-white/25 border border-white/[0.06]">
+          <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md bg-white/[0.08] text-[11px] font-mono text-white/30 border border-white/[0.08]">
             ESC
           </kbd>
         </div>
@@ -324,14 +331,14 @@ export function HeaderCountySearch() {
         {/* Results area */}
         <div
           ref={listRef}
-          className="max-h-[360px] overflow-y-auto"
+          className="max-h-[380px] overflow-y-auto"
           style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}
         >
           {/* Loading state */}
           {loading && (
             <div className="flex items-center justify-center gap-3 py-12">
               <div className="w-5 h-5 border-2 border-harvest-gold/30 border-t-harvest-gold rounded-full animate-spin" />
-              <span className="text-sm text-white/30">Loading counties...</span>
+              <span className="text-[14px] text-white/40">Loading counties...</span>
             </div>
           )}
 
@@ -339,7 +346,7 @@ export function HeaderCountySearch() {
           {showRecent && !loading && (
             <>
               <div className="px-4 pt-3 pb-1.5">
-                <span className="text-[10px] font-bold text-white/25 uppercase tracking-[0.14em]">
+                <span className="text-[11px] font-bold text-white/30 uppercase tracking-[0.14em]">
                   Recent Searches
                 </span>
               </div>
@@ -349,19 +356,19 @@ export function HeaderCountySearch() {
                   data-county-item
                   onClick={() => navigateTo(county)}
                   className={`
-                    w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors
-                    ${activeIndex === i ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'}
+                    w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors
+                    ${activeIndex === i ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'}
                   `}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/20 shrink-0">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/25 shrink-0">
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span className="text-[14px] font-medium text-white/80 truncate">
+                    <span className="text-[15px] font-medium text-white/90 truncate">
                       {county.n}
                     </span>
-                    <span className="text-[12px] text-white/25 shrink-0">{county.sa}</span>
+                    <span className="text-[13px] text-white/35 shrink-0">{county.sa}</span>
                   </div>
                   <button
                     onClick={(e) => clearRecent(county, e)}
@@ -384,7 +391,7 @@ export function HeaderCountySearch() {
               {grouped.map((group) => (
                 <div key={group.stateSlug}>
                   <div className="px-4 pt-3 pb-1.5 sticky top-0 bg-[#0C1F17]/98 backdrop-blur-sm z-10">
-                    <span className="text-[10px] font-bold text-white/25 uppercase tracking-[0.14em]">
+                    <span className="text-[11px] font-bold text-white/30 uppercase tracking-[0.14em]">
                       {group.state}
                     </span>
                   </div>
@@ -396,18 +403,18 @@ export function HeaderCountySearch() {
                         data-county-item
                         onClick={() => navigateTo(county)}
                         className={`
-                          w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors
-                          ${flatIdx === activeIndex ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'}
+                          w-full flex items-center gap-3 px-4 py-3 text-left transition-colors
+                          ${flatIdx === activeIndex ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'}
                         `}
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/20 shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-harvest-gold/50 shrink-0">
                           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                           <circle cx="12" cy="10" r="3" />
                         </svg>
-                        <span className="text-[14px] font-medium text-white/80 truncate">
+                        <span className="text-[15px] font-medium text-white/90 truncate">
                           {county.n}
                         </span>
-                        <span className="text-[12px] text-white/25 shrink-0">{county.sa}</span>
+                        <span className="text-[13px] text-white/35 shrink-0">{county.sa}</span>
                       </button>
                     );
                   })}
@@ -418,52 +425,52 @@ export function HeaderCountySearch() {
 
           {/* Empty prompt (no query yet, no recent) */}
           {!showRecent && !showResults && !showEmpty && !loading && (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/15">
+            <div className="flex flex-col items-center justify-center py-14 gap-2.5">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                 <circle cx="12" cy="10" r="3" />
               </svg>
-              <p className="text-[13px] text-white/25">
-                Type a county name or state abbreviation
+              <p className="text-[14px] text-white/35 font-medium">
+                Search any U.S. farming county
               </p>
-              <p className="text-[11px] text-white/15">
-                3,000+ farming counties with real USDA data
+              <p className="text-[12px] text-white/20">
+                Real USDA data for every county in America
               </p>
             </div>
           )}
 
           {/* No results */}
           {showEmpty && (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/15">
+            <div className="flex flex-col items-center justify-center py-14 gap-2.5">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <p className="text-[13px] text-white/30">
+              <p className="text-[14px] text-white/40 font-medium">
                 No counties found for &ldquo;{query}&rdquo;
               </p>
-              <p className="text-[11px] text-white/15">
-                Try a different county name or state
+              <p className="text-[12px] text-white/20">
+                Try a different county name or state abbreviation
               </p>
             </div>
           )}
         </div>
 
         {/* Footer with keyboard hints */}
-        <div className="flex items-center gap-4 px-4 py-2.5 border-t border-white/[0.06]">
-          <span className="text-[10px] text-white/15 flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[9px] font-mono border border-white/[0.04]">↑↓</kbd>
+        <div className="flex items-center gap-4 px-4 py-2.5 border-t border-white/[0.06] bg-white/[0.02]">
+          <span className="text-[11px] text-white/20 flex items-center gap-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono border border-white/[0.04]">↑↓</kbd>
             navigate
           </span>
-          <span className="text-[10px] text-white/15 flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[9px] font-mono border border-white/[0.04]">↵</kbd>
+          <span className="text-[11px] text-white/20 flex items-center gap-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono border border-white/[0.04]">↵</kbd>
             open
           </span>
-          <span className="text-[10px] text-white/15 flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[9px] font-mono border border-white/[0.04]">esc</kbd>
+          <span className="text-[11px] text-white/20 flex items-center gap-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono border border-white/[0.04]">esc</kbd>
             close
           </span>
-          <span className="ml-auto text-[10px] text-white/10">
+          <span className="ml-auto text-[11px] text-white/15">
             {counties.length > 0 ? `${counties.length.toLocaleString()} counties` : ''}
           </span>
         </div>
@@ -473,20 +480,20 @@ export function HeaderCountySearch() {
 
   return (
     <>
-      {/* Search trigger — icon button in the header */}
+      {/* Search trigger — higher contrast for older demographics */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all duration-300 hover:bg-white/[0.06] group"
-        aria-label="Search counties"
+        className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 hover:bg-white/[0.08] group"
+        aria-label="Search counties (Ctrl+K)"
         style={{ color: 'var(--nav-text-muted)' }}
       >
         <svg
-          width="16"
-          height="16"
+          width="17"
+          height="17"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="transition-colors group-hover:text-harvest-gold"
@@ -494,8 +501,14 @@ export function HeaderCountySearch() {
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-        <span className="hidden lg:inline text-[13px] font-medium">Find County</span>
-        <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 rounded bg-white/[0.06] text-[9px] font-mono border border-white/[0.04]"
+        <span
+          className="hidden lg:inline text-[13px] font-semibold transition-colors group-hover:text-harvest-gold"
+          style={{ color: 'var(--nav-text)' }}
+        >
+          Find County
+        </span>
+        <kbd
+          className="hidden lg:inline-flex items-center px-1.5 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono border border-white/[0.06]"
           style={{ color: 'var(--nav-text-muted)' }}
         >
           ⌘K

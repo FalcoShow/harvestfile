@@ -14,7 +14,7 @@ import { RevealOnScroll } from './shared/RevealOnScroll';
 
 const stats = [
   { value: '50', label: 'States', detail: 'Every state covered' },
-  { value: '3,142', label: 'Counties', detail: 'Full USDA coverage' },
+  { value: '2,000+', label: 'Counties', detail: 'With real USDA data' },
   { value: '16', label: 'Commodities', detail: 'All covered crops' },
   { value: '$0', label: 'To Start', detail: 'Free forever' },
 ];
