@@ -280,7 +280,6 @@ export default function PricingPage() {
     }
 
     if (authState === "trialing" || authState === "expired") {
-      const displayPrice = billing === "annual" ? Math.round(tier.monthly! * 0.8) : tier.monthly;
       const isLoading = loadingTier === tier.name;
       return (
         <button
@@ -293,7 +292,7 @@ export default function PricingPage() {
               : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }
           }
         >
-          {isLoading ? "Redirecting to Checkout..." : `Subscribe \u2014 $${displayPrice}/mo \u2192`}
+          {isLoading ? "Redirecting to Checkout..." : "Subscribe \u2192"}
         </button>
       );
     }
