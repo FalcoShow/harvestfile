@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 23 Build 1: Navigation Overhaul
+// Phase 24A Build 2: Added Insurance Calculator (7th free tool)
 //
-// Premium dropdown showing all 6 free tools with icons and descriptions.
+// Premium dropdown showing all 7 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -14,6 +14,17 @@ import Link from 'next/link';
 
 const FREE_TOOLS = [
   {
+    href: '/insurance',
+    label: 'Insurance Calculator',
+    description: 'RP + SCO + ECO stacking optimizer',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 7h-3a2 2 0 0 1-2-2V2" /><path d="M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z" /><path d="M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8" /><path d="M12 10v6" /><path d="M9 13h6" />
+      </svg>
+    ),
+    badge: 'NEW',
+  },
+  {
     href: '/optimize',
     label: 'Election Optimizer',
     description: 'Monte Carlo ARC vs PLC analysis',
@@ -22,7 +33,7 @@ const FREE_TOOLS = [
         <path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" />
       </svg>
     ),
-    badge: 'NEW',
+    badge: null,
   },
   {
     href: '/check',

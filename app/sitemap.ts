@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Dynamic Sitemap Generator
-// Phase 5A-2 → Phase 23 Build 1: Added /optimize to core pages
+// Phase 24A Build 2: Added /insurance to core pages (7 free tools)
 //
 // Next.js App Router automatically serves this at /sitemap.xml
 // Now generates ~2,500+ URLs for county SEO pages + election map + OBBBA
@@ -23,6 +23,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/check`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.95,
+    },
+    {
+      url: `${baseUrl}/insurance`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.95,

@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase 23 Build 1: Navigation Overhaul — All 6 free tools in footer
+// Phase 24A Build 2: Added Insurance Calculator (7th free tool)
 // =============================================================================
 
 import Link from "next/link";
@@ -8,6 +8,7 @@ import { Logo } from "./logo";
 
 const footerLinks = {
   "Free Tools": [
+    { label: "Insurance Calculator", href: "/insurance" },
     { label: "Election Optimizer", href: "/optimize" },
     { label: "ARC/PLC Calculator", href: "/check" },
     { label: "Payment Scanner", href: "/payments" },

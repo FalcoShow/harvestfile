@@ -1,15 +1,9 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// Phase 23 Build 1.3: Portal-based overlay (fixes iOS rendering)
+// Phase 24A Build 2: Added Insurance Calculator (7th free tool)
 //
-// ROOT CAUSE: The mobile menu overlay was rendering inside the <header> which
-// has pointer-events-none. On iOS WebKit, a fixed-position child inside a
-// pointer-events-none parent with backdrop-filter gets clipped/hidden.
-//
-// FIX: Use React createPortal to render the overlay on document.body,
-// completely escaping the header's DOM hierarchy and stacking context.
-// This is the same pattern used by Radix UI, Headless UI, and shadcn/ui
-// for all overlay components (dialogs, sheets, dropdowns).
+// Portal-based overlay (fixes iOS rendering). Uses createPortal to render
+// on document.body, escaping header stacking context.
 // =============================================================================
 
 "use client";
@@ -24,7 +18,8 @@ interface MobileMenuProps {
 }
 
 const FREE_TOOLS = [
-  { href: "/optimize", label: "Election Optimizer", desc: "Monte Carlo ARC vs PLC", badge: "NEW" },
+  { href: "/insurance", label: "Insurance Calculator", desc: "RP + SCO + ECO stacking", badge: "NEW" },
+  { href: "/optimize", label: "Election Optimizer", desc: "Monte Carlo ARC vs PLC", badge: null },
   { href: "/check", label: "ARC/PLC Calculator", desc: "Compare programs by county", badge: null },
   { href: "/payments", label: "Payment Scanner", desc: "Projected payments", badge: null },
   { href: "/fba", label: "Base Acre Calculator", desc: "OBBBA base acres", badge: null },
