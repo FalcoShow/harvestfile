@@ -1,50 +1,27 @@
 // =============================================================================
-// HarvestFile — Phase 7B: Dynamic County OG Image
-// Generates a unique, data-driven social sharing card for each county page.
-//
-// When a farmer texts "harvestfile.com/ohio/darke-county/arc-plc" to a neighbor,
-// iMessage/Facebook/SMS shows a rich card: "86% of Darke County chose ARC-CO
-// for Corn". That's the viral mechanic.
-//
-// Tech: Next.js App Router opengraph-image.tsx convention + ImageResponse (Satori)
-// Size: 1200×630 (universal OG standard)
-// Cache: ISR with 24-hour revalidation
+// HarvestFile — Phase 25: Dynamic OG Image for County Pages
+// Generates a unique 1200x630 social card for each county
+// Auto-served at /{state}/{county}/arc-plc/opengraph-image
 // =============================================================================
 
 import { ImageResponse } from 'next/og';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { getCountyEnrollmentSummary } from '@/lib/data/historical-enrollment';
 import { getCountyBySlug } from '@/lib/data/county-queries';
+import { getCountyEnrollmentSummary } from '@/lib/data/historical-enrollment';
 
-// ─── OG Image Config ─────────────────────────────────────────────────────────
-
-export const alt = 'HarvestFile County ARC/PLC Data';
+export const runtime = 'edge';
+export const alt = 'ARC/PLC election data';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const revalidate = 86400; // 24 hours
 
-// ─── Generate Image ──────────────────────────────────────────────────────────
-
-export default async function Image({
+export default async function OGImage({
   params,
 }: {
   params: Promise<{ state: string; county: string }>;
 }) {
-  const { state: stateSlug, county: countySlug } = await params;
+  const { state, county } = await params;
+  const result = await getCountyBySlug(state, county);
 
-  // Load font
-  let fontData: ArrayBuffer;
-  try {
-    const fontBuffer = await readFile(
-      join(process.cwd(), 'public', 'fonts', 'Inter-Bold.ttf')
-    );
-    fontData = fontBuffer.buffer.slice(
-      fontBuffer.byteOffset,
-      fontBuffer.byteOffset + fontBuffer.byteLength
-    );
-  } catch {
-    // Fallback: return a basic branded image without custom font
+  if (!result) {
     return new ImageResponse(
       (
         <div
@@ -54,129 +31,27 @@ export default async function Image({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #0C1F17 0%, #1B4332 100%)',
-            color: 'white',
-            fontSize: 48,
-            fontWeight: 'bold',
+            backgroundColor: '#0C1F17',
+            color: '#fff',
+            fontSize: 36,
+            fontWeight: 700,
           }}
         >
-          HarvestFile — ARC/PLC Data
+          HarvestFile
         </div>
       ),
       { ...size }
     );
   }
 
-  // Fetch county data
-  const result = await getCountyBySlug(stateSlug, countySlug);
-  const summary = result
-    ? await getCountyEnrollmentSummary(result.county.county_fips)
-    : null;
+  const { county: c, state: s } = result;
+  const enrollment = await getCountyEnrollmentSummary(c.county_fips);
 
-  // ── No data fallback ───────────────────────────────────────────────────
-  if (!result || !summary) {
-    const countyDisplay = countySlug
-      .split('-')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
-    const stateDisplay = stateSlug
-      .split('-')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
-
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            padding: '60px 70px',
-            background: 'linear-gradient(145deg, #0C1F17 0%, #1B4332 50%, #0C1F17 100%)',
-            fontFamily: 'Inter',
-            color: 'white',
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: '#C9A84C',
-                textTransform: 'uppercase' as const,
-                letterSpacing: '3px',
-                marginBottom: '16px',
-              }}
-            >
-              FREE ARC/PLC DATA
-            </div>
-            <div
-              style={{
-                fontSize: 56,
-                fontWeight: 700,
-                lineHeight: 1.1,
-                marginBottom: '16px',
-              }}
-            >
-              {countyDisplay} County
-            </div>
-            <div
-              style={{
-                fontSize: 32,
-                color: 'rgba(255,255,255,0.6)',
-              }}
-            >
-              {stateDisplay}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 22,
-                color: 'rgba(255,255,255,0.4)',
-              }}
-            >
-              Compare ARC-CO vs PLC payments · Real USDA data
-            </div>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 700,
-                color: '#C9A84C',
-              }}
-            >
-              harvestfile.com
-            </div>
-          </div>
-        </div>
-      ),
-      {
-        ...size,
-        fonts: [{ name: 'Inter', data: fontData, weight: 700 }],
-      }
-    );
-  }
-
-  // ── Data-rich OG card ──────────────────────────────────────────────────
-  const { county, state } = result;
-  const arcPct = Math.round(summary.top_crop_arcco_pct);
-  const plcPct = 100 - arcPct;
-  const totalAcres = Math.round(summary.top_crop_total_acres).toLocaleString();
-  const majorityProgram = arcPct >= plcPct ? 'ARC-CO' : 'PLC';
-  const majorityPct = Math.max(arcPct, plcPct);
-
-  // Color for the majority bar
-  const arcColor = '#10B981'; // emerald-500
-  const plcColor = '#3B82F6'; // blue-500
+  const arcPct = enrollment?.top_crop_arcco_pct ?? 0;
+  const plcPct = enrollment?.top_crop_plc_pct ?? 0;
+  const topCrop = enrollment?.top_crop ?? '';
+  const latestYear = enrollment?.latest_year ?? '';
+  const totalAcres = c.total_base_acres || 0;
 
   return new ImageResponse(
     (
@@ -186,203 +61,200 @@ export default async function Image({
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
-          padding: '50px 64px 44px',
-          background: 'linear-gradient(145deg, #0C1F17 0%, #162B22 50%, #0C1F17 100%)',
-          fontFamily: 'Inter',
-          color: 'white',
+          backgroundColor: '#0C1F17',
+          padding: '48px 56px',
+          fontFamily: 'system-ui, sans-serif',
         }}
       >
-        {/* ── Top: Label + County Name ── */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: '#C9A84C',
-              textTransform: 'uppercase' as const,
-              letterSpacing: '3px',
-              marginBottom: '12px',
-            }}
-          >
-            {summary.latest_year} ARC/PLC ENROLLMENT DATA
-          </div>
-          <div
-            style={{
-              fontSize: 44,
-              fontWeight: 700,
-              lineHeight: 1.1,
-            }}
-          >
-            {county.display_name} County, {state.abbreviation}
-          </div>
-        </div>
-
-        {/* ── Middle: Big Number + Bar Chart ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Headline stat */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
-            <div
-              style={{
-                fontSize: 96,
-                fontWeight: 700,
-                lineHeight: 1,
-                color: majorityProgram === 'ARC-CO' ? arcColor : plcColor,
-              }}
-            >
-              {majorityPct}%
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
-              }}
-            >
-              <div style={{ fontSize: 28, fontWeight: 700 }}>
-                chose {majorityProgram}
-              </div>
-              <div
-                style={{
-                  fontSize: 22,
-                  color: 'rgba(255,255,255,0.5)',
-                }}
-              >
-                for {summary.top_crop} · {totalAcres} base acres
-              </div>
-            </div>
-          </div>
-
-          {/* ARC/PLC split bar */}
-          <div
-            style={{
-              display: 'flex',
-              width: '100%',
-              height: '40px',
-              borderRadius: '20px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${arcPct}%`,
-                height: '100%',
-                background: arcColor,
-                display: 'flex',
-                alignItems: 'center',
-                paddingLeft: arcPct > 15 ? '16px' : '4px',
-                fontSize: arcPct > 20 ? 16 : 12,
-                fontWeight: 700,
-                color: 'white',
-              }}
-            >
-              {arcPct > 10 ? `ARC-CO ${arcPct}%` : ''}
-            </div>
-            <div
-              style={{
-                width: `${plcPct}%`,
-                height: '100%',
-                background: plcColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                paddingRight: plcPct > 15 ? '16px' : '4px',
-                fontSize: plcPct > 20 ? 16 : 12,
-                fontWeight: 700,
-                color: 'white',
-              }}
-            >
-              {plcPct > 10 ? `PLC ${plcPct}%` : ''}
-            </div>
-          </div>
-
-          {/* Secondary crops preview */}
-          {summary.crops.length > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                gap: '24px',
-                fontSize: 16,
-                color: 'rgba(255,255,255,0.4)',
-              }}
-            >
-              {summary.crops.slice(1, 4).map((crop) => (
-                <div key={crop.crop_name} style={{ display: 'flex', gap: '6px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>
-                    {crop.crop_name}:
-                  </span>
-                  <span
-                    style={{
-                      color:
-                        crop.arcco_pct >= 50
-                          ? 'rgba(16,185,129,0.7)'
-                          : 'rgba(59,130,246,0.7)',
-                    }}
-                  >
-                    {Math.round(Math.max(crop.arcco_pct, crop.plc_pct))}%{' '}
-                    {crop.arcco_pct >= 50 ? 'ARC' : 'PLC'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Bottom: Branding ── */}
+        {/* Top bar */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
             justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 32,
           }}
         >
           <div
             style={{
-              fontSize: 16,
-              color: 'rgba(255,255,255,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'rgba(255,255,255,0.35)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
             }}
           >
-            Source: USDA FSA Enrolled Base Acres · Updated for OBBBA
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: '#10b981',
+              }}
+            />
+            Real USDA Data
           </div>
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
+              fontSize: 16,
+              fontWeight: 800,
+              color: '#E2C366',
+              letterSpacing: '-0.01em',
             }}
           >
+            HarvestFile
+          </div>
+        </div>
+
+        {/* County Name */}
+        <div
+          style={{
+            fontSize: 56,
+            fontWeight: 800,
+            color: '#ffffff',
+            lineHeight: 1.1,
+            letterSpacing: '-0.03em',
+            marginBottom: 4,
+          }}
+        >
+          {c.display_name}
+        </div>
+        <div
+          style={{
+            fontSize: 24,
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.3)',
+            marginBottom: 40,
+          }}
+        >
+          {s.name} · ARC/PLC Election Data
+        </div>
+
+        {/* ARC/PLC Bar */}
+        {enrollment && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
             <div
               style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '6px',
-                background: '#C9A84C',
+                fontSize: 13,
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+              }}
+            >
+              {topCrop} · {latestYear}
+            </div>
+            <div
+              style={{
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16,
-                fontWeight: 700,
-                color: '#0C1F17',
+                height: 40,
+                borderRadius: 12,
+                overflow: 'hidden',
               }}
             >
-              H
+              <div
+                style={{
+                  width: `${arcPct}%`,
+                  backgroundColor: '#10b981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  paddingLeft: 16,
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: '#ffffff',
+                }}
+              >
+                ARC-CO {arcPct}%
+              </div>
+              <div
+                style={{
+                  width: `${plcPct}%`,
+                  backgroundColor: '#3b82f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  paddingRight: 16,
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: '#ffffff',
+                }}
+              >
+                PLC {plcPct}%
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom stats */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 40,
+            marginTop: 'auto',
+          }}
+        >
+          {totalAcres > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 800,
+                  color: '#ffffff',
+                }}
+              >
+                {totalAcres >= 1_000_000
+                  ? `${(totalAcres / 1_000_000).toFixed(1)}M`
+                  : totalAcres >= 1_000
+                  ? `${Math.round(totalAcres / 1000)}K`
+                  : totalAcres.toLocaleString()}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: 'rgba(255,255,255,0.25)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.12em',
+                }}
+              >
+                Base Acres
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#ffffff' }}>
+              Free
             </div>
             <div
               style={{
-                fontSize: 20,
+                fontSize: 11,
                 fontWeight: 700,
-                color: '#C9A84C',
+                color: 'rgba(255,255,255,0.25)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.12em',
               }}
             >
-              harvestfile.com
+              ARC/PLC Calculator
             </div>
+          </div>
+          <div
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'flex-end',
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'rgba(255,255,255,0.2)',
+            }}
+          >
+            harvestfile.com/{state}/{county}/arc-plc
           </div>
         </div>
       </div>
     ),
-    {
-      ...size,
-      fonts: [{ name: 'Inter', data: fontData, weight: 700 }],
-    }
+    { ...size }
   );
 }

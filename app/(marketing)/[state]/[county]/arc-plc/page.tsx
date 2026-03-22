@@ -1,19 +1,17 @@
 // =============================================================================
-// HarvestFile — County ARC/PLC Page
-// Phase 5A-2 + Phase 6B + Phase 7A + Phase 7B:
-// County SEO + Scenario Modeler + Benchmarking + Historical Enrollment Data
+// HarvestFile — Phase 25 Build 1: County ARC/PLC Detail Page
+// /{state}/{county}/arc-plc — THE primary SEO page
 //
-// THE MONEY PAGE — this is what every farmer searching "ARC PLC [county]" lands on.
-// Server Component for full SEO. Renders real USDA data.
-// Phase 6B adds the interactive Multi-Year Scenario Modeler as a client island.
-// Phase 7A adds the "Facebook moment" — live anonymous election benchmarking.
-// Phase 7B adds historical FSA enrollment data (cold-start) + dynamic OG images.
+// 3,000+ unique county pages, each packed with genuine USDA data.
+// This is the page farmers land on from Google. It must be incredible.
+//
+// Server Component with client islands for charts and interactivity.
+// ISR with 1-hour revalidation + on-demand revalidation on benchmark updates.
 // =============================================================================
 
 import { Metadata } from 'next';
-import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import {
   getCountyBySlug,
   getCountyCropData,
@@ -21,460 +19,840 @@ import {
   getRecommendation,
   type CommodityGroup,
 } from '@/lib/data/county-queries';
-import { BenchmarkSection } from '@/components/county/BenchmarkSection';
-import { HistoricalEnrollmentSection } from '@/components/county/HistoricalEnrollmentSection';
+import {
+  getCountyEnrollmentHistory,
+  getCountyEnrollmentSummary,
+} from '@/lib/data/historical-enrollment';
+import { CountyCharts } from '@/components/county/CountyCharts';
+import { CountyBenchmarkCTA } from '@/components/county/CountyBenchmarkCTA';
 
-// ─── Dynamic Import: Scenario Modeler (client-only, lazy-loaded) ─────────────
-// Keeps the initial page load fast. Recharts + modeler bundle (~40KB gzip)
-// only downloads when the user scrolls to this section.
+// ── ISR: Revalidate every hour ──────────────────────────────────────────
+export const revalidate = 3600;
+export const dynamicParams = true;
 
-const ScenarioModeler = dynamic(
-  () => import('@/components/county/ScenarioModeler'),
-  { ssr: false, loading: () => <ModelerSkeleton /> }
-);
+// ── Generate top 200 counties at build time ─────────────────────────────
+export async function generateStaticParams() {
+  // Import here to avoid top-level side effects during build
+  const { supabasePublic } = await import('@/lib/supabase/public');
 
-function ModelerSkeleton() {
-  return (
-    <section className="mx-auto max-w-[1200px] px-6 pb-12">
-      <div className="rounded-2xl border border-harvest-gold/20 overflow-hidden animate-pulse">
-        <div className="px-8 py-6 border-b border-border/50">
-          <div className="h-4 w-24 bg-surface/50 rounded mb-2" />
-          <div className="h-7 w-64 bg-surface/50 rounded mb-2" />
-          <div className="h-4 w-80 bg-surface/50 rounded" />
-        </div>
-        <div className="px-8 py-5 border-b border-border/50">
-          <div className="flex gap-2">
-            {[1,2,3,4,5].map(i => <div key={i} className="h-9 w-28 bg-surface/50 rounded-lg" />)}
-          </div>
-        </div>
-        <div className="px-8 py-8">
-          <div className="h-[320px] bg-surface/30 rounded-xl" />
-        </div>
-      </div>
-    </section>
-  );
+  const { data } = await supabasePublic
+    .from('counties')
+    .select('slug, states!inner(slug)')
+    .eq('has_arc_plc_data', true)
+    .order('total_base_acres', { ascending: false })
+    .limit(200);
+
+  if (!data) return [];
+
+  return data.map((row: any) => ({
+    state: row.states.slug,
+    county: row.slug,
+  }));
 }
 
-// ─── Dynamic Metadata ────────────────────────────────────────────────────────
-// NOTE: OG images are now handled by opengraph-image.tsx (Phase 7B).
-// The file convention auto-generates dynamic, data-driven social cards per county.
-
-export async function generateMetadata({
-  params,
-}: {
+// ── Dynamic Metadata ────────────────────────────────────────────────────
+interface PageProps {
   params: Promise<{ state: string; county: string }>;
-}): Promise<Metadata> {
-  const { state: stateSlug, county: countySlug } = await params;
-  const result = await getCountyBySlug(stateSlug, countySlug);
-  if (!result) return { title: 'County Not Found' };
+}
 
-  const { county, state } = result;
-  const title = `ARC vs PLC — ${county.display_name}, ${state.name} | Free Calculator & Data`;
-  const description = `Compare ARC-CO and PLC estimated payments for ${county.display_name}, ${state.name}. Real USDA NASS county yield data, multi-year scenario projections, and program recommendations. Free, updated for 2026 OBBBA.`;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { state, county } = await params;
+  const result = await getCountyBySlug(state, county);
+  if (!result) return { title: 'County Not Found | HarvestFile' };
+
+  const { county: c, state: s } = result;
+  const enrollment = await getCountyEnrollmentSummary(c.county_fips);
+  const acresStr = c.total_base_acres
+    ? `${(c.total_base_acres / 1000).toFixed(0)}K`
+    : '';
+
+  const title = `${c.display_name}, ${s.abbreviation} ARC/PLC Data — Payment Projections & Election History | HarvestFile`;
+  const description = `Free ARC-CO vs PLC analysis for ${c.display_name}, ${s.name}. ${acresStr ? `${acresStr} enrolled base acres. ` : ''}${
+    enrollment
+      ? `${enrollment.top_crop}: ${enrollment.top_crop_arcco_pct}% ARC-CO, ${enrollment.top_crop_plc_pct}% PLC. `
+      : ''
+  }Real USDA data, payment history, and 2026 recommendations under OBBBA.`;
 
   return {
     title,
     description,
-    keywords: [
-      `ARC PLC ${county.display_name} ${state.name}`,
-      `ARC vs PLC ${state.abbreviation}`,
-      `${county.name} county yield data`,
-      `ARC-CO ${county.display_name}`,
-      `PLC ${county.display_name}`,
-      `farm program ${state.name}`,
-      `USDA county data ${state.abbreviation}`,
-      `ARC PLC scenario modeler ${state.abbreviation}`,
-    ],
     openGraph: {
-      title: `ARC vs PLC — ${county.display_name}, ${state.abbreviation}`,
+      title: `${c.display_name}, ${s.abbreviation} — ARC/PLC Election Data | HarvestFile`,
       description,
-      url: `https://harvestfile.com/${state.slug}/${county.slug}/arc-plc`,
+      type: 'website',
+      url: `https://harvestfile.com/${state}/${county}/arc-plc`,
+      siteName: 'HarvestFile',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${c.display_name}, ${s.abbreviation} ARC/PLC Data`,
+      description,
     },
     alternates: {
-      canonical: `https://harvestfile.com/${state.slug}/${county.slug}/arc-plc`,
+      canonical: `https://harvestfile.com/${state}/${county}/arc-plc`,
     },
   };
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ── Utility Functions ───────────────────────────────────────────────────
 
-function fmt(n: number | null | undefined, decimals = 0): string {
-  if (n == null) return '—';
-  return decimals > 0 ? n.toFixed(decimals) : Math.round(n).toLocaleString();
+function formatAcres(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1000).toLocaleString()}K`;
+  return n.toLocaleString();
 }
 
-function fmtDollars(n: number | null | undefined): string {
-  if (n == null) return '—';
-  if (n === 0) return '$0';
-  return `$${Math.round(n).toLocaleString()}`;
+function formatDollars(n: number): string {
+  if (n >= 100) return `$${Math.round(n).toLocaleString()}`;
+  if (n >= 1) return `$${n.toFixed(2)}`;
+  return `$${n.toFixed(3)}`;
 }
 
-function fmtPrice(n: number | null | undefined): string {
-  if (n == null) return '—';
-  return `$${n.toFixed(2)}`;
+function getConfidenceColor(confidence: string): string {
+  switch (confidence) {
+    case 'high': return 'text-emerald-700';
+    case 'moderate': return 'text-amber-700';
+    default: return 'text-gray-500';
+  }
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+function getConfidenceBg(confidence: string): string {
+  switch (confidence) {
+    case 'high': return 'bg-emerald-50 border-emerald-200';
+    case 'moderate': return 'bg-amber-50 border-amber-200';
+    default: return 'bg-gray-50 border-gray-200';
+  }
+}
 
-export const revalidate = 60; // ISR: revalidate every 60s for live benchmarks
+function getRecBadgeColor(rec: string): string {
+  switch (rec) {
+    case 'ARC-CO': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    case 'PLC': return 'bg-blue-100 text-blue-800 border-blue-200';
+    default: return 'bg-gray-100 text-gray-700 border-gray-200';
+  }
+}
 
-export default async function CountyPage({
-  params,
+// ── JSON-LD Structured Data ─────────────────────────────────────────────
+
+function CountyJsonLd({
+  county,
+  state,
+  cropData,
 }: {
-  params: Promise<{ state: string; county: string }>;
+  county: any;
+  state: any;
+  cropData: CommodityGroup[];
 }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Dataset',
+        name: `ARC/PLC Program Data for ${county.display_name}, ${state.name}`,
+        description: `Historical ARC-CO and PLC payment rates, benchmark yields, enrollment data, and program recommendations for ${county.display_name}, ${state.name}. Sourced from USDA Farm Service Agency and USDA NASS.`,
+        url: `https://harvestfile.com/${state.slug}/${county.slug}/arc-plc`,
+        license: 'https://creativecommons.org/publicdomain/zero/1.0/',
+        creator: { '@type': 'Organization', name: 'USDA Farm Service Agency' },
+        temporalCoverage: '2014/2026',
+        spatialCoverage: {
+          '@type': 'Place',
+          name: `${county.display_name}, ${state.name}`,
+          geo: county.latitude && county.longitude
+            ? {
+                '@type': 'GeoCoordinates',
+                latitude: county.latitude,
+                longitude: county.longitude,
+              }
+            : undefined,
+        },
+        variableMeasured: cropData.map((c) => ({
+          '@type': 'PropertyValue',
+          name: `${c.display_name} ARC/PLC Data`,
+          unitText: c.unit_label,
+        })),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'HarvestFile',
+            item: 'https://harvestfile.com',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: `${state.name} ARC/PLC`,
+            item: `https://harvestfile.com/${state.slug}/arc-plc`,
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: `${county.display_name}`,
+            item: `https://harvestfile.com/${state.slug}/${county.slug}/arc-plc`,
+          },
+        ],
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: `Should I choose ARC-CO or PLC in ${county.display_name}, ${state.abbreviation} for 2026?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `The optimal choice depends on your specific crops and base acres. Use HarvestFile's free calculator at harvestfile.com/check to get a personalized recommendation based on real USDA data for ${county.display_name}.`,
+            },
+          },
+          {
+            '@type': 'Question',
+            name: `What are the ARC-CO payment rates for ${county.display_name}?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `ARC-CO payment rates for ${county.display_name} vary by crop and year. View the full payment history and 2026 projections on this page, or run a personalized analysis with the free ARC/PLC calculator.`,
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// PAGE COMPONENT
+// ═════════════════════════════════════════════════════════════════════════
+
+export default async function CountyArcPlcPage({ params }: PageProps) {
   const { state: stateSlug, county: countySlug } = await params;
+
+  // ── Fetch all data in parallel ──────────────────────────────────────
   const result = await getCountyBySlug(stateSlug, countySlug);
   if (!result) notFound();
 
   const { county, state } = result;
-  const cropGroups = await getCountyCropData(county.county_fips);
-  const neighbors = await getNeighborCounties(state.state_fips, county.county_fips);
 
-  // Get primary crop (most years of data)
-  const primaryCrop = cropGroups.reduce<CommodityGroup | null>(
-    (best, curr) => (!best || curr.years.length > best.years.length ? curr : best),
-    null,
-  );
+  const [cropData, enrollment, enrollmentSummary, neighbors] = await Promise.all([
+    getCountyCropData(county.county_fips),
+    getCountyEnrollmentHistory(county.county_fips),
+    getCountyEnrollmentSummary(county.county_fips),
+    getNeighborCounties(county.state_fips, county.county_fips),
+  ]);
 
-  const primaryRec = primaryCrop ? getRecommendation(primaryCrop) : null;
-
-  // Most recent year with benchmark data for the hero stats
-  const latestBench = primaryCrop?.years.find(y => y.benchmark_yield != null);
-
-  // ── Prepare data for the Scenario Modeler (serializable props) ──
-  const modelerCrops = cropGroups.map(g => ({
-    commodityCode: g.commodity_code,
-    displayName: g.display_name,
-    unitLabel: g.unit_label,
-    statutoryRefPrice: g.statutory_ref_price,
-    years: g.years.map(y => ({
-      crop_year: y.crop_year,
-      county_yield: y.county_yield,
-      mya_price: y.mya_price,
-      benchmark_yield: y.benchmark_yield,
-      benchmark_revenue: y.benchmark_revenue,
-      arc_guarantee: y.arc_guarantee,
-      arc_payment_rate: y.arc_payment_rate,
-      plc_payment_rate: y.plc_payment_rate,
-    })),
+  // Get recommendations for each crop
+  const recommendations = cropData.map((crop) => ({
+    crop,
+    ...getRecommendation(crop),
   }));
 
-  // JSON-LD
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: `ARC vs PLC — ${county.display_name}, ${state.name}`,
-    description: `ARC-CO and PLC program data for ${county.display_name}, ${state.name}`,
-    url: `https://harvestfile.com/${state.slug}/${county.slug}/arc-plc`,
-    isPartOf: { '@type': 'WebSite', name: 'HarvestFile', url: 'https://harvestfile.com' },
-    breadcrumb: {
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://harvestfile.com' },
-        { '@type': 'ListItem', position: 2, name: state.name, item: `https://harvestfile.com/${state.slug}/arc-plc` },
-        { '@type': 'ListItem', position: 3, name: county.display_name },
-      ],
-    },
-  };
+  // Find the primary crop (most base acres in latest year)
+  const primaryCrop = cropData.length > 0 ? cropData[0] : null;
+  const primaryRec = recommendations.length > 0 ? recommendations[0] : null;
+
+  // Latest enrollment year data
+  const latestYear = enrollmentSummary?.latest_year;
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <CountyJsonLd county={county} state={state} cropData={cropData} />
 
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#FAFAF8]">
         {/* ═══ HERO ═══ */}
-        <section className="relative overflow-hidden border-b border-border/50">
-          <div className="hf-noise-subtle" />
-          <div className="relative z-10 mx-auto max-w-[1200px] px-6 pt-24 pb-16">
-            {/* Breadcrumbs */}
-            <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
-              <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
-              <span className="text-border">/</span>
-              <Link href={`/${state.slug}/arc-plc`} className="hover:text-foreground transition-colors">{state.name}</Link>
-              <span className="text-border">/</span>
-              <span className="text-foreground font-medium">{county.display_name}</span>
+        <section className="relative overflow-hidden">
+          {/* Subtle gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0C1F17] via-[#142B20] to-[#1B4332]" />
+          <div
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+            }}
+          />
+
+          <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-10 sm:pb-14">
+            {/* Breadcrumb */}
+            <nav className="flex items-center gap-1.5 text-[11px] font-medium text-white/35 mb-6">
+              <Link href="/" className="hover:text-white/60 transition-colors">
+                HarvestFile
+              </Link>
+              <span className="text-white/20">/</span>
+              <Link
+                href={`/${stateSlug}/arc-plc`}
+                className="hover:text-white/60 transition-colors"
+              >
+                {state.name}
+              </Link>
+              <span className="text-white/20">/</span>
+              <span className="text-white/50">{county.display_name}</span>
             </nav>
 
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground">
-              {county.display_name}, {state.abbreviation}
-              <span className="block text-xl sm:text-2xl font-semibold text-harvest-gold mt-2">
-                ARC-CO vs PLC Analysis
-              </span>
-            </h1>
+            {/* County Name + Badge */}
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-5 mb-5">
+              <h1 className="text-[clamp(28px,4.5vw,48px)] font-extrabold text-white tracking-[-0.03em] leading-[1.05]">
+                {county.display_name}
+                <span className="text-white/30 font-semibold text-[0.5em] ml-3">
+                  {state.abbreviation}
+                </span>
+              </h1>
+              {primaryRec && primaryRec.recommendation !== 'NEUTRAL' && (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border mb-1 ${getRecBadgeColor(
+                    primaryRec.recommendation
+                  )}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  {primaryRec.recommendation} Favored for{' '}
+                  {primaryRec.crop.display_name}
+                </span>
+              )}
+            </div>
 
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl leading-relaxed">
-              Real USDA county-level yield data and calculated ARC/PLC benchmarks
-              for {county.display_name}. Updated for the 2026 OBBBA farm bill.
+            <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed max-w-2xl mb-8">
+              ARC-CO and PLC program data for {county.display_name},{' '}
+              {state.name}. Historical payment rates, benchmark yields,
+              enrollment trends, and 2026 election analysis under the One Big
+              Beautiful Bill Act.
             </p>
 
-            {/* Hero stats */}
-            {latestBench && primaryCrop && (
-              <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                  { label: 'Latest Yield', value: `${fmt(latestBench.county_yield, 1)} ${primaryCrop.unit.split(' / ')[0].toLowerCase()}/ac`, sub: primaryCrop.display_name },
-                  { label: 'ARC Benchmark', value: `${fmt(latestBench.benchmark_yield, 1)} ${primaryCrop.unit.split(' / ')[0].toLowerCase()}/ac`, sub: '5yr Olympic Avg' },
-                  { label: 'ARC Guarantee', value: fmtDollars(latestBench.arc_guarantee), sub: '90% of benchmark rev' },
-                  { label: 'Recommendation', value: primaryRec?.recommendation || '—', sub: `${primaryRec?.confidence || ''} confidence` },
-                ].map((stat) => (
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {county.total_base_acres > 0 && (
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-sm px-4 py-3.5">
+                  <div className="text-[22px] font-extrabold text-white tracking-tight">
+                    {formatAcres(county.total_base_acres)}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30 mt-0.5">
+                    Base Acres
+                  </div>
+                </div>
+              )}
+              {cropData.length > 0 && (
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-sm px-4 py-3.5">
+                  <div className="text-[22px] font-extrabold text-white tracking-tight">
+                    {cropData.length}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30 mt-0.5">
+                    Program Crops
+                  </div>
+                </div>
+              )}
+              {enrollmentSummary && (
+                <>
+                  <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-sm px-4 py-3.5">
+                    <div className="text-[22px] font-extrabold text-emerald-400 tracking-tight">
+                      {enrollmentSummary.top_crop_arcco_pct}%
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30 mt-0.5">
+                      ARC-CO ({enrollmentSummary.top_crop}, {latestYear})
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-sm px-4 py-3.5">
+                    <div className="text-[22px] font-extrabold text-blue-400 tracking-tight">
+                      {enrollmentSummary.top_crop_plc_pct}%
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30 mt-0.5">
+                      PLC ({enrollmentSummary.top_crop}, {latestYear})
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Gradient fade to content */}
+          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-b from-transparent to-[#FAFAF8]" />
+        </section>
+
+        {/* ═══ MAIN CONTENT ═══ */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
+          {/* ── CTA: Run Calculator ── */}
+          <div className="rounded-2xl border border-[#E2C366]/20 bg-gradient-to-r from-[#FFFDF5] to-[#FFF9E6] p-5 sm:p-6 mb-10 -mt-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-[17px] font-bold text-[#1B4332] mb-1">
+                  Get Your Personalized 2026 Recommendation
+                </h2>
+                <p className="text-[13px] text-[#1B4332]/50">
+                  Enter your base acres and crops for a county-specific ARC vs
+                  PLC analysis with payment projections under OBBBA.
+                </p>
+              </div>
+              <Link
+                href={`/check?county=${encodeURIComponent(county.display_name)}&state=${state.abbreviation}`}
+                className="shrink-0 inline-flex items-center gap-2 bg-[#1B4332] hover:bg-[#0C1F17] text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-[#1B4332]/15 hover:shadow-[#1B4332]/25 transition-all text-[14px]"
+              >
+                Run Free Calculator
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+
+          {/* ── Crop-by-Crop Analysis ── */}
+          {cropData.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+                Crop-by-Crop Program Analysis
+              </h2>
+
+              <div className="space-y-6">
+                {recommendations.map(({ crop, recommendation, reasoning, confidence }) => (
                   <div
-                    key={stat.label}
-                    className="rounded-xl border border-border/50 bg-surface/50 px-4 py-4"
+                    key={crop.commodity_code}
+                    className="rounded-2xl border border-gray-200/80 bg-white shadow-sm overflow-hidden"
                   >
-                    <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                      {stat.label}
+                    {/* Crop Header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-[17px] font-bold text-[#1B4332]">
+                          {crop.display_name}
+                        </h3>
+                        <span className="text-[11px] font-medium text-gray-400">
+                          Ref. Price: ${crop.statutory_ref_price}/{crop.unit_label}
+                          {crop.effective_ref_price &&
+                            crop.effective_ref_price !== crop.statutory_ref_price && (
+                              <span className="text-emerald-600 ml-1">
+                                → ${crop.effective_ref_price} (OBBBA)
+                              </span>
+                            )}
+                        </span>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${getRecBadgeColor(
+                          recommendation
+                        )}`}
+                      >
+                        {recommendation === 'NEUTRAL'
+                          ? 'Toss-Up'
+                          : `${recommendation} Favored`}
+                      </span>
                     </div>
-                    <div className={`mt-1 text-xl font-bold ${
-                      stat.value === 'ARC-CO' ? 'text-emerald-500' :
-                      stat.value === 'PLC' ? 'text-blue-400' :
-                      'text-foreground'
-                    }`}>
-                      {stat.value}
+
+                    {/* Data Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[13px]">
+                        <thead>
+                          <tr className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 border-b border-gray-100">
+                            <th className="text-left px-5 py-2.5">Year</th>
+                            <th className="text-right px-3 py-2.5">
+                              County Yield
+                            </th>
+                            <th className="text-right px-3 py-2.5">
+                              Benchmark Yield
+                            </th>
+                            <th className="text-right px-3 py-2.5">MYA Price</th>
+                            <th className="text-right px-3 py-2.5">
+                              <span className="text-emerald-600">
+                                ARC-CO Rate
+                              </span>
+                            </th>
+                            <th className="text-right px-5 py-2.5">
+                              <span className="text-blue-600">PLC Rate</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {crop.years.slice(0, 8).map((year) => {
+                            const arcWins =
+                              (year.arc_payment_rate || 0) >
+                              (year.plc_payment_rate || 0);
+                            const plcWins =
+                              (year.plc_payment_rate || 0) >
+                              (year.arc_payment_rate || 0);
+                            return (
+                              <tr
+                                key={year.crop_year}
+                                className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                              >
+                                <td className="px-5 py-2.5 font-semibold text-gray-700">
+                                  {year.crop_year}
+                                </td>
+                                <td className="text-right px-3 py-2.5 text-gray-600 tabular-nums">
+                                  {year.county_yield
+                                    ? `${year.county_yield.toFixed(1)} ${crop.unit_label}`
+                                    : '—'}
+                                </td>
+                                <td className="text-right px-3 py-2.5 text-gray-600 tabular-nums">
+                                  {year.benchmark_yield
+                                    ? `${year.benchmark_yield.toFixed(1)} ${crop.unit_label}`
+                                    : '—'}
+                                </td>
+                                <td className="text-right px-3 py-2.5 text-gray-600 tabular-nums">
+                                  {year.mya_price
+                                    ? formatDollars(year.mya_price)
+                                    : '—'}
+                                </td>
+                                <td
+                                  className={`text-right px-3 py-2.5 tabular-nums font-semibold ${
+                                    arcWins
+                                      ? 'text-emerald-700 bg-emerald-50/50'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  {year.arc_payment_rate != null
+                                    ? formatDollars(year.arc_payment_rate) +
+                                      '/acre'
+                                    : '—'}
+                                </td>
+                                <td
+                                  className={`text-right px-5 py-2.5 tabular-nums font-semibold ${
+                                    plcWins
+                                      ? 'text-blue-700 bg-blue-50/50'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  {year.plc_payment_rate != null
+                                    ? formatDollars(year.plc_payment_rate) +
+                                      '/acre'
+                                    : '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{stat.sub}</div>
+
+                    {/* Recommendation */}
+                    <div
+                      className={`mx-5 mb-5 mt-4 rounded-xl border p-4 ${getConfidenceBg(
+                        confidence
+                      )}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0 mt-0.5">
+                          {recommendation === 'ARC-CO' ? (
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                              <svg
+                                className="w-4 h-4 text-emerald-700"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                          ) : recommendation === 'PLC' ? (
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                              <svg
+                                className="w-4 h-4 text-blue-700"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                              <svg
+                                className="w-4 h-4 text-gray-500"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[13px] font-bold text-gray-800">
+                              HarvestFile Analysis
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold uppercase tracking-wider ${getConfidenceColor(
+                                confidence
+                              )}`}
+                            >
+                              {confidence} confidence
+                            </span>
+                          </div>
+                          <p className="text-[13px] text-gray-600 leading-relaxed">
+                            {reasoning}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </section>
+            </section>
+          )}
 
-        {/* ═══ RECOMMENDATION ═══ */}
-        {primaryRec && primaryCrop && (
-          <section className="mx-auto max-w-[1200px] px-6 py-12">
-            <div className={`rounded-2xl border p-8 ${
-              primaryRec.recommendation === 'ARC-CO'
-                ? 'border-emerald-500/20 bg-emerald-500/[0.04]'
-                : primaryRec.recommendation === 'PLC'
-                ? 'border-blue-500/20 bg-blue-500/[0.04]'
-                : 'border-border/50 bg-surface/50'
-            }`}>
-              <div className="flex items-start gap-4">
-                <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${
-                  primaryRec.recommendation === 'ARC-CO'
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : primaryRec.recommendation === 'PLC'
-                    ? 'bg-blue-500/20 text-blue-400'
-                    : 'bg-muted text-muted-foreground'
-                }`}>
-                  {primaryRec.recommendation === 'ARC-CO' ? '🌾' : primaryRec.recommendation === 'PLC' ? '📊' : '⚖️'}
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-foreground">
-                    {primaryCrop.display_name} Recommendation: {primaryRec.recommendation}
-                    <span className="ml-2 text-xs font-medium text-muted-foreground px-2 py-0.5 rounded-full bg-surface border border-border/50">
-                      {primaryRec.confidence} confidence
-                    </span>
-                  </h2>
-                  <p className="mt-2 text-muted-foreground leading-relaxed">
-                    {primaryRec.reasoning}
-                  </p>
-                  <p className="mt-3 text-xs text-muted-foreground/70">
-                    Based on historical county data. Run the full calculator for personalized estimates with your base acres and PLC yield.
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* ── Historical Charts (Client Island) ── */}
+          {cropData.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+                Payment History &amp; Enrollment Trends
+              </h2>
+              <CountyCharts
+                cropData={cropData}
+                enrollment={enrollment}
+                countyName={county.display_name}
+                stateAbbr={state.abbreviation}
+              />
+            </section>
+          )}
+
+          {/* ── Benchmark CTA (Client Island) ── */}
+          <section className="mb-12">
+            <CountyBenchmarkCTA
+              countyFips={county.county_fips}
+              countyName={county.display_name}
+              stateAbbr={state.abbreviation}
+            />
           </section>
-        )}
 
-        {/* ═══ HISTORICAL ENROLLMENT — Phase 7B "Cold-Start Data" ═══ */}
-        <HistoricalEnrollmentSection
-          countyFips={county.county_fips}
-          countyName={county.display_name}
-          stateAbbr={state.abbreviation}
-        />
-
-        {/* ═══ LIVE ELECTION BENCHMARKS — Phase 7A "The Facebook Moment" ═══ */}
-        <BenchmarkSection
-          countyFips={county.county_fips}
-          countyName={county.display_name}
-          stateName={state.name}
-          stateAbbr={state.abbreviation}
-          cropGroups={cropGroups.map(g => ({
-            commodity_code: g.commodity_code,
-            display_name: g.display_name,
-          }))}
-        />
-
-        {/* ═══ SCENARIO MODELER (Phase 6B) ═══ */}
-        {modelerCrops.length > 0 && (
-          <ScenarioModeler
-            crops={modelerCrops}
-            countyName={county.display_name}
-            stateAbbr={state.abbreviation}
-          />
-        )}
-
-        {/* ═══ CROP DATA TABLES ═══ */}
-        {cropGroups.map((crop) => (
-          <section key={crop.commodity_code} className="mx-auto max-w-[1200px] px-6 pb-12">
-            <div className="rounded-2xl border border-border/50 overflow-hidden">
-              {/* Crop header */}
-              <div className="px-6 py-5 bg-surface/50 border-b border-border/50 flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">{crop.display_name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Reference price: {fmtPrice(crop.statutory_ref_price)}/{crop.unit_label}
-                    {crop.effective_ref_price && crop.effective_ref_price > crop.statutory_ref_price && (
-                      <span className="ml-2 text-harvest-gold">
-                        (Effective: {fmtPrice(crop.effective_ref_price)})
+          {/* ── Enrollment Breakdown ── */}
+          {enrollmentSummary && enrollmentSummary.crops.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+                {latestYear} Election Breakdown
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {enrollmentSummary.crops.map((crop) => (
+                  <div
+                    key={crop.commodity_code}
+                    className="rounded-xl border border-gray-200/80 bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[15px] font-bold text-[#1B4332]">
+                        {crop.crop_name}
                       </span>
-                    )}
+                      <span className="text-[11px] text-gray-400 font-medium">
+                        {formatAcres(crop.total_acres)} acres
+                      </span>
+                    </div>
+                    {/* Split bar */}
+                    <div className="flex h-3 rounded-full overflow-hidden mb-2.5">
+                      <div
+                        className="bg-emerald-500 transition-all"
+                        style={{ width: `${crop.arcco_pct}%` }}
+                      />
+                      <div
+                        className="bg-blue-500 transition-all"
+                        style={{ width: `${crop.plc_pct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[12px] font-semibold">
+                      <span className="text-emerald-700">
+                        ARC-CO {crop.arcco_pct}%
+                      </span>
+                      <span className="text-blue-700">
+                        PLC {crop.plc_pct}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── 2026 OBBBA Changes Banner ── */}
+          <section className="mb-12">
+            <div className="rounded-2xl border border-[#1B4332]/10 bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 sm:p-8 text-white">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-[#E2C366]/20 flex items-center justify-center">
+                  <svg
+                    className="w-5 h-5 text-[#E2C366]"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-[17px] font-bold mb-2">
+                    2026 Changes Under OBBBA
+                  </h3>
+                  <p className="text-[13px] text-white/50 leading-relaxed mb-3">
+                    The One Big Beautiful Bill Act significantly changes ARC/PLC
+                    for {county.display_name}. Reference prices increased (corn
+                    to $4.10/bu, soybeans to $10.00/bu), ARC guarantee rose to
+                    90%, payment cap increased to 12%, and up to 30 million new
+                    base acres can be added. For 2026, farmers must make an
+                    affirmative annual election — no election means no payment.
                   </p>
+                  <Link
+                    href="/obbba"
+                    className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#E2C366] hover:text-[#E2C366]/80 transition-colors"
+                  >
+                    Learn about OBBBA changes
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </Link>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {crop.years.length} years of data
-                </div>
-              </div>
-
-              {/* Data table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border/50 bg-surface/30">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Year</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Yield</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">MYA Price</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">ARC Guarantee</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">ARC Payment</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">PLC Payment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {crop.years.map((year, i) => {
-                      const arcPaid = (year.arc_payment_rate || 0) > 0;
-                      const plcPaid = (year.plc_payment_rate || 0) > 0;
-                      return (
-                        <tr
-                          key={year.crop_year}
-                          className={`border-b border-border/30 ${
-                            i % 2 === 0 ? '' : 'bg-surface/20'
-                          } ${arcPaid || plcPaid ? 'bg-harvest-gold/[0.02]' : ''}`}
-                        >
-                          <td className="px-4 py-3 font-semibold text-foreground">{year.crop_year}</td>
-                          <td className="px-4 py-3 text-right text-foreground tabular-nums">
-                            {fmt(year.county_yield, 1)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
-                            {fmt(year.benchmark_yield, 1)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
-                            {fmtPrice(year.mya_price)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
-                            {fmtDollars(year.arc_guarantee)}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-semibold tabular-nums ${
-                            arcPaid ? 'text-emerald-500' : 'text-muted-foreground/50'
-                          }`}>
-                            {arcPaid ? `$${fmt(year.arc_payment_rate, 2)}/ac` : fmtDollars(year.arc_payment_rate)}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-semibold tabular-nums ${
-                            plcPaid ? 'text-blue-400' : 'text-muted-foreground/50'
-                          }`}>
-                            {plcPaid ? `$${fmt(year.plc_payment_rate, 2)}/ac` : fmtDollars(year.plc_payment_rate)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Table footer */}
-              <div className="px-6 py-3 bg-surface/30 border-t border-border/50 text-xs text-muted-foreground">
-                Source: USDA NASS Quick Stats · Benchmarks use 5-year Olympic average · ARC-CO guarantee = 90% of benchmark revenue (OBBBA)
               </div>
             </div>
           </section>
-        ))}
 
-        {/* ═══ OBBBA EXPLAINER ═══ */}
-        <section className="mx-auto max-w-[1200px] px-6 pb-12">
-          <div className="rounded-2xl border border-border/50 bg-surface/30 p-8">
-            <h2 className="text-lg font-bold text-foreground mb-4">
-              What Changed Under OBBBA (2025 Farm Bill)
-            </h2>
-            <div className="grid sm:grid-cols-2 gap-6 text-sm text-muted-foreground leading-relaxed">
-              <div>
-                <h3 className="font-semibold text-foreground mb-2">ARC-CO Improvements</h3>
-                <p>
-                  The ARC-CO guarantee band expanded from 86% to 90% of benchmark revenue,
-                  meaning payments trigger sooner when county revenue drops. The payment cap
-                  increased from 10% to 12% of benchmark revenue per acre. Trend-adjusted yields
-                  are now used in benchmark calculations. ARC-CO can also be stacked with SCO
-                  crop insurance (previously prohibited).
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-2">PLC Improvements</h3>
-                <p>
-                  Statutory reference prices increased significantly — corn from $3.70 to $4.10/bu,
-                  soybeans from $8.40 to $10.00/bu, wheat from $5.50 to $6.35/bu. The effective
-                  reference price escalator improved from 85% to 88% of the 5-year Olympic average MYA,
-                  and can push the ERP up to 115% of statutory. Payment limits increased to $155,000.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ CTA ═══ */}
-        <section className="mx-auto max-w-[1200px] px-6 pb-12">
-          <div className="rounded-2xl bg-gradient-to-br from-harvest-forest-800 to-harvest-forest-950 border border-harvest-gold/10 p-10 text-center relative overflow-hidden">
-            <div className="hf-noise-subtle" />
-            <div className="relative z-10">
-              <h2 className="text-2xl font-bold text-white mb-3">
-                Get Your Personalized ARC/PLC Estimate
+          {/* ── FSA Office Info ── */}
+          {(county.fsa_office_phone || county.fsa_office_address) && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-4">
+                Local FSA Office
               </h2>
-              <p className="text-white/60 max-w-lg mx-auto mb-8">
-                Enter your base acres, PLC yield, and crop to see exactly how much you could
-                receive under each program. Free, instant, no registration.
-              </p>
-              <div className="flex items-center justify-center gap-4 flex-wrap">
-                <Link
-                  href="/check"
-                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-harvest-gold text-harvest-forest-950 font-bold text-sm hover:brightness-110 transition-all shadow-lg shadow-harvest-gold/25"
-                >
-                  Run Free Calculator →
-                </Link>
-                <Link
-                  href="/signup"
-                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl border border-white/15 text-white font-semibold text-sm hover:bg-white/5 transition-all"
-                >
-                  Pro Dashboard — 14 Day Trial
-                </Link>
+              <div className="rounded-xl border border-gray-200/80 bg-white p-5 shadow-sm">
+                <p className="text-[14px] text-gray-700 font-medium mb-1">
+                  {county.display_name} FSA Service Center
+                </p>
+                {county.fsa_office_address && (
+                  <p className="text-[13px] text-gray-500">
+                    {county.fsa_office_address}
+                  </p>
+                )}
+                {county.fsa_office_phone && (
+                  <p className="text-[13px] text-gray-500 mt-1">
+                    Phone:{' '}
+                    <a
+                      href={`tel:${county.fsa_office_phone}`}
+                      className="text-[#1B4332] font-medium hover:underline"
+                    >
+                      {county.fsa_office_phone}
+                    </a>
+                  </p>
+                )}
               </div>
-            </div>
-          </div>
-        </section>
+            </section>
+          )}
 
-        {/* ═══ NEIGHBOR COUNTIES ═══ */}
-        {neighbors.length > 0 && (
-          <section className="border-t border-border/50">
-            <div className="mx-auto max-w-[1200px] px-6 py-16">
-              <h2 className="text-lg font-bold text-foreground mb-6">
-                Other {state.name} Counties
+          {/* ── Nearby Counties ── */}
+          {neighbors.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-4">
+                Nearby Counties in {state.name}
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {neighbors.map((n) => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {neighbors.slice(0, 8).map((n) => (
                   <Link
                     key={n.county_fips}
                     href={`/${n.state_slug}/${n.slug}/arc-plc`}
-                    className="px-4 py-2.5 rounded-lg border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-all"
+                    className="rounded-xl border border-gray-200/80 bg-white px-4 py-3.5 shadow-sm hover:border-[#1B4332]/20 hover:shadow-md transition-all group"
                   >
-                    {n.display_name}
+                    <span className="text-[14px] font-semibold text-[#1B4332] group-hover:text-emerald-700 transition-colors">
+                      {n.display_name}
+                    </span>
+                    <span className="block text-[11px] text-gray-400 mt-0.5">
+                      View ARC/PLC data →
+                    </span>
                   </Link>
                 ))}
               </div>
+              <div className="mt-4 text-center">
+                <Link
+                  href={`/${stateSlug}/arc-plc`}
+                  className="text-[13px] font-semibold text-[#1B4332] hover:text-emerald-700 transition-colors"
+                >
+                  View all {state.county_count} counties in {state.name} →
+                </Link>
+              </div>
+            </section>
+          )}
+
+          {/* ── Free Tools CTA ── */}
+          <section className="mb-12">
+            <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-4">
+              Free Farm Program Tools
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                {
+                  href: '/check',
+                  title: 'ARC/PLC Calculator',
+                  desc: 'Side-by-side ARC-CO vs PLC comparison with real USDA data',
+                },
+                {
+                  href: '/insurance',
+                  title: 'Crop Insurance Optimizer',
+                  desc: 'RP + SCO + ECO stacking with 10,000 Monte Carlo simulations',
+                },
+                {
+                  href: '/optimize',
+                  title: 'Election Optimizer',
+                  desc: 'Multi-year scenario modeling for optimal program choice',
+                },
+                {
+                  href: '/payments',
+                  title: 'Payment Tracker',
+                  desc: 'Track projected ARC-CO and PLC payments as MYA prices update',
+                },
+                {
+                  href: '/fba',
+                  title: 'Base Acre Analyzer',
+                  desc: 'Calculate new base acre eligibility under OBBBA',
+                },
+                {
+                  href: '/calendar',
+                  title: 'Policy Calendar',
+                  desc: 'Every USDA deadline and payment date in one place',
+                },
+              ].map((tool) => (
+                <Link
+                  key={tool.href}
+                  href={tool.href}
+                  className="rounded-xl border border-gray-200/80 bg-white px-5 py-4 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all group"
+                >
+                  <span className="text-[14px] font-bold text-[#1B4332] group-hover:text-emerald-700 transition-colors">
+                    {tool.title}
+                  </span>
+                  <span className="block text-[12px] text-gray-400 mt-1 leading-relaxed">
+                    {tool.desc}
+                  </span>
+                </Link>
+              ))}
             </div>
           </section>
-        )}
+
+          {/* ── Disclaimer ── */}
+          <div className="border-t border-gray-200 pt-6">
+            <p className="text-[10px] text-gray-400 leading-relaxed max-w-4xl">
+              Data sources: USDA Farm Service Agency ARC/PLC Program Data, USDA
+              NASS Quick Stats API. This page is not official USDA guidance.
+              HarvestFile is not affiliated with USDA. ARC/PLC election decisions
+              should be made in consultation with your local FSA office or
+              agricultural advisor. Payment projections are estimates based on
+              historical data and may not reflect actual future payments.
+            </p>
+          </div>
+        </div>
       </div>
     </>
   );
