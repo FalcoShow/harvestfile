@@ -1,13 +1,12 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase 25 Build 2: Added "Browse by State" grid + "Popular Counties" column
+// Phase 26 Build 3: Updated Free Tools column to include all 10 free tools
 //
 // CHANGES:
-//   - New "Browse by State" section — compact 50-state abbreviation grid
-//     linking to /{state}/arc-plc hub pages (critical for SEO link equity)
-//   - New "Popular Counties" column — top 8 counties by base acres
-//   - Existing link columns preserved (Free Tools, Learn, Company)
-//   - SEO benefit: every page now links to all 50 state hubs via footer
+//   - Added Commodity Markets (/markets), Spray Window (/spray-window),
+//     and Ag Weather (/weather) to the Free Tools column
+//   - Updated tool count references
+//   - Existing structure preserved: 50-state grid, Popular Counties, Learn, Company
 // =============================================================================
 
 import Link from "next/link";
@@ -16,11 +15,14 @@ import { Logo } from "./logo";
 // ── Footer link columns ─────────────────────────────────────────────────
 const footerLinks = {
   "Free Tools": [
+    { label: "Commodity Markets", href: "/markets" },
     { label: "Insurance Calculator", href: "/insurance" },
     { label: "Election Optimizer", href: "/optimize" },
     { label: "ARC/PLC Calculator", href: "/check" },
+    { label: "Ag Weather Dashboard", href: "/weather" },
+    { label: "Spray Window Calculator", href: "/spray-window" },
     { label: "Payment Scanner", href: "/payments" },
-    { label: "Base Acre Calculator", href: "/fba" },
+    { label: "Base Acre Analyzer", href: "/fba" },
     { label: "SDRP Checker", href: "/sdrp" },
     { label: "Policy Calendar", href: "/calendar" },
   ],
@@ -121,7 +123,7 @@ export function MarketingFooter() {
               </span>
             </Link>
             <p className="text-[13px] text-white/20 leading-relaxed">
-              The TurboTax of USDA farm programs. Free tools powered by live USDA data for every farming county in America.
+              The only platform that connects commodity prices to USDA farm program payments. 10 free tools powered by live USDA data for every farming county in America.
             </p>
           </div>
 
@@ -135,17 +137,17 @@ export function MarketingFooter() {
                 {links.map((link) =>
                   link.href.startsWith("mailto") ? (
                     <a
-                      key={link.label}
+                      key={link.href}
                       href={link.href}
-                      className="block text-[13px] text-white/30 hover:text-harvest-gold transition-colors duration-200"
+                      className="block text-[13px] text-white/30 hover:text-harvest-gold transition-colors"
                     >
                       {link.label}
                     </a>
                   ) : (
                     <Link
-                      key={link.label}
+                      key={link.href}
                       href={link.href}
-                      className="block text-[13px] text-white/30 hover:text-harvest-gold transition-colors duration-200"
+                      className="block text-[13px] text-white/30 hover:text-harvest-gold transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -156,18 +158,18 @@ export function MarketingFooter() {
           ))}
         </div>
 
-        {/* ── Browse by State — compact 50-state grid ────────────────── */}
+        {/* Browse by State grid */}
         <div className="mb-10">
           <div className="text-[11px] font-extrabold text-white/40 uppercase tracking-[0.1em] mb-4">
-            Browse ARC/PLC Data by State
+            Browse by State
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-x-1 gap-y-1">
             {STATES.map((state) => (
               <Link
                 key={state.abbr}
                 href={`/${state.slug}/arc-plc`}
-                className="inline-flex items-center justify-center w-[42px] h-[30px] rounded-md text-[11px] font-bold text-white/25 bg-white/[0.03] border border-white/[0.04] hover:text-harvest-gold hover:bg-white/[0.06] hover:border-harvest-gold/20 transition-all duration-200"
-                title={`${state.abbr} ARC/PLC County Data`}
+                className="inline-flex items-center justify-center w-[38px] h-[28px] text-[11px] font-bold text-white/25 hover:text-harvest-gold hover:bg-white/[0.04] rounded transition-colors"
+                title={state.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
               >
                 {state.abbr}
               </Link>
@@ -176,21 +178,14 @@ export function MarketingFooter() {
         </div>
 
         {/* Bottom bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.06] pt-6">
-          <p className="text-[11px] text-white/15">
-            © {new Date().getFullYear()} HarvestFile LLC. All rights reserved.
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-white/[0.06]">
+          <p className="text-[12px] text-white/15">
+            &copy; {new Date().getFullYear()} HarvestFile LLC. All rights reserved.
           </p>
-          <div className="flex items-center gap-4">
-            <p className="text-[11px] text-white/15">
-              Not affiliated with USDA or any government agency.
-            </p>
-            <Link
-              href="/elections"
-              className="text-[11px] text-white/15 hover:text-white/30 transition-colors"
-            >
-              Election Map
-            </Link>
-          </div>
+          <p className="text-[11px] text-white/10 max-w-[500px] text-right leading-relaxed">
+            HarvestFile is not affiliated with, endorsed by, or connected to the USDA, FSA, or any government agency.
+            Data sourced from USDA NASS, ERS, and FSA public databases.
+          </p>
         </div>
       </div>
     </footer>
