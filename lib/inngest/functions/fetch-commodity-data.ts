@@ -1,13 +1,15 @@
 // =============================================================================
-// HarvestFile — Phase 14A: Commodity Price Fetch (Inngest Cron)
+// HarvestFile — Commodity Price Fetch (Inngest Cron)
 // lib/inngest/functions/fetch-commodity-data.ts
+//
+// MIGRATED from Nasdaq Data Link CHRIS (deprecated 2024) to Yahoo Finance.
 //
 // Two crons:
 // 1. Hourly during market hours (7 AM - 4 PM CT, weekdays): Fetch futures
 // 2. Daily at 4:30 PM CT: Recompute MYA snapshots from all available data
 //
 // Data sources:
-//   - Nasdaq Data Link CHRIS database (futures settlement prices)
+//   - Yahoo Finance v8 chart API (futures close prices — free, no key)
 //   - USDA NASS Quick Stats (monthly Price Received — checked daily, updates monthly)
 // =============================================================================
 
@@ -26,15 +28,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const NASDAQ_API_KEY = process.env.NASDAQ_DATA_LINK_API_KEY || '';
 const NASS_API_KEY = process.env.NASS_API_KEY || '';
 
-// Nasdaq CHRIS codes
-const FUTURES_CODES: Record<string, string> = {
-  CORN: 'CHRIS/CME_C1',
-  SOYBEANS: 'CHRIS/CME_S1',
-  WHEAT: 'CHRIS/CME_W1',
-  OATS: 'CHRIS/CME_O1',
+// Yahoo Finance symbols (replaces dead Nasdaq CHRIS codes)
+const YAHOO_SYMBOLS: Record<string, string> = {
+  CORN: 'ZC=F',
+  SOYBEANS: 'ZS=F',
+  WHEAT: 'ZW=F',
+  OATS: 'ZO=F',
+  RICE: 'ZR=F',
+  COTTON: 'CT=F',
 };
 
 // NASS commodity names
@@ -56,63 +59,61 @@ export const fetchFuturesPrices = inngest.createFunction(
   },
   { cron: 'TZ=America/Chicago 0 7-16 * * 1-5' },
   async ({ step }) => {
-    if (!NASDAQ_API_KEY) {
-      console.warn('[FetchFutures] NASDAQ_DATA_LINK_API_KEY not set, skipping');
-      return { skipped: true, reason: 'no_api_key' };
-    }
-
     const results: Record<string, { stored: number; error?: string }> = {};
 
-    // Fetch each commodity in parallel steps
-    for (const commodity of Object.keys(FUTURES_CODES)) {
+    for (const commodity of Object.keys(YAHOO_SYMBOLS)) {
       const result = await step.run(`fetch-${commodity.toLowerCase()}`, async (): Promise<{ stored: number; error?: string }> => {
-        const code = FUTURES_CODES[commodity];
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 7); // Last 7 days
-        const startStr = startDate.toISOString().split('T')[0];
-
-        const url = `https://data.nasdaq.com/api/v3/datasets/${code}.json?api_key=${NASDAQ_API_KEY}&start_date=${startStr}&order=asc`;
+        const symbol = YAHOO_SYMBOLS[commodity];
 
         try {
-          const res = await fetch(url);
+          const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=7d`;
+          const res = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+          });
+
           if (!res.ok) return { stored: 0, error: `HTTP ${res.status}` };
 
           const json = await res.json();
-          const columns: string[] = json?.dataset?.column_names || [];
-          const data: any[][] = json?.dataset?.data || [];
+          const chartResult = json?.chart?.result?.[0];
+          if (!chartResult) return { stored: 0, error: 'No chart result' };
 
-          const settleIdx = columns.indexOf('Settle');
-          const dateIdx = columns.indexOf('Date');
-          const openIdx = columns.indexOf('Open');
-          const highIdx = columns.indexOf('High');
-          const lowIdx = columns.indexOf('Low');
-          const volIdx = columns.indexOf('Volume');
-          const oiIdx = columns.indexOf('Previous Day Open Interest');
+          const timestamps: number[] = chartResult.timestamp || [];
+          const quote = chartResult.indicators?.quote?.[0];
+          if (!quote || timestamps.length === 0) return { stored: 0, error: 'No quote data' };
 
-          if (settleIdx === -1 || dateIdx === -1) {
-            return { stored: 0, error: 'Missing Settle or Date column' };
-          }
+          const closes: (number | null)[] = quote.close || [];
+          const opens: (number | null)[] = quote.open || [];
+          const highs: (number | null)[] = quote.high || [];
+          const lows: (number | null)[] = quote.low || [];
+          const volumes: (number | null)[] = quote.volume || [];
 
-          const rows = data
-            .filter((r) => r[settleIdx] !== null)
-            .map((r) => ({
-              commodity,
-              contract_code: code,
-              price_date: r[dateIdx],
-              settle: r[settleIdx],
-              open_price: openIdx >= 0 ? r[openIdx] : null,
-              high: highIdx >= 0 ? r[highIdx] : null,
-              low: lowIdx >= 0 ? r[lowIdx] : null,
-              volume: volIdx >= 0 ? r[volIdx] : null,
-              open_interest: oiIdx >= 0 ? r[oiIdx] : null,
-              source: 'nasdaq_chris',
-              fetched_at: new Date().toISOString(),
-            }));
+          const rows = timestamps
+            .map((ts, i) => {
+              const close = closes[i];
+              if (close === null || close === undefined) return null;
+              const dateStr = new Date(ts * 1000).toISOString().split('T')[0];
+              return {
+                commodity,
+                contract_code: symbol,
+                price_date: dateStr,
+                settle: Math.round(close * 100) / 100,
+                open_price: opens[i] !== null ? Math.round(opens[i]! * 100) / 100 : null,
+                high: highs[i] !== null ? Math.round(highs[i]! * 100) / 100 : null,
+                low: lows[i] !== null ? Math.round(lows[i]! * 100) / 100 : null,
+                volume: volumes[i] || null,
+                open_interest: null,
+                source: 'yahoo_finance',
+                fetched_at: new Date().toISOString(),
+              };
+            })
+            .filter(Boolean);
 
           if (rows.length > 0) {
             const { error } = await supabase
               .from('futures_prices')
-              .upsert(rows, { onConflict: 'commodity,price_date,contract_code' });
+              .upsert(rows as any[], { onConflict: 'commodity,price_date,contract_code' });
 
             if (error) return { stored: 0, error: error.message };
           }
@@ -173,172 +174,144 @@ export const recomputeMYASnapshots = inngest.createFunction(
           for (const rec of records) {
             const val = rec.Value?.replace(/,/g, '').trim();
             if (!val || ['(D)', '(Z)', '(NA)', '(S)'].includes(val)) continue;
-
             const price = parseFloat(val);
             if (isNaN(price)) continue;
 
-            const monthNum = parseInt(rec.begin_code);
+            const monthName = rec.reference_period_desc?.toUpperCase();
             const year = parseInt(rec.year);
+            const monthNum = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'].indexOf(monthName) + 1;
             if (!monthNum || !year) continue;
 
-            // Determine marketing year for this month
-            const dateForMY = new Date(year, monthNum - 1, 15);
-            const my = getMarketingYear(code, dateForMY);
-            if (!my) continue;
-
-            const monthLabels = ['', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-              'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-
             const { error } = await supabase
-              .from('monthly_prices')
-              .upsert({
-                commodity: code,
-                marketing_year: my,
-                month_num: monthNum,
-                month_label: monthLabels[monthNum] || '',
-                price,
-                is_actual: true,
-                source: 'nass',
-                fetched_at: new Date().toISOString(),
-              }, { onConflict: 'commodity,marketing_year,month_num' });
+              .from('commodity_prices')
+              .upsert(
+                {
+                  commodity: code,
+                  year,
+                  month: monthNum,
+                  price,
+                  source: 'nass_monthly',
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'commodity,year,month' }
+              );
 
             if (!error) stored++;
           }
 
           updates[code] = stored;
         } catch (err) {
-          console.error(`[MYA] NASS fetch failed for ${code}:`, err);
+          console.error(`[MYA] NASS fetch error for ${code}:`, err);
         }
       }
 
       return { checked: true, updates };
     });
 
-    // Step 2: Recompute MYA snapshots for each commodity
-    for (const commodity of COMMODITY_ORDER) {
-      results[commodity] = await step.run(`mya-${commodity.toLowerCase()}`, async () => {
+    results.nassUpdates = nassUpdates;
+
+    // Step 2: Recompute MYA snapshots for current marketing year
+    const myaResults = await step.run('recompute-mya', async () => {
+      const snapshots: Record<string, any> = {};
+
+      for (const code of COMMODITY_ORDER) {
         try {
-          const config = COMMODITIES[commodity];
-          if (!config) return { error: 'Unknown commodity' };
+          const config = COMMODITIES[code];
+          if (!config) continue;
 
-          const marketingYear = getMarketingYear(commodity);
-          if (!marketingYear) return { error: 'Could not determine marketing year' };
+          const marketingYear = getMarketingYear(code);
+          const months = getMarketingYearMonths(code, marketingYear);
 
-          // Fetch actual monthly prices
+          // Fetch all monthly prices for this commodity and marketing year
+          const yearSet = new Set(months.map((m) => m.year));
           const { data: monthlyPrices } = await supabase
-            .from('monthly_prices')
-            .select('month_num, price, is_actual')
-            .eq('commodity', commodity)
-            .eq('marketing_year', marketingYear);
+            .from('commodity_prices')
+            .select('year, month, price')
+            .eq('commodity', code)
+            .in('year', Array.from(yearSet));
 
-          // Fetch marketing weights
+          // Fetch latest futures price for forward projection
+          const { data: latestFutures } = await supabase
+            .from('futures_prices')
+            .select('settle, price_date')
+            .eq('commodity', code)
+            .order('price_date', { ascending: false })
+            .limit(1);
+
+          const futuresPrice = latestFutures?.[0]?.settle || null;
+
+          // Fetch marketing weights from DB
           const { data: weightRows } = await supabase
             .from('marketing_weights')
             .select('month_num, weight')
-            .eq('commodity', commodity);
+            .eq('commodity', code);
 
-          // Fetch latest futures settle for projection
-          const { data: latestFutures } = await supabase
-            .from('futures_prices')
-            .select('settle')
-            .eq('commodity', commodity)
-            .order('price_date', { ascending: false })
-            .limit(1)
-            .single();
+          // Build Maps for calculateMYA
+          const actualPrices = new Map<number, number>();
+          const projectedPrices = new Map<number, number>();
+          const weights = new Map<number, number>();
 
-          // Build maps
-          const actualMap = new Map<number, number>();
-          (monthlyPrices || [])
-            .filter((p) => p.is_actual && p.price !== null)
-            .forEach((p) => actualMap.set(p.month_num, parseFloat(p.price)));
-
-          const projMap = new Map<number, number>();
-          // Use latest futures settle as proxy for all unprojected months
-          // (Simplified — full implementation would use per-month basis adjustment)
-          if (latestFutures?.settle) {
-            const futuresPrice = parseFloat(latestFutures.settle);
-            const myMonths = getMarketingYearMonths(commodity, marketingYear);
-            for (const m of myMonths) {
-              if (!actualMap.has(m.month)) {
-                projMap.set(m.month, futuresPrice);
-              }
+          // Populate weight map from DB or use equal weights
+          if (weightRows && weightRows.length > 0) {
+            for (const w of weightRows) {
+              weights.set(w.month_num, parseFloat(w.weight));
+            }
+          } else {
+            // Equal weight fallback
+            for (const m of months) {
+              weights.set(m.month, 100 / 12);
             }
           }
 
-          const weightMap = new Map<number, number>();
-          (weightRows || []).forEach((w) =>
-            weightMap.set(w.month_num, parseFloat(w.weight))
-          );
+          for (const m of months) {
+            const actual = (monthlyPrices || []).find(
+              (p: any) => p.year === m.year && p.month === m.month
+            );
+            if (actual) {
+              actualPrices.set(m.month, actual.price);
+            } else if (futuresPrice) {
+              projectedPrices.set(m.month, futuresPrice);
+            }
+          }
 
-          // Calculate
-          const calc = calculateMYA({
-            commodity,
+          const mya = calculateMYA({
+            commodity: code,
             marketingYear,
-            actualPrices: actualMap,
-            projectedPrices: projMap,
-            weights: weightMap,
+            actualPrices,
+            projectedPrices,
+            weights,
           });
 
           // Store snapshot
-          const { error: snapError } = await supabase
-            .from('mya_snapshots')
-            .insert({
-              commodity,
-              marketing_year: marketingYear,
-              months_actual: calc.monthsActual,
-              months_projected: calc.monthsProjected,
-              partial_mya: calc.partialMYA,
-              projected_mya: calc.projectedMYA,
-              confidence: calc.confidence,
-              statutory_ref_price: calc.statutoryRefPrice,
-              effective_ref_price: calc.effectiveRefPrice,
-              plc_payment_rate: calc.plcPaymentRate,
-              plc_payment_per_acre: calc.plcPaymentPerAcre,
-              arc_benchmark_revenue: calc.arcBenchmarkRevenue,
-              methodology: 'ers_futures_basis',
-              source_data: { months: calc.months },
-            });
+          const { error } = await supabase.from('commodity_prices').upsert(
+            {
+              commodity: code,
+              year: marketingYear,
+              month: 0, // 0 = MYA snapshot
+              price: mya.projectedMYA,
+              source: 'mya_computed',
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'commodity,year,month' }
+          );
 
-          if (snapError) {
-            console.error(`[MYA] Snapshot insert failed for ${commodity}:`, snapError);
-            return { error: snapError.message };
-          }
-
-          return {
+          snapshots[code] = {
             marketingYear,
-            monthsActual: calc.monthsActual,
-            projectedMYA: calc.projectedMYA,
-            plcPaymentRate: calc.plcPaymentRate,
-            confidence: calc.confidence,
+            projectedMYA: mya.projectedMYA,
+            monthsReported: mya.monthsActual,
+            futuresPrice,
+            error: error?.message || null,
           };
         } catch (err: any) {
-          return { error: err.message };
+          snapshots[code] = { error: err.message };
         }
-      });
-    }
-
-    // Step 3: Trigger cache revalidation
-    await step.run('revalidate-cache', async () => {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000';
-
-      try {
-        await fetch(`${appUrl}/api/revalidate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tag: 'commodity-prices' }),
-        });
-      } catch {
-        // Revalidation is best-effort
       }
+
+      return snapshots;
     });
 
-    return {
-      success: true,
-      nassUpdates,
-      myaSnapshots: results,
-      computedAt: new Date().toISOString(),
-    };
+    results.myaSnapshots = myaResults;
+
+    return results;
   }
 );

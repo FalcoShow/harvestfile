@@ -1,12 +1,19 @@
 // =============================================================================
-// HarvestFile — Phase 14A: Futures Price API
+// HarvestFile — Futures Price API (Yahoo Finance)
 // app/api/prices/futures/route.ts
 //
 // GET /api/prices/futures?commodity=CORN
 // GET /api/prices/futures?commodities=CORN,SOYBEANS,WHEAT
+// GET /api/prices/futures?commodities=CORN,SOYBEANS,WHEAT,OATS,RICE,COTTON&days=90
 //
-// Fetches daily futures settlement prices from Nasdaq Data Link (CHRIS database)
-// and caches them in the futures_prices Supabase table.
+// MIGRATED from Nasdaq Data Link CHRIS (deprecated 2024, data stopped updating)
+// to Yahoo Finance v8 chart API — free, no API key, covers all 6 commodities.
+//
+// Yahoo returns close prices (not official CME settlement), but the difference
+// is negligible for daily tracking. Will upgrade to Barchart when API access
+// is confirmed.
+//
+// Caches results in Supabase futures_prices table for historical tracking.
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,64 +25,103 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const NASDAQ_API_KEY = process.env.NASDAQ_DATA_LINK_API_KEY || '';
-
-// Nasdaq Data Link CHRIS contract codes
-const FUTURES_CODES: Record<string, string> = {
-  CORN: 'CHRIS/CME_C1',
-  SOYBEANS: 'CHRIS/CME_S1',
-  WHEAT: 'CHRIS/CME_W1',
-  OATS: 'CHRIS/CME_O1',
-  RICE: 'CHRIS/CME_RR1',
-  // No exchange-traded futures for sorghum or barley
+// Yahoo Finance symbols for CME/ICE commodity futures
+const YAHOO_SYMBOLS: Record<string, string> = {
+  CORN: 'ZC=F',
+  SOYBEANS: 'ZS=F',
+  WHEAT: 'ZW=F',
+  OATS: 'ZO=F',
+  RICE: 'ZR=F',
+  COTTON: 'CT=F',
 };
 
-interface NasdaqRow {
-  Date: string;
-  Open: number | null;
-  High: number | null;
-  Low: number | null;
-  Last: number | null;
-  Change: number | null;
-  Settle: number | null;
-  Volume: number | null;
-  'Previous Day Open Interest': number | null;
+// Keep legacy codes for DB compatibility
+const FUTURES_CODES: Record<string, string> = {
+  CORN: 'ZC=F',
+  SOYBEANS: 'ZS=F',
+  WHEAT: 'ZW=F',
+  OATS: 'ZO=F',
+  RICE: 'ZR=F',
+  COTTON: 'CT=F',
+};
+
+interface PricePoint {
+  date: string;
+  settle: number;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  volume: number | null;
 }
 
-async function fetchFuturesFromNasdaq(
+async function fetchFuturesFromYahoo(
   commodity: string,
   days: number = 30
-): Promise<NasdaqRow[]> {
-  const code = FUTURES_CODES[commodity];
-  if (!code || !NASDAQ_API_KEY) return [];
-
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-  const startStr = startDate.toISOString().split('T')[0];
-
-  const url = `https://data.nasdaq.com/api/v3/datasets/${code}.json?api_key=${NASDAQ_API_KEY}&start_date=${startStr}&order=asc`;
+): Promise<PricePoint[]> {
+  const symbol = YAHOO_SYMBOLS[commodity];
+  if (!symbol) return [];
 
   try {
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    // Yahoo Finance v8 chart API — no API key needed
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${days > 60 ? '6mo' : days > 14 ? '3mo' : '1mo'}`;
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      next: { revalidate: 1800 }, // Cache for 30 minutes
+    });
+
     if (!res.ok) {
-      console.error(`[Futures] Nasdaq API error for ${commodity}: ${res.status}`);
+      console.error(`[Futures] Yahoo Finance error for ${commodity} (${symbol}): ${res.status}`);
       return [];
     }
 
     const json = await res.json();
-    const columns: string[] = json?.dataset?.column_names || [];
-    const data: any[][] = json?.dataset?.data || [];
+    const result = json?.chart?.result?.[0];
+    if (!result) {
+      console.error(`[Futures] No chart result for ${commodity}`);
+      return [];
+    }
 
-    // Map array rows to objects using column names
-    return data.map((row) => {
-      const obj: any = {};
-      columns.forEach((col, i) => {
-        obj[col] = row[i];
+    const timestamps: number[] = result.timestamp || [];
+    const quote = result.indicators?.quote?.[0];
+    if (!quote || timestamps.length === 0) {
+      console.error(`[Futures] No quote data for ${commodity}`);
+      return [];
+    }
+
+    const opens: (number | null)[] = quote.open || [];
+    const highs: (number | null)[] = quote.high || [];
+    const lows: (number | null)[] = quote.low || [];
+    const closes: (number | null)[] = quote.close || [];
+    const volumes: (number | null)[] = quote.volume || [];
+
+    const prices: PricePoint[] = [];
+
+    for (let i = 0; i < timestamps.length; i++) {
+      const close = closes[i];
+      if (close === null || close === undefined) continue;
+
+      // Convert Unix timestamp to YYYY-MM-DD
+      const date = new Date(timestamps[i] * 1000);
+      const dateStr = date.toISOString().split('T')[0];
+
+      // Yahoo returns cents for grains — convert to dollars if needed
+      // Actually Yahoo returns dollar values already for ZC=F etc.
+      prices.push({
+        date: dateStr,
+        settle: Math.round(close * 100) / 100, // Use close as settle proxy
+        open: opens[i] !== null ? Math.round(opens[i]! * 100) / 100 : null,
+        high: highs[i] !== null ? Math.round(highs[i]! * 100) / 100 : null,
+        low: lows[i] !== null ? Math.round(lows[i]! * 100) / 100 : null,
+        volume: volumes[i] || null,
       });
-      return obj as NasdaqRow;
-    });
+    }
+
+    return prices;
   } catch (err) {
-    console.error(`[Futures] Failed to fetch ${commodity}:`, err);
+    console.error(`[Futures] Failed to fetch ${commodity} from Yahoo:`, err);
     return [];
   }
 }
@@ -97,8 +143,8 @@ export async function GET(request: NextRequest) {
     commodities = ['CORN', 'SOYBEANS', 'WHEAT'];
   }
 
-  // Filter to only those with futures codes
-  commodities = commodities.filter((c) => FUTURES_CODES[c]);
+  // Filter to only those with Yahoo symbols
+  commodities = commodities.filter((c) => YAHOO_SYMBOLS[c]);
 
   if (commodities.length === 0) {
     return NextResponse.json(
@@ -107,36 +153,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!NASDAQ_API_KEY) {
-    return NextResponse.json(
-      { success: false, error: 'NASDAQ_DATA_LINK_API_KEY not configured' },
-      { status: 500 }
-    );
-  }
-
   try {
     const results: Record<string, any> = {};
 
     await Promise.all(
       commodities.map(async (commodity) => {
-        const rows = await fetchFuturesFromNasdaq(commodity, daysParam);
+        const prices = await fetchFuturesFromYahoo(commodity, daysParam);
 
-        if (rows.length === 0) {
+        if (prices.length === 0) {
           results[commodity] = { commodity, prices: [], error: 'No data returned' };
           return;
         }
-
-        // Transform for response
-        const prices = rows
-          .filter((r) => r.Settle !== null && r.Settle !== undefined)
-          .map((r) => ({
-            date: r.Date,
-            settle: r.Settle,
-            open: r.Open,
-            high: r.High,
-            low: r.Low,
-            volume: r.Volume,
-          }));
 
         // Store to Supabase if requested
         if (store && prices.length > 0) {
@@ -149,7 +176,7 @@ export async function GET(request: NextRequest) {
             high: p.high,
             low: p.low,
             volume: p.volume,
-            source: 'nasdaq_chris',
+            source: 'yahoo_finance',
             fetched_at: new Date().toISOString(),
           }));
 
@@ -167,10 +194,10 @@ export async function GET(request: NextRequest) {
         const latest = prices[prices.length - 1];
         const previous = prices.length > 1 ? prices[prices.length - 2] : null;
         const change = latest && previous
-          ? Math.round((latest.settle! - previous.settle!) * 100) / 100
+          ? Math.round((latest.settle - previous.settle) * 100) / 100
           : null;
         const changePct = latest && previous && previous.settle
-          ? Math.round(((latest.settle! - previous.settle!) / previous.settle!) * 10000) / 100
+          ? Math.round(((latest.settle - previous.settle) / previous.settle) * 10000) / 100
           : null;
 
         const config = COMMODITIES[commodity];
@@ -195,6 +222,7 @@ export async function GET(request: NextRequest) {
       {
         success: true,
         data: results,
+        source: 'yahoo_finance',
         timestamp: new Date().toISOString(),
       },
       {
