@@ -1,10 +1,10 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase 27 Build 2: Added Cash Flow Forecaster (13 free tools)
+// Phase 27 Build 3: Added Farm Score (14 free tools)
 //
 // CHANGES:
-//   - Added Cash Flow Forecaster (/cashflow) to Free Tools column
-//   - Updated tool count to 13
+//   - Added Farm Score (/farm-score) to Free Tools column
+//   - Updated tool count to 14
 // =============================================================================
 
 import Link from "next/link";
@@ -15,6 +15,7 @@ const footerLinks = {
   "Free Tools": [
     { label: "Morning Dashboard", href: "/morning" },
     { label: "Cash Flow Forecaster", href: "/cashflow" },
+    { label: "Farm Score", href: "/farm-score" },
     { label: "Breakeven Calculator", href: "/breakeven" },
     { label: "Commodity Markets", href: "/markets" },
     { label: "Insurance Calculator", href: "/insurance" },
@@ -124,7 +125,7 @@ export function MarketingFooter() {
               </span>
             </Link>
             <p className="text-[13px] text-white/20 leading-relaxed">
-              The farmer&apos;s Bloomberg Terminal. 13 free tools powered by live USDA data for every farming county in America.
+              The farmer&apos;s Bloomberg Terminal. 14 free tools powered by live USDA data for every farming county in America.
             </p>
           </div>
 

@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 27 Build 2: Added Cash Flow Forecaster (13 free tools)
+// Phase 27 Build 3: Added Farm Score (14 free tools)
 //
-// Premium dropdown showing all 13 free tools with icons and descriptions.
+// Premium dropdown showing all 14 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -31,6 +31,17 @@ const FREE_TOOLS = [
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+      </svg>
+    ),
+    badge: null,
+  },
+  {
+    href: '/farm-score',
+    label: 'Farm Score',
+    description: 'Financial health rating 0–850',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20V10" /><path d="m18 20-6-6" /><path d="m6 20 6-6" /><circle cx="12" cy="7" r="3" />
       </svg>
     ),
     badge: 'NEW',
