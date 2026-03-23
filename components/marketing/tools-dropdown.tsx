@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 27 Build 3: Added Farm Score (14 free tools)
+// Phase 28 Build 1: Added Grain Marketing (15 free tools)
 //
-// Premium dropdown showing all 14 free tools with icons and descriptions.
+// Premium dropdown showing all 15 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -25,6 +25,17 @@ const FREE_TOOLS = [
     badge: null,
   },
   {
+    href: '/grain',
+    label: 'Grain Marketing',
+    description: 'Marketing Score + position tracking',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+      </svg>
+    ),
+    badge: 'NEW',
+  },
+  {
     href: '/cashflow',
     label: 'Cash Flow Forecaster',
     description: '12-month projections & LOC tracking',
@@ -44,7 +55,7 @@ const FREE_TOOLS = [
         <path d="M12 20V10" /><path d="m18 20-6-6" /><path d="m6 20 6-6" /><circle cx="12" cy="7" r="3" />
       </svg>
     ),
-    badge: 'NEW',
+    badge: null,
   },
   {
     href: '/breakeven',

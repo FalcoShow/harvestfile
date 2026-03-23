@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// Phase 27 Build 3: Updated to 14 free tools — added Farm Score
+// Phase 28 Build 1: Updated to 15 free tools — added Grain Marketing
 //
 // Portal-based overlay (fixes iOS rendering). Uses createPortal to render
 // on document.body, escaping header stacking context.
@@ -19,8 +19,9 @@ interface MobileMenuProps {
 
 const FREE_TOOLS = [
   { href: "/morning", label: "Morning Dashboard", desc: "Weather, markets & spray", badge: null },
+  { href: "/grain", label: "Grain Marketing", desc: "Marketing Score + positions", badge: "NEW" },
   { href: "/cashflow", label: "Cash Flow Forecaster", desc: "12-month projections & LOC", badge: null },
-  { href: "/farm-score", label: "Farm Score", desc: "Financial health 0–850", badge: "NEW" },
+  { href: "/farm-score", label: "Farm Score", desc: "Financial health 0–850", badge: null },
   { href: "/breakeven", label: "Breakeven Calculator", desc: "Cost analysis vs. live futures", badge: null },
   { href: "/markets", label: "Commodity Markets", desc: "Futures + ARC/PLC impact", badge: null },
   { href: "/insurance", label: "Insurance Calculator", desc: "RP + SCO + ECO stacking", badge: null },
