@@ -81,9 +81,9 @@ const MARKETING_STRATEGIES: Record<string, { label: string; desc: string; timing
 // Fix marketing strategies to ensure they're proper 12-month arrays summing to ~100
 const SALE_TIMING: Record<string, number[]> = {
   harvest: [0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 35, 25],
-  store50:  [0, 0, 10, 10, 10, 0, 0, 0, 0, 20, 17, 13],
+  store50:  [10, 10, 10, 10, 10, 0, 0, 0, 0, 20, 17, 13],
   forward:  [0, 0, 0, 0, 0, 10, 15, 15, 0, 24, 21, 15],
-  spread:   [5, 5, 8, 8, 8, 5, 0, 0, 0, 20, 18, 13],
+  spread:   [11, 11, 11, 11, 11, 6, 0, 0, 0, 13, 13, 13],
 };
 
 // Crop configurations (shared with breakeven)
@@ -320,6 +320,19 @@ export default function CashFlowPage() {
   // View toggle
   const [chartView, setChartView] = useState<'cumulative' | 'monthly'>('cumulative');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [addCropOpen, setAddCropOpen] = useState(false);
+  const addCropRef = React.useRef<HTMLDivElement>(null);
+
+  // Close Add Crop dropdown on outside click
+  React.useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (addCropRef.current && !addCropRef.current.contains(e.target as Node)) {
+        setAddCropOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   // ── Fetch live futures ────────────────────────────────────────────────
   useEffect(() => {
@@ -676,22 +689,27 @@ export default function CashFlowPage() {
                     Farm Setup — {totalAcres.toLocaleString()} Total Acres
                   </h3>
                   {availableCrops.length > 0 && (
-                    <div className="relative group">
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors">
+                    <div className="relative" ref={addCropRef}>
+                      <button
+                        onClick={() => setAddCropOpen(!addCropOpen)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                      >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         Add Crop
                       </button>
-                      <div className="hidden group-hover:block absolute top-full right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 min-w-[150px]">
-                        {availableCrops.map(code => {
-                          const config = CROP_CONFIGS[code];
-                          return (
-                            <button key={code} onClick={() => addCrop(code)}
-                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                              <span>{config.emoji}</span> {config.name}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      {addCropOpen && (
+                        <div className="absolute top-full right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 min-w-[150px]">
+                          {availableCrops.map(code => {
+                            const config = CROP_CONFIGS[code];
+                            return (
+                              <button key={code} onClick={() => { addCrop(code); setAddCropOpen(false); }}
+                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                                <span>{config.emoji}</span> {config.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
