@@ -64,6 +64,7 @@ export default async function sitemap({
       { url: `${baseUrl}/check`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
       { url: `${baseUrl}/spray-window`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
       { url: `${baseUrl}/weather`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
+      { url: `${baseUrl}/morning`, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
       { url: `${baseUrl}/markets`, lastModified: now, changeFrequency: 'daily', priority: 0.95 },
       { url: `${baseUrl}/insurance`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
       { url: `${baseUrl}/optimize`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },

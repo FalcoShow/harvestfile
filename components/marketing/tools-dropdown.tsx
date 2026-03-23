@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 26 Build 3: Added Markets, Spray Window, Weather (10 free tools)
+// Phase 26 Build 4: Added Morning Dashboard (11 free tools)
 //
-// Premium dropdown showing all 10 free tools with icons and descriptions.
+// Premium dropdown showing all 11 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -14,6 +14,17 @@ import Link from 'next/link';
 
 const FREE_TOOLS = [
   {
+    href: '/morning',
+    label: 'Morning Dashboard',
+    description: 'Weather, markets & spray — one page',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    ),
+    badge: 'NEW',
+  },
+  {
     href: '/markets',
     label: 'Commodity Markets',
     description: 'Futures prices with ARC/PLC payment impact',
@@ -22,7 +33,7 @@ const FREE_TOOLS = [
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
     ),
-    badge: 'NEW',
+    badge: null,
   },
   {
     href: '/insurance',
@@ -130,7 +141,6 @@ export function ToolsDropdown() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close on click outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -157,7 +167,6 @@ export function ToolsDropdown() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Trigger button */}
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 text-sm font-medium transition-colors duration-500 hover:opacity-80"
@@ -179,7 +188,6 @@ export function ToolsDropdown() {
         </svg>
       </button>
 
-      {/* Dropdown panel */}
       {open && (
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-[340px] max-h-[75vh] rounded-2xl border shadow-2xl overflow-hidden"
@@ -189,7 +197,6 @@ export function ToolsDropdown() {
             backdropFilter: 'blur(24px)',
           }}
         >
-          {/* Header */}
           <div className="px-4 pt-4 pb-2">
             <p
               className="text-[11px] font-bold uppercase tracking-[0.1em]"
@@ -199,7 +206,6 @@ export function ToolsDropdown() {
             </p>
           </div>
 
-          {/* Tool links — scrollable */}
           <div className="px-2 pb-2 max-h-[55vh] overflow-y-auto">
             {FREE_TOOLS.map((tool) => (
               <Link
@@ -239,7 +245,6 @@ export function ToolsDropdown() {
             ))}
           </div>
 
-          {/* Footer CTA */}
           <div
             className="px-4 py-3 border-t"
             style={{ borderColor: 'var(--dropdown-border, rgba(255,255,255,0.06))' }}

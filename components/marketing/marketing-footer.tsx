@@ -1,12 +1,10 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase 26 Build 3: Updated Free Tools column to include all 10 free tools
+// Phase 26 Build 4: Updated Free Tools column to include all 11 free tools
 //
 // CHANGES:
-//   - Added Commodity Markets (/markets), Spray Window (/spray-window),
-//     and Ag Weather (/weather) to the Free Tools column
-//   - Updated tool count references
-//   - Existing structure preserved: 50-state grid, Popular Counties, Learn, Company
+//   - Added Morning Dashboard (/morning) to Free Tools column at top
+//   - Updated tool count to 11
 // =============================================================================
 
 import Link from "next/link";
@@ -15,6 +13,7 @@ import { Logo } from "./logo";
 // ── Footer link columns ─────────────────────────────────────────────────
 const footerLinks = {
   "Free Tools": [
+    { label: "Morning Dashboard", href: "/morning" },
     { label: "Commodity Markets", href: "/markets" },
     { label: "Insurance Calculator", href: "/insurance" },
     { label: "Election Optimizer", href: "/optimize" },
@@ -123,7 +122,7 @@ export function MarketingFooter() {
               </span>
             </Link>
             <p className="text-[13px] text-white/20 leading-relaxed">
-              The only platform that connects commodity prices to USDA farm program payments. 10 free tools powered by live USDA data for every farming county in America.
+              The farmer&apos;s Bloomberg Terminal. 11 free tools powered by live USDA data for every farming county in America.
             </p>
           </div>
 
