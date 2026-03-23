@@ -276,7 +276,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const result = streamText({
-      model: anthropic('claude-sonnet-4-5-20250514'),
+      model: anthropic('claude-sonnet-4-20250514'),
       system: SYSTEM_PROMPT,
       messages: formattedMessages,
       tools: advisorTools,
