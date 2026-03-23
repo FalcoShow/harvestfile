@@ -1,6 +1,7 @@
 // =============================================================================
 // app/(marketing)/advisor/page.tsx
 // HarvestFile — Phase 29 Build 1: AI Farm Advisor
+// Phase 29.5: Fixed auto-scroll — no longer hijacks reading position
 //
 // FREE TOOL #16 — The ONLY AI farm financial advisor that connects to live
 // commodity futures, knows OBBBA farm bill rules, and can estimate ARC/PLC
@@ -99,13 +100,49 @@ export default function AdvisorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const userScrolledUpRef = useRef(false);
 
-  // Auto-scroll
+  // ─── Smart auto-scroll: only scroll if user is near the bottom ──────
+  const isNearBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return true;
+    const threshold = 120; // px from bottom
+    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  }, []);
+
+  // Track whether user has scrolled up during streaming
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent]);
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (isLoading) {
+        userScrolledUpRef.current = !isNearBottom();
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isLoading, isNearBottom]);
+
+  // Auto-scroll only when appropriate
+  useEffect(() => {
+    if (!userScrolledUpRef.current && isNearBottom()) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, streamingContent, isNearBottom]);
+
+  // Reset scroll tracking when a new message is sent
+  useEffect(() => {
+    if (isLoading) {
+      userScrolledUpRef.current = false;
+      // Scroll to bottom when user sends a new message
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isLoading]);
 
   // Focus on load
   useEffect(() => {
@@ -277,7 +314,11 @@ export default function AdvisorPage() {
         <div className="bg-white rounded-2xl shadow-lg border border-[#1B4332]/10 overflow-hidden flex flex-col" style={{ minHeight: '600px' }}>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6" style={{ maxHeight: '60vh' }}>
+          <div
+            ref={messagesContainerRef}
+            className="flex-1 overflow-y-auto p-6 space-y-6"
+            style={{ maxHeight: '60vh' }}
+          >
 
             {/* Welcome state */}
             {messages.length === 0 && !isLoading && (

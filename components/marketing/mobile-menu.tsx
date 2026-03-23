@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// Phase 28 Build 1: Updated to 15 free tools — added Grain Marketing
+// Phase 29.5: Updated to 16 free tools — added AI Farm Advisor
 //
 // Portal-based overlay (fixes iOS rendering). Uses createPortal to render
 // on document.body, escaping header stacking context.
@@ -18,8 +18,9 @@ interface MobileMenuProps {
 }
 
 const FREE_TOOLS = [
+  { href: "/advisor", label: "AI Farm Advisor", desc: "AI-powered financial advisor", badge: "NEW" },
   { href: "/morning", label: "Morning Dashboard", desc: "Weather, markets & spray", badge: null },
-  { href: "/grain", label: "Grain Marketing", desc: "Marketing Score + positions", badge: "NEW" },
+  { href: "/grain", label: "Grain Marketing", desc: "Marketing Score + positions", badge: null },
   { href: "/cashflow", label: "Cash Flow Forecaster", desc: "12-month projections & LOC", badge: null },
   { href: "/farm-score", label: "Farm Score", desc: "Financial health 0–850", badge: null },
   { href: "/breakeven", label: "Breakeven Calculator", desc: "Cost analysis vs. live futures", badge: null },
@@ -122,7 +123,7 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
         <nav className="flex-1 px-6 pt-4">
           {/* Free Tools section */}
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30 mb-3">
-            Free Tools
+            16 Free Tools
           </p>
           <div className="space-y-0.5 mb-6">
             {FREE_TOOLS.map((tool) => (

@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 28 Build 1: Added Grain Marketing (15 free tools)
+// Phase 29.5: Updated to 16 free tools — added AI Farm Advisor
 //
-// Premium dropdown showing all 15 free tools with icons and descriptions.
+// Premium dropdown showing all 16 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -13,6 +13,17 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 
 const FREE_TOOLS = [
+  {
+    href: '/advisor',
+    label: 'AI Farm Advisor',
+    description: 'AI-powered farm financial advisor',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93" /><path d="M8.24 9.93A4 4 0 0 1 12 2" /><path d="M12 18v-8" /><path d="m8 22 4-4 4 4" /><circle cx="12" cy="14" r="1" />
+      </svg>
+    ),
+    badge: 'NEW',
+  },
   {
     href: '/morning',
     label: 'Morning Dashboard',
@@ -33,7 +44,7 @@ const FREE_TOOLS = [
         <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
       </svg>
     ),
-    badge: 'NEW',
+    badge: null,
   },
   {
     href: '/cashflow',
@@ -246,7 +257,7 @@ export function ToolsDropdown() {
               className="text-[11px] font-bold uppercase tracking-[0.1em]"
               style={{ color: 'var(--dropdown-muted, rgba(255,255,255,0.3))' }}
             >
-              Free Tools — No Account Required
+              16 Free Tools — No Account Required
             </p>
           </div>
 

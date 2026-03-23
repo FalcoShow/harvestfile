@@ -1,10 +1,10 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase 28 Build 1: Added Grain Marketing (15 free tools)
+// Phase 29.5: Updated to 16 free tools — added AI Farm Advisor
 //
 // CHANGES:
-//   - Added Grain Marketing (/grain) to Free Tools column
-//   - Updated tool count to 15
+//   - Added AI Farm Advisor (/advisor) to Free Tools column
+//   - Updated tool count to 16
 // =============================================================================
 
 import Link from "next/link";
@@ -13,6 +13,7 @@ import { Logo } from "./logo";
 // ── Footer link columns ─────────────────────────────────────────────────
 const footerLinks = {
   "Free Tools": [
+    { label: "AI Farm Advisor", href: "/advisor" },
     { label: "Morning Dashboard", href: "/morning" },
     { label: "Grain Marketing", href: "/grain" },
     { label: "Cash Flow Forecaster", href: "/cashflow" },
@@ -126,7 +127,7 @@ export function MarketingFooter() {
               </span>
             </Link>
             <p className="text-[13px] text-white/20 leading-relaxed">
-              The farmer&apos;s Bloomberg Terminal. 15 free tools powered by live USDA data for every farming county in America.
+              The farmer&apos;s Bloomberg Terminal. 16 free tools powered by live USDA data for every farming county in America.
             </p>
           </div>
 
