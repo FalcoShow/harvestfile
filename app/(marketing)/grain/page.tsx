@@ -389,10 +389,12 @@ export default function GrainMarketingPage() {
   useEffect(() => {
     async function fetchFutures() {
       try {
-        const res = await fetch('/api/prices/futures');
+        const res = await fetch('/api/prices/futures?commodities=CORN,SOYBEANS,WHEAT,COTTON,RICE');
         if (res.ok) {
-          const data = await res.json();
-          setFutures(data);
+          const json = await res.json();
+          if (json.success && json.data) {
+            setFutures(json.data);
+          }
         }
       } catch (e) {
         console.error('Failed to fetch futures:', e);
