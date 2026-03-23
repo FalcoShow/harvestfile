@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// Phase 27 Build 1: Updated to 12 free tools (was 7 — severely outdated)
+// Phase 27 Build 2: Updated to 13 free tools — added Cash Flow Forecaster
 //
 // Portal-based overlay (fixes iOS rendering). Uses createPortal to render
 // on document.body, escaping header stacking context.
@@ -19,7 +19,8 @@ interface MobileMenuProps {
 
 const FREE_TOOLS = [
   { href: "/morning", label: "Morning Dashboard", desc: "Weather, markets & spray", badge: null },
-  { href: "/breakeven", label: "Breakeven Calculator", desc: "Cost analysis vs. live futures", badge: "NEW" },
+  { href: "/cashflow", label: "Cash Flow Forecaster", desc: "12-month projections & LOC", badge: "NEW" },
+  { href: "/breakeven", label: "Breakeven Calculator", desc: "Cost analysis vs. live futures", badge: null },
   { href: "/markets", label: "Commodity Markets", desc: "Futures + ARC/PLC impact", badge: null },
   { href: "/insurance", label: "Insurance Calculator", desc: "RP + SCO + ECO stacking", badge: null },
   { href: "/optimize", label: "Election Optimizer", desc: "Monte Carlo ARC vs PLC", badge: null },

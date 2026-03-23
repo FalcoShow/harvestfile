@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 27 Build 1: Added Breakeven Calculator (12 free tools)
+// Phase 27 Build 2: Added Cash Flow Forecaster (13 free tools)
 //
-// Premium dropdown showing all 12 free tools with icons and descriptions.
+// Premium dropdown showing all 13 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -25,6 +25,17 @@ const FREE_TOOLS = [
     badge: null,
   },
   {
+    href: '/cashflow',
+    label: 'Cash Flow Forecaster',
+    description: '12-month projections & LOC tracking',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+      </svg>
+    ),
+    badge: 'NEW',
+  },
+  {
     href: '/breakeven',
     label: 'Breakeven Calculator',
     description: 'Cost analysis vs. live futures prices',
@@ -33,7 +44,7 @@ const FREE_TOOLS = [
         <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </svg>
     ),
-    badge: 'NEW',
+    badge: null,
   },
   {
     href: '/markets',

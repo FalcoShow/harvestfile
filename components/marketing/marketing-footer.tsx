@@ -1,10 +1,10 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase 27 Build 1: Added Breakeven Calculator (12 free tools)
+// Phase 27 Build 2: Added Cash Flow Forecaster (13 free tools)
 //
 // CHANGES:
-//   - Added Breakeven Calculator (/breakeven) to Free Tools column
-//   - Updated tool count to 12
+//   - Added Cash Flow Forecaster (/cashflow) to Free Tools column
+//   - Updated tool count to 13
 // =============================================================================
 
 import Link from "next/link";
@@ -14,6 +14,7 @@ import { Logo } from "./logo";
 const footerLinks = {
   "Free Tools": [
     { label: "Morning Dashboard", href: "/morning" },
+    { label: "Cash Flow Forecaster", href: "/cashflow" },
     { label: "Breakeven Calculator", href: "/breakeven" },
     { label: "Commodity Markets", href: "/markets" },
     { label: "Insurance Calculator", href: "/insurance" },
@@ -123,7 +124,7 @@ export function MarketingFooter() {
               </span>
             </Link>
             <p className="text-[13px] text-white/20 leading-relaxed">
-              The farmer&apos;s Bloomberg Terminal. 12 free tools powered by live USDA data for every farming county in America.
+              The farmer&apos;s Bloomberg Terminal. 13 free tools powered by live USDA data for every farming county in America.
             </p>
           </div>
 
