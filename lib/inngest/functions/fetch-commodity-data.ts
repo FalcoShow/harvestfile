@@ -8,6 +8,10 @@
 // 1. Hourly during market hours (7 AM - 4 PM CT, weekdays): Fetch futures
 // 2. Daily at 4:30 PM CT: Recompute MYA snapshots from all available data
 //
+// CRITICAL: Yahoo Finance returns raw CME/ICE exchange quotes in CENTS per unit.
+// We divide by 100 to convert to $/unit for consistency with USDA reference
+// prices, NASS marketing year average prices, and all downstream calculations.
+//
 // Data sources:
 //   - Yahoo Finance v8 chart API (futures close prices — free, no key)
 //   - USDA NASS Quick Stats (monthly Price Received — checked daily, updates monthly)
@@ -49,6 +53,15 @@ const NASS_COMMODITIES: Record<string, string> = {
   BARLEY: 'BARLEY',
   OATS: 'OATS',
 };
+
+// ─── Cents → Dollars conversion ──────────────────────────────────────────────
+// All CME/ICE commodity futures are quoted in cents per unit on the exchange.
+// Yahoo Finance returns the raw exchange quote. We convert to dollars here
+// so stored values in futures_prices match USDA prices ($/bu, $/cwt, $/lb).
+// ─────────────────────────────────────────────────────────────────────────────
+function centsToDollars(cents: number): number {
+  return Math.round((cents / 100) * 10000) / 10000;
+}
 
 // ─── Cron 1: Fetch futures prices hourly during market hours ─────────────────
 
@@ -98,10 +111,10 @@ export const fetchFuturesPrices = inngest.createFunction(
                 commodity,
                 contract_code: symbol,
                 price_date: dateStr,
-                settle: Math.round(close * 100) / 100,
-                open_price: opens[i] !== null ? Math.round(opens[i]! * 100) / 100 : null,
-                high: highs[i] !== null ? Math.round(highs[i]! * 100) / 100 : null,
-                low: lows[i] !== null ? Math.round(lows[i]! * 100) / 100 : null,
+                settle: centsToDollars(close),
+                open_price: opens[i] !== null ? centsToDollars(opens[i]!) : null,
+                high: highs[i] !== null ? centsToDollars(highs[i]!) : null,
+                low: lows[i] !== null ? centsToDollars(lows[i]!) : null,
                 volume: volumes[i] || null,
                 open_interest: null,
                 source: 'yahoo_finance',
@@ -231,6 +244,8 @@ export const recomputeMYASnapshots = inngest.createFunction(
             .in('year', Array.from(yearSet));
 
           // Fetch latest futures price for forward projection
+          // NOTE: After cents→dollars fix, stored futures are in $/unit,
+          // matching NASS monthly prices — MYA projection is now correct.
           const { data: latestFutures } = await supabase
             .from('futures_prices')
             .select('settle, price_date')

@@ -9,9 +9,17 @@
 // MIGRATED from Nasdaq Data Link CHRIS (deprecated 2024, data stopped updating)
 // to Yahoo Finance v8 chart API — free, no API key, covers all 6 commodities.
 //
-// Yahoo returns close prices (not official CME settlement), but the difference
-// is negligible for daily tracking. Will upgrade to Barchart when API access
-// is confirmed.
+// CRITICAL: Yahoo Finance returns raw CME/ICE exchange quotes in CENTS per unit.
+// All grain/commodity futures trade in cents:
+//   - Corn (ZC=F): cents/bushel → 460 = $4.60/bu
+//   - Soybeans (ZS=F): cents/bushel → 1165 = $11.65/bu
+//   - Wheat (ZW=F): cents/bushel → 589 = $5.89/bu
+//   - Oats (ZO=F): cents/bushel → 340 = $3.40/bu
+//   - Rice (ZR=F): cents/cwt → 1850 = $18.50/cwt
+//   - Cotton (CT=F): cents/lb → 68 = $0.68/lb
+//
+// We divide by 100 to convert to $/unit for consistency with USDA reference
+// prices, NASS marketing year average prices, and farmer breakeven costs.
 //
 // Caches results in Supabase futures_prices table for historical tracking.
 // =============================================================================
@@ -44,6 +52,16 @@ const FUTURES_CODES: Record<string, string> = {
   RICE: 'ZR=F',
   COTTON: 'CT=F',
 };
+
+// ─── Cents → Dollars conversion ──────────────────────────────────────────────
+// All CME/ICE commodity futures are quoted in cents per unit on the exchange.
+// Yahoo Finance returns the raw exchange quote. We convert to dollars here
+// so every downstream consumer (Markets page, Grain page, Cash Flow, Marketing
+// Score, MYA projections) works in $/unit matching USDA reference prices.
+// ─────────────────────────────────────────────────────────────────────────────
+function centsToDollars(cents: number): number {
+  return Math.round((cents / 100) * 10000) / 10000;
+}
 
 interface PricePoint {
   date: string;
@@ -107,14 +125,13 @@ async function fetchFuturesFromYahoo(
       const date = new Date(timestamps[i] * 1000);
       const dateStr = date.toISOString().split('T')[0];
 
-      // Yahoo returns cents for grains — convert to dollars if needed
-      // Actually Yahoo returns dollar values already for ZC=F etc.
+      // Convert from exchange cents to dollars per unit
       prices.push({
         date: dateStr,
-        settle: Math.round(close * 100) / 100, // Use close as settle proxy
-        open: opens[i] !== null ? Math.round(opens[i]! * 100) / 100 : null,
-        high: highs[i] !== null ? Math.round(highs[i]! * 100) / 100 : null,
-        low: lows[i] !== null ? Math.round(lows[i]! * 100) / 100 : null,
+        settle: centsToDollars(close),
+        open: opens[i] !== null ? centsToDollars(opens[i]!) : null,
+        high: highs[i] !== null ? centsToDollars(highs[i]!) : null,
+        low: lows[i] !== null ? centsToDollars(lows[i]!) : null,
         volume: volumes[i] || null,
       });
     }
@@ -165,7 +182,7 @@ export async function GET(request: NextRequest) {
           return;
         }
 
-        // Store to Supabase if requested
+        // Store to Supabase if requested (prices are already converted to $/unit)
         if (store && prices.length > 0) {
           const upsertRows = prices.map((p) => ({
             commodity,
@@ -194,7 +211,7 @@ export async function GET(request: NextRequest) {
         const latest = prices[prices.length - 1];
         const previous = prices.length > 1 ? prices[prices.length - 2] : null;
         const change = latest && previous
-          ? Math.round((latest.settle - previous.settle) * 100) / 100
+          ? Math.round((latest.settle - previous.settle) * 10000) / 10000
           : null;
         const changePct = latest && previous && previous.settle
           ? Math.round(((latest.settle - previous.settle) / previous.settle) * 10000) / 100
