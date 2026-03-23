@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// Phase 24A Build 2: Added Insurance Calculator (7th free tool)
+// Phase 27 Build 1: Updated to 12 free tools (was 7 — severely outdated)
 //
 // Portal-based overlay (fixes iOS rendering). Uses createPortal to render
 // on document.body, escaping header stacking context.
@@ -18,9 +18,14 @@ interface MobileMenuProps {
 }
 
 const FREE_TOOLS = [
-  { href: "/insurance", label: "Insurance Calculator", desc: "RP + SCO + ECO stacking", badge: "NEW" },
+  { href: "/morning", label: "Morning Dashboard", desc: "Weather, markets & spray", badge: null },
+  { href: "/breakeven", label: "Breakeven Calculator", desc: "Cost analysis vs. live futures", badge: "NEW" },
+  { href: "/markets", label: "Commodity Markets", desc: "Futures + ARC/PLC impact", badge: null },
+  { href: "/insurance", label: "Insurance Calculator", desc: "RP + SCO + ECO stacking", badge: null },
   { href: "/optimize", label: "Election Optimizer", desc: "Monte Carlo ARC vs PLC", badge: null },
   { href: "/check", label: "ARC/PLC Calculator", desc: "Compare programs by county", badge: null },
+  { href: "/weather", label: "Ag Weather Dashboard", desc: "GDD, soil temps & planting", badge: null },
+  { href: "/spray-window", label: "Spray Window Calculator", desc: "GO/NO-GO spray decisions", badge: null },
   { href: "/payments", label: "Payment Scanner", desc: "Projected payments", badge: null },
   { href: "/fba", label: "Base Acre Calculator", desc: "OBBBA base acres", badge: null },
   { href: "/sdrp", label: "SDRP Checker", desc: "Dairy eligibility", badge: null },

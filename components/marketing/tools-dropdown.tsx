@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 26 Build 4: Added Morning Dashboard (11 free tools)
+// Phase 27 Build 1: Added Breakeven Calculator (12 free tools)
 //
-// Premium dropdown showing all 11 free tools with icons and descriptions.
+// Premium dropdown showing all 12 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -20,6 +20,17 @@ const FREE_TOOLS = [
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    ),
+    badge: null,
+  },
+  {
+    href: '/breakeven',
+    label: 'Breakeven Calculator',
+    description: 'Cost analysis vs. live futures prices',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </svg>
     ),
     badge: 'NEW',
