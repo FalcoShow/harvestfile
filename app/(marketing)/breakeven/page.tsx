@@ -367,6 +367,53 @@ function ProfitMeter({ breakeven, marketPrice }: { breakeven: number; marketPric
   );
 }
 
+// ─── Add Crop Dropdown (click-based, works on mobile + desktop) ─────────────
+
+function AddCropDropdown({ availableCrops, onAdd }: { availableCrops: string[]; onAdd: (code: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all border border-dashed border-gray-300 hover:border-gray-400"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Add Crop
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 min-w-[160px]">
+          {availableCrops.map((code) => {
+            const config = CROP_CONFIGS[code];
+            return (
+              <button
+                key={code}
+                onClick={() => { onAdd(code); setOpen(false); }}
+                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <span>{config.emoji}</span> {config.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function BreakevenPage() {
@@ -665,28 +712,7 @@ export default function BreakevenPage() {
 
             {/* Add crop */}
             {availableCrops.length > 0 && crops.length < 5 && (
-              <div className="relative group">
-                <button className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-all border border-dashed border-gray-300 hover:border-gray-400">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Add Crop
-                </button>
-                <div className="hidden group-hover:block absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 min-w-[160px]">
-                  {availableCrops.map((code) => {
-                    const config = CROP_CONFIGS[code];
-                    return (
-                      <button
-                        key={code}
-                        onClick={() => addCrop(code)}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <span>{config.emoji}</span> {config.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <AddCropDropdown availableCrops={availableCrops} onAdd={addCrop} />
             )}
           </div>
 
