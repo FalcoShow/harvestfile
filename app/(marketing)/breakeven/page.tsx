@@ -670,7 +670,7 @@ export default function BreakevenPage() {
         <div className="mx-auto max-w-[1200px] px-6">
 
           {/* Crop tabs + add button */}
-          <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex items-center gap-2 mb-6 flex-wrap">
             {crops.map((crop) => {
               const config = CROP_CONFIGS[crop.cropCode];
               const calc = calculations.find((c) => c.id === crop.id);
