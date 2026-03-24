@@ -19,8 +19,11 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import Link from 'next/link';
+
+// Phase 31 Build 4: Lazy-load peer context sidebar for zero impact on main tool paint
+const PeerContextSidebar = lazy(() => import('./_components/PeerContextSidebar'));
 import {
   AreaChart,
   Area,
@@ -1180,6 +1183,11 @@ export default function GrainMarketingPage() {
           </div>
         </div>
       </section>
+
+      {/* Phase 31 Build 4: Peer Context Sidebar — Cross-tool integration #4 */}
+      <Suspense fallback={null}>
+        <PeerContextSidebar />
+      </Suspense>
     </div>
   );
 }
