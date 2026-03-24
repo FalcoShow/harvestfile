@@ -157,7 +157,7 @@ export default function BenchmarkAlertCard() {
           choice: bridgeData!.results.best,
         });
 
-        const res = await fetch(`/api/benchmark-alert?${params}`);
+        const res = await fetch(`/api/benchmarks/benchmark-alert?${params}`);
         const json = await res.json();
 
         if (json.success && json.alert) {
