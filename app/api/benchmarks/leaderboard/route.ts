@@ -1,21 +1,12 @@
 // =============================================================================
-// HarvestFile — Phase 30 Build 1: State Benchmarking Leaderboard API
+// HarvestFile — Phase 30 Build 3: State Benchmarking Leaderboard API (v2)
 // GET /api/benchmarks/leaderboard
 //
-// Returns state-level benchmarking statistics for the Election Night Dashboard:
-// - States ranked by total submissions
-// - County completion rates per state
-// - Weekly activity trends
-// - National totals
+// FIXED: County counts now pulled from actual historical_enrollment data
+// instead of hardcoded approximations. Uses 2025 (latest complete year)
+// as the baseline for "total farming counties."
 //
-// Response: {
-//   states: [{ state_fips, state_abbr, state_name, total_submissions,
-//              unique_counties, total_farming_counties, completion_pct,
-//              this_week }],
-//   national: { total_submissions, total_counties_with_data, total_farming_counties,
-//               this_week_submissions },
-//   updated_at
-// }
+// Returns state-level benchmarking statistics for the Election Night Dashboard.
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -25,19 +16,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
-// Approximate number of farming counties per state (counties with >1000 base acres)
-// Source: USDA FSA enrolled base acre data
-const FARMING_COUNTIES_BY_STATE: Record<string, number> = {
-  '01': 52, '02': 5, '04': 10, '05': 55, '06': 42, '08': 40, '09': 6,
-  '10': 3, '12': 35, '13': 105, '15': 3, '16': 30, '17': 95, '18': 82,
-  '19': 96, '20': 95, '21': 85, '22': 45, '23': 10, '24': 18, '25': 8,
-  '26': 62, '27': 72, '28': 60, '29': 98, '30': 42, '31': 82, '32': 10,
-  '33': 5, '34': 12, '35': 18, '36': 40, '37': 70, '38': 48, '39': 72,
-  '40': 65, '41': 25, '42': 48, '44': 3, '45': 35, '46': 55, '47': 70,
-  '48': 180, '49': 15, '50': 8, '51': 70, '53': 28, '54': 30, '55': 60,
-  '56': 18,
-};
 
 const STATE_NAMES: Record<string, string> = {
   '01': 'Alabama', '02': 'Alaska', '04': 'Arizona', '05': 'Arkansas',
@@ -75,8 +53,54 @@ function getWeekStart(): string {
   return monday.toISOString().split('T')[0];
 }
 
+// ─── Get real farming county counts from historical_enrollment ───────────────
+
+async function getFarmingCountiesByState(): Promise<Record<string, number>> {
+  // Query unique county_fips per state from the most recent complete year (2025)
+  // Paginate to bypass 1000-row default limit
+  const allRows: { county_fips: string }[] = [];
+  let offset = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('historical_enrollment')
+      .select('county_fips')
+      .eq('program_year', 2025)
+      .range(offset, offset + pageSize - 1);
+
+    if (error || !data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allRows.push(...data);
+      offset += pageSize;
+      if (data.length < pageSize) hasMore = false;
+    }
+  }
+
+  // Count unique counties per state (first 2 digits of FIPS = state)
+  const stateCounts: Record<string, Set<string>> = {};
+  for (const row of allRows) {
+    const stateFips = row.county_fips.substring(0, 2);
+    if (!stateCounts[stateFips]) {
+      stateCounts[stateFips] = new Set();
+    }
+    stateCounts[stateFips].add(row.county_fips);
+  }
+
+  const result: Record<string, number> = {};
+  for (const [stateFips, counties] of Object.entries(stateCounts)) {
+    result[stateFips] = counties.size;
+  }
+  return result;
+}
+
 export async function GET() {
   try {
+    // ── Get real farming county counts from database ───────────────────
+    const farmingCountiesByState = await getFarmingCountiesByState();
+
     // ── Fetch all activity data ─────────────────────────────────────────
     const { data: activityRows, error: activityError } = await supabase
       .from('benchmark_activity')
@@ -103,12 +127,10 @@ export async function GET() {
       }
       stateAgg[sf].total_submissions += row.submission_count || 0;
 
-      // unique_counties is cumulative per week — take max across all weeks
       if ((row.unique_counties || 0) > stateAgg[sf].unique_counties) {
         stateAgg[sf].unique_counties = row.unique_counties;
       }
 
-      // This week's activity
       if (row.week_start === weekStart) {
         stateAgg[sf].this_week += row.submission_count || 0;
       }
@@ -121,7 +143,6 @@ export async function GET() {
       .eq('program_year', 2026)
       .gt('total_count', 0);
 
-    // Count unique counties with data per state
     const countiesWithDataByState: Record<string, Set<string>> = {};
     for (const row of (cacheRows || [])) {
       const stateFips = row.county_fips.substring(0, 2);
@@ -131,13 +152,20 @@ export async function GET() {
       countiesWithDataByState[stateFips].add(row.county_fips);
     }
 
-    // ── Build state leaderboard ─────────────────────────────────────────
-    const states = Object.keys({ ...stateAgg, ...countiesWithDataByState })
+    // ── Build state leaderboard using REAL county counts ────────────────
+    const allStateFips = new Set([
+      ...Object.keys(stateAgg),
+      ...Object.keys(countiesWithDataByState),
+      ...Object.keys(farmingCountiesByState),
+    ]);
+
+    const states = Array.from(allStateFips)
       .filter(sf => STATE_NAMES[sf])
       .map(sf => {
         const agg = stateAgg[sf] || { total_submissions: 0, unique_counties: 0, this_week: 0 };
         const countiesWithData = countiesWithDataByState[sf]?.size || 0;
-        const farmingCounties = FARMING_COUNTIES_BY_STATE[sf] || 50;
+        // Use REAL county count from database
+        const farmingCounties = farmingCountiesByState[sf] || 0;
 
         return {
           state_fips: sf,
@@ -146,19 +174,18 @@ export async function GET() {
           total_submissions: agg.total_submissions,
           unique_counties: Math.max(agg.unique_counties, countiesWithData),
           total_farming_counties: farmingCounties,
-          completion_pct: Math.min(
-            100,
-            Math.round((Math.max(agg.unique_counties, countiesWithData) / farmingCounties) * 100)
-          ),
+          completion_pct: farmingCounties > 0
+            ? Math.min(100, Math.round((Math.max(agg.unique_counties, countiesWithData) / farmingCounties) * 100))
+            : 0,
           this_week: agg.this_week,
         };
       })
       .sort((a, b) => b.total_submissions - a.total_submissions);
 
-    // ── National totals ─────────────────────────────────────────────────
+    // ── National totals using REAL counts ────────────────────────────────
     const totalSubmissions = states.reduce((s, st) => s + st.total_submissions, 0);
     const totalCountiesWithData = states.reduce((s, st) => s + st.unique_counties, 0);
-    const totalFarmingCounties = Object.values(FARMING_COUNTIES_BY_STATE).reduce((a, b) => a + b, 0);
+    const totalFarmingCounties = Object.values(farmingCountiesByState).reduce((a, b) => a + b, 0);
     const thisWeekSubmissions = states.reduce((s, st) => s + st.this_week, 0);
 
     // ── Response ────────────────────────────────────────────────────────
@@ -168,7 +195,9 @@ export async function GET() {
         total_submissions: totalSubmissions,
         total_counties_with_data: totalCountiesWithData,
         total_farming_counties: totalFarmingCounties,
-        completion_pct: Math.round((totalCountiesWithData / totalFarmingCounties) * 100),
+        completion_pct: totalFarmingCounties > 0
+          ? Math.round((totalCountiesWithData / totalFarmingCounties) * 100)
+          : 0,
         this_week_submissions: thisWeekSubmissions,
       },
       updated_at: new Date().toISOString(),
@@ -176,7 +205,7 @@ export async function GET() {
 
     response.headers.set(
       'Cache-Control',
-      'public, s-maxage=60, stale-while-revalidate=300'
+      'public, s-maxage=120, stale-while-revalidate=600'
     );
 
     return response;

@@ -1,12 +1,14 @@
 // =============================================================================
-// HarvestFile — Phase 7A: Election Benchmark Submission API
+// HarvestFile — Phase 30 Build 3: Election Benchmark Submission API (v2)
 // POST /api/benchmarks/submit
 //
-// Handles: validation, SHA-256 hashing, dedup, rate limiting, submission,
-//          and returns updated county benchmarks in the same response.
+// UPDATED: Added Cloudflare Turnstile server-side verification.
+// Turnstile token is verified FIRST before any other processing.
+// If TURNSTILE_SECRET_KEY is not set, Turnstile check is skipped
+// (graceful degradation for dev/test environments).
 //
-// No auth required — this is the anonymous public contribution endpoint.
-// Anti-fraud: email-based dedup, IP rate limiting, FIPS validation.
+// Handles: Turnstile verification, validation, SHA-256 hashing, dedup,
+//          rate limiting, submission, and returns updated county benchmarks.
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -35,6 +37,9 @@ const MAX_PROGRAM_YEAR = 2031;
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_HOURS = 1;
 
+// Turnstile verification URL
+const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function sha256(input: string): string {
@@ -57,12 +62,71 @@ function isValidFIPS(fips: string): boolean {
   return /^\d{5}$/.test(fips);
 }
 
+// ─── Turnstile Verification ──────────────────────────────────────────────────
+
+async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+
+  // Graceful degradation: skip if secret key not configured
+  if (!secretKey) {
+    console.warn('⚠️ TURNSTILE_SECRET_KEY not set — skipping CAPTCHA verification');
+    return true;
+  }
+
+  try {
+    const res = await fetch(TURNSTILE_VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret: secretKey,
+        response: token,
+        remoteip: ip,
+      }),
+    });
+
+    const data = await res.json();
+    return data.success === true;
+  } catch (err) {
+    console.error('Turnstile verification error:', err);
+    // On verification failure, allow the submission (fail open)
+    // The IP rate limiting and email dedup still protect against abuse
+    return true;
+  }
+}
+
 // ─── POST Handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { county_fips, commodity_code, election_choice, email, program_year } = body;
+    const {
+      county_fips,
+      commodity_code,
+      election_choice,
+      email,
+      program_year,
+      turnstile_token,
+    } = body;
+
+    // ── Turnstile CAPTCHA verification (first check) ──────────────────────
+    const clientIP = getClientIP(request);
+
+    if (process.env.TURNSTILE_SECRET_KEY && !turnstile_token) {
+      return NextResponse.json(
+        { error: 'CAPTCHA verification required' },
+        { status: 400 }
+      );
+    }
+
+    if (turnstile_token) {
+      const isHuman = await verifyTurnstile(turnstile_token, clientIP);
+      if (!isHuman) {
+        return NextResponse.json(
+          { error: 'CAPTCHA verification failed. Please try again.' },
+          { status: 403 }
+        );
+      }
+    }
 
     // ── Input validation ──────────────────────────────────────────────────
     const year = program_year || CURRENT_PROGRAM_YEAR;
@@ -134,7 +198,6 @@ export async function POST(request: Request) {
     }
 
     // ── Rate limiting (IP-based) ──────────────────────────────────────────
-    const clientIP = getClientIP(request);
     const ipHash = sha256(clientIP);
     const windowStart = new Date();
     windowStart.setHours(windowStart.getHours() - RATE_LIMIT_WINDOW_HOURS);
