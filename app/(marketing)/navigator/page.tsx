@@ -215,7 +215,7 @@ export default function NavigatorPage() {
   // ── Loading State ──────────────────────────────────────────────────────
   if (isLoadingResults) {
     return (
-      <div className="min-h-screen bg-[#0C1F17] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0C1F17] flex items-center justify-center pt-28">
         <div className="text-center">
           <div className="relative w-20 h-20 mx-auto mb-6">
             <div className="absolute inset-0 rounded-full border-2 border-[#1B4332] animate-ping" />
@@ -237,7 +237,7 @@ export default function NavigatorPage() {
 
   // ── Wizard View ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0C1F17] relative overflow-hidden">
+    <div className="min-h-screen bg-[#0C1F17] relative overflow-hidden pt-28">
       {/* Background texture */}
       <div className="absolute inset-0 opacity-[0.03]" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
@@ -583,7 +583,7 @@ function ResultsView({ results, onReset }: ResultsViewProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0C1F17]">
+    <div className="min-h-screen bg-[#0C1F17] pt-28">
       {/* Background */}
       <div className="absolute inset-0 opacity-[0.03]" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,

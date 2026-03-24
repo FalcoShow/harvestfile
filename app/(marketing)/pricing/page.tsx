@@ -2,7 +2,7 @@
 
 // =============================================================================
 // HarvestFile — /pricing Page
-// Phase 28 Build 1: Updated free tools count from 14 to 15
+// Phase 33: Updated free tools count to 17
 //
 // Auth-aware CTAs:
 //   - Not logged in → "Start Free Trial" → /signup
@@ -412,8 +412,8 @@ export default function PricingPage() {
         <ScrollReveal>
           <div className="rounded-[20px] p-7 sm:p-10 text-center" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="text-[12px] font-bold text-[#C9A84C]/60 uppercase tracking-wider mb-3">Always Free &middot; No Account Required</div>
-            <h3 className="text-[22px] sm:text-[26px] font-extrabold text-white tracking-[-0.02em] mb-3">15 Free Tools for Every Farmer</h3>
-            <p className="text-[14px] text-white/30 leading-relaxed max-w-[520px] mx-auto mb-6">Morning Dashboard, Grain Marketing Command Center, Cash Flow Forecaster, Farm Score, Breakeven Calculator, Commodity Markets, Insurance Calculator, Election Optimizer, ARC/PLC Calculator, Ag Weather Dashboard, Spray Window Calculator, Payment Scanner, Base Acre Analyzer, SDRP Checker, and Policy Calendar &mdash; all free, forever.</p>
+            <h3 className="text-[22px] sm:text-[26px] font-extrabold text-white tracking-[-0.02em] mb-3">17 Free Tools for Every Farmer</h3>
+            <p className="text-[14px] text-white/30 leading-relaxed max-w-[520px] mx-auto mb-6">USDA Program Navigator, AI Farm Advisor, Morning Dashboard, Grain Marketing Command Center, Cash Flow Forecaster, Farm Score, Breakeven Calculator, Commodity Markets, Insurance Calculator, Election Optimizer, ARC/PLC Calculator, Ag Weather Dashboard, Spray Window Calculator, Payment Scanner, Base Acre Analyzer, SDRP Checker, and Policy Calendar &mdash; all free, forever.</p>
             <Link href="/check" className="inline-flex items-center gap-2 px-7 py-3 rounded-[12px] text-[14px] font-bold no-underline transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]" style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)", color: "#C9A84C" }}>Try the Free Calculator &rarr;</Link>
           </div>
         </ScrollReveal>

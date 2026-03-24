@@ -164,7 +164,7 @@ export function HeroSection() {
         >
           {[
             { value: 50, suffix: '', label: 'States Covered' },
-            { value: 2000, suffix: '+', label: 'Counties' },
+            { value: 3000, suffix: '+', label: 'Counties' },
             { value: 16, suffix: '', label: 'Crop Programs' },
             { value: 2025, suffix: '', label: 'OBBBA Updated' },
           ].map((stat, i) => (
