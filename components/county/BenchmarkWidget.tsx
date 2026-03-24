@@ -1,70 +1,127 @@
 // =============================================================================
-// HarvestFile — Phase 30 Build 6: BenchmarkWidget (Zero-Friction)
-// components/calculator/BenchmarkWidget.tsx
+// HarvestFile — Phase 30 Build 6 + Build 4: BenchmarkWidget (County Pages, Zero-Friction + Gamification)
+// components/county/BenchmarkWidget.tsx
 //
-// "The Facebook Moment" — Zero-friction anonymous benchmarking.
+// "What is [County] choosing?" — The Network Effect Engine on county SEO pages.
 //
 // WHAT CHANGED (Build 6):
-//   ✅ Email REMOVED from submission form — zero friction
-//   ✅ Cloudflare Turnstile invisible CAPTCHA — anti-bot without annoying users
+//   ✅ Email REMOVED from submission — just pick ARC-CO or PLC and submit
+//   ✅ Cloudflare Turnstile invisible CAPTCHA — anti-bot without user friction
 //   ✅ Anonymous session via localStorage UUID — dedup without accounts
-//   ✅ Post-submit email capture — soft "Save your results" prompt (optional)
+//   ✅ Post-submit soft email capture prompt (optional)
 //   ✅ Turnstile script loaded dynamically on mount
 //
-// Flow:
-//   1. Farmer sees benchmark teaser (locked/unlocked data)
-//   2. Clicks "Share My Election" → picks crop + ARC-CO/PLC (that's it!)
-//   3. Turnstile validates invisibly in background
-//   4. Anonymous session_id sent with submission for dedup
-//   5. Results revealed instantly
-//   6. Soft prompt: "Want to save your results? Enter email." (optional)
+// WHAT CHANGED (Build 4 — Gamification Engine):
+//   ✅ GamificationPanel renders post-submission with tabbed interface
+//   ✅ Impact counters, completion meters, state leaderboard, SMS referral
 //
-// Design: Dark glassmorphism on /check. Emerald = ARC-CO, Blue = PLC, Gold = CTAs.
+// This version appears on the /check results page (Step 3) after the farmer
+// sees their ARC-CO vs PLC comparison. Includes historical FSA data + live 2026.
 // =============================================================================
 
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { GamificationPanel } from '@/components/gamification/GamificationPanel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+interface HistoricalYear {
+  year: number;
+  arc_acres: number;
+  plc_acres: number;
+  total: number;
+  arc_pct: number;
+  plc_pct: number;
+}
+
 interface BenchmarkData {
-  commodity_code: string;
-  arc_co_pct: number | null;
-  plc_pct: number | null;
-  total_count: number;
-  is_visible: boolean;
-  last_updated?: string;
+  county_fips: string;
+  county_name: string;
+  state_abbr: string;
+  commodity: string;
+  historical: HistoricalYear[];
+  live_2026: {
+    arc_co_count: number;
+    plc_count: number;
+    total: number;
+    arc_co_pct: number | null;
+    plc_pct: number | null;
+    is_visible: boolean;
+  };
+  social_proof: {
+    state_this_week: number;
+    state_counties_this_week: number;
+    state_total: number;
+    county_total: number;
+  };
 }
 
-interface SocialProof {
-  state_this_week: number;
-  state_counties_this_week: number;
-  state_total: number;
-}
-
-interface Props {
+interface BenchmarkWidgetProps {
   countyFips: string;
   countyName: string;
-  stateName: string;
   stateAbbr: string;
-  availableCrops: { code: string; name: string }[];
-  initialBenchmarks?: BenchmarkData[];
-  initialSocialProof?: SocialProof;
+  cropCode: string;
+  cropName: string;
+  recommendedChoice: 'ARC-CO' | 'PLC';
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Format Helpers ──────────────────────────────────────────────────────────
 
-const UNLOCK_THRESHOLD = 5;
-const POLL_INTERVAL = 30000;
-const PROGRAM_YEAR = 2026;
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
+function formatAcres(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000).toLocaleString()}K`;
+  return n.toLocaleString();
+}
 
-const CROP_EMOJI: Record<string, string> = {
-  CORN: '🌽', SOYBEANS: '🫘', WHEAT: '🌾', SORGHUM: '🌿',
-  BARLEY: '🪴', OATS: '🌱', COTTON: '☁️', PEANUTS: '🥜',
-  RICE: '🍚', SUNFLOWER: '🌻', CANOLA: '🪻', FLAXSEED: '🌰',
-};
+// ─── Icons ───────────────────────────────────────────────────────────────────
+
+function IconUsers() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconLock() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function IconShare() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" y1="2" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function IconTrendUp() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+      <polyline points="17 6 23 6 23 12" />
+    </svg>
+  );
+}
 
 // ─── Anonymous Session Helper ────────────────────────────────────────────────
 
@@ -74,7 +131,6 @@ function getOrCreateSessionId(): string {
     const existing = localStorage.getItem(STORAGE_KEY);
     if (existing && existing.length >= 32) return existing;
 
-    // Generate a UUID v4
     const uuid = crypto.randomUUID
       ? crypto.randomUUID()
       : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -86,181 +142,129 @@ function getOrCreateSessionId(): string {
     localStorage.setItem(STORAGE_KEY, uuid);
     return uuid;
   } catch {
-    // Fallback for private browsing / no localStorage
     return crypto.randomUUID
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
   }
 }
 
-// ─── Turnstile Hook ──────────────────────────────────────────────────────────
+// ─── Turnstile Setup ─────────────────────────────────────────────────────────
 
-function useTurnstile(containerId: string) {
-  const [token, setToken] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
-  const widgetIdRef = useRef<string | null>(null);
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
 
-  useEffect(() => {
-    if (!TURNSTILE_SITE_KEY) {
-      setReady(true); // Skip if no site key (dev)
+function loadTurnstileScript(): Promise<void> {
+  return new Promise((resolve) => {
+    if ((window as any).turnstile) { resolve(); return; }
+    const existing = document.querySelector('script[src*="turnstile"]');
+    if (existing) {
+      const check = setInterval(() => {
+        if ((window as any).turnstile) { clearInterval(check); resolve(); }
+      }, 100);
       return;
     }
-
-    // Load Turnstile script if not already loaded
-    const existingScript = document.querySelector('script[src*="turnstile"]');
-    if (!existingScript) {
-      const script = document.createElement('script');
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.onload = () => renderWidget();
-      document.head.appendChild(script);
-    } else {
-      // Script already loaded, render widget
-      const checkReady = setInterval(() => {
-        if ((window as any).turnstile) {
-          clearInterval(checkReady);
-          renderWidget();
-        }
-      }, 100);
-      return () => clearInterval(checkReady);
-    }
-
-    function renderWidget() {
-      const turnstile = (window as any).turnstile;
-      if (!turnstile) return;
-
-      // Clean up any existing widget
-      if (widgetIdRef.current) {
-        try { turnstile.remove(widgetIdRef.current); } catch {}
-      }
-
-      const container = document.getElementById(containerId);
-      if (!container) return;
-
-      widgetIdRef.current = turnstile.render(container, {
-        sitekey: TURNSTILE_SITE_KEY,
-        size: 'invisible',
-        callback: (t: string) => {
-          setToken(t);
-          setReady(true);
-        },
-        'error-callback': () => {
-          setReady(true); // Allow submission even if Turnstile fails
-        },
-        'expired-callback': () => {
-          setToken(null);
-          // Re-execute for a fresh token
-          if (widgetIdRef.current) {
-            try { turnstile.reset(widgetIdRef.current); } catch {}
-          }
-        },
-      });
-
-      setReady(true);
-    }
-
-    return () => {
-      if (widgetIdRef.current) {
-        try { (window as any).turnstile?.remove(widgetIdRef.current); } catch {}
-      }
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async = true;
+    script.onload = () => {
+      const check = setInterval(() => {
+        if ((window as any).turnstile) { clearInterval(check); resolve(); }
+      }, 50);
     };
-  }, [containerId]);
-
-  const reset = useCallback(() => {
-    setToken(null);
-    if (widgetIdRef.current && (window as any).turnstile) {
-      try { (window as any).turnstile.reset(widgetIdRef.current); } catch {}
-    }
-  }, []);
-
-  return { token, ready, reset };
+    document.head.appendChild(script);
+  });
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═════════════════════════════════════════════════════════════════════════════
 
 export default function BenchmarkWidget({
   countyFips,
   countyName,
-  stateName,
   stateAbbr,
-  availableCrops,
-  initialBenchmarks,
-  initialSocialProof,
-}: Props) {
-  // State
-  const [benchmarks, setBenchmarks] = useState<BenchmarkData[]>(initialBenchmarks || []);
-  const [socialProof, setSocialProof] = useState<SocialProof>(
-    initialSocialProof || { state_this_week: 0, state_counties_this_week: 0, state_total: 0 }
-  );
-  const [hasContributed, setHasContributed] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [justUnlocked, setJustUnlocked] = useState(false);
+  cropCode,
+  cropName,
+  recommendedChoice,
+}: BenchmarkWidgetProps) {
+  // ── State ───────────────────────────────────────────────────────────────
+  const [data, setData] = useState<BenchmarkData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Submission state — NO EMAIL REQUIRED
+  const [selectedChoice, setSelectedChoice] = useState<'ARC-CO' | 'PLC' | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Anonymous session + Turnstile
+  const [sessionId, setSessionId] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Post-submit email capture
   const [showEmailCapture, setShowEmailCapture] = useState(false);
   const [captureEmail, setCaptureEmail] = useState('');
   const [emailSaved, setEmailSaved] = useState(false);
 
-  // Form state — NO EMAIL REQUIRED
-  const [selectedCrop, setSelectedCrop] = useState(availableCrops[0]?.code || '');
-  const [selectedElection, setSelectedElection] = useState<'ARC-CO' | 'PLC' | ''>('');
+  // Share state
+  const [shared, setShared] = useState(false);
 
-  // Anonymous session
-  const [sessionId, setSessionId] = useState('');
-
-  // Turnstile
-  const turnstileContainerId = `turnstile-calc-${countyFips}`;
-  const { token: turnstileToken, ready: turnstileReady, reset: resetTurnstile } = useTurnstile(turnstileContainerId);
-
-  const formRef = useRef<HTMLDivElement>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
-
-  // Initialize session ID on mount
+  // ── Initialize session + Turnstile ──────────────────────────────────────
   useEffect(() => {
     setSessionId(getOrCreateSessionId());
-  }, []);
 
-  // Check localStorage for prior contribution
-  useEffect(() => {
-    try {
-      const contributed = localStorage.getItem(`hf_benchmark_${countyFips}_${PROGRAM_YEAR}`);
-      if (contributed) setHasContributed(true);
-    } catch {}
+    if (TURNSTILE_SITE_KEY) {
+      loadTurnstileScript().then(() => {
+        const container = document.getElementById(`turnstile-county-${countyFips}`);
+        if (container && (window as any).turnstile) {
+          (window as any).turnstile.render(container, {
+            sitekey: TURNSTILE_SITE_KEY,
+            size: 'invisible',
+            callback: (token: string) => setTurnstileToken(token),
+            'error-callback': () => {},
+            'expired-callback': () => setTurnstileToken(null),
+          });
+        }
+      });
+    }
   }, [countyFips]);
 
-  // ── SWR-like polling for benchmark data ─────────────────────────────────
-  const fetchBenchmarks = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/benchmarks/${countyFips}?year=${PROGRAM_YEAR}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setBenchmarks(data.benchmarks || []);
-      setSocialProof(data.social_proof || socialProof);
-    } catch {}
-  }, [countyFips]);
-
+  // ── Fetch benchmark data ────────────────────────────────────────────────
   useEffect(() => {
-    if (!initialBenchmarks) fetchBenchmarks();
-    const interval = setInterval(fetchBenchmarks, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchBenchmarks, initialBenchmarks]);
+    if (!countyFips || !cropCode) return;
 
-  // ── Submit handler — NO EMAIL REQUIRED ──────────────────────────────────
-  const handleSubmit = async () => {
-    if (!selectedCrop || !selectedElection) {
-      setSubmitError('Please select your crop and election choice');
-      return;
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/benchmarks/county?county_fips=${countyFips}&commodity=${cropCode}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      })
+      .then((result) => {
+        setData(result);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Unable to load benchmark data');
+        setLoading(false);
+      });
+  }, [countyFips, cropCode]);
+
+  // ── Pre-select the calculator's recommendation ──────────────────────────
+  useEffect(() => {
+    if (recommendedChoice && !submitted) {
+      setSelectedChoice(recommendedChoice);
     }
+  }, [recommendedChoice, submitted]);
 
-    if (!sessionId) {
-      setSubmitError('Session error — please refresh and try again');
-      return;
-    }
+  // ── Submit election — ZERO FRICTION ─────────────────────────────────────
+  const handleSubmit = useCallback(async () => {
+    if (!selectedChoice) return;
+    if (!sessionId) return;
 
-    setIsSubmitting(true);
-    setSubmitError('');
+    setSubmitting(true);
+    setSubmitError(null);
 
     try {
       const res = await fetch('/api/benchmarks/submit', {
@@ -268,54 +272,53 @@ export default function BenchmarkWidget({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           county_fips: countyFips,
-          commodity_code: selectedCrop,
-          election_choice: selectedElection,
+          commodity_code: cropCode,
+          election_choice: selectedChoice,
           session_id: sessionId,
-          program_year: PROGRAM_YEAR,
+          program_year: 2026,
           turnstile_token: turnstileToken || undefined,
         }),
       });
 
-      const data = await res.json();
+      const result = await res.json();
 
       if (!res.ok) {
-        // If duplicate, still treat as contributed
-        if (data.duplicate) {
-          setHasContributed(true);
-          setShowForm(false);
-          try { localStorage.setItem(`hf_benchmark_${countyFips}_${PROGRAM_YEAR}`, 'true'); } catch {}
-          fetchBenchmarks();
+        // Duplicate submission — treat as success
+        if (result.duplicate) {
+          setSubmitted(true);
+          setShowEmailCapture(true);
+          setSubmitting(false);
+          // Refresh data
+          const refreshRes = await fetch(
+            `/api/benchmarks/county?county_fips=${countyFips}&commodity=${cropCode}`
+          );
+          if (refreshRes.ok) setData(await refreshRes.json());
           return;
         }
-        setSubmitError(data.error || 'Something went wrong');
-        resetTurnstile();
+        setSubmitError(result.error || 'Submission failed');
+        setSubmitting(false);
         return;
       }
 
-      setBenchmarks(data.benchmarks || []);
-      setHasContributed(true);
-      setShowForm(false);
-      setJustUnlocked(true);
+      // Refresh benchmark data after submission
+      const refreshRes = await fetch(
+        `/api/benchmarks/county?county_fips=${countyFips}&commodity=${cropCode}`
+      );
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        setData(refreshData);
+      }
+
+      setSubmitted(true);
       setShowEmailCapture(true);
-
-      try {
-        localStorage.setItem(`hf_benchmark_${countyFips}_${PROGRAM_YEAR}`, 'true');
-      } catch {}
-
-      setTimeout(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
-
-      setTimeout(() => setJustUnlocked(false), 3000);
+      setSubmitting(false);
     } catch {
-      setSubmitError('Network error. Please try again.');
-      resetTurnstile();
-    } finally {
-      setIsSubmitting(false);
+      setSubmitError('Network error — please try again');
+      setSubmitting(false);
     }
-  };
+  }, [selectedChoice, sessionId, countyFips, cropCode, turnstileToken]);
 
-  // ── Email capture (post-submit, optional) ───────────────────────────────
+  // ── Email capture (optional, post-submit) ───────────────────────────────
   const handleEmailCapture = async () => {
     if (!captureEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(captureEmail)) return;
 
@@ -325,485 +328,482 @@ export default function BenchmarkWidget({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           county_fips: countyFips,
-          commodity_code: selectedCrop,
-          election_choice: selectedElection,
+          commodity_code: cropCode,
+          election_choice: selectedChoice,
           session_id: sessionId,
           email: captureEmail,
-          program_year: PROGRAM_YEAR,
+          program_year: 2026,
         }),
       });
     } catch {}
 
-    // Always show success — even if the update fails, we don't want to frustrate
     setEmailSaved(true);
     setShowEmailCapture(false);
-    try {
-      localStorage.setItem('hf_email', captureEmail);
-    } catch {}
+    try { localStorage.setItem('hf_email', captureEmail); } catch {}
   };
 
-  // ── Derived state ───────────────────────────────────────────────────────
-  const totalSubmissions = benchmarks.reduce((sum, b) => sum + b.total_count, 0);
-  const anyVisible = benchmarks.some(b => b.is_visible);
-  const canSeeResults = hasContributed || anyVisible;
+  // ── Share handler ───────────────────────────────────────────────────────
+  const handleShare = useCallback(() => {
+    const text = `I just compared ARC-CO vs PLC for ${cropName} in ${countyName}, ${stateAbbr} — check yours free:`;
+    const url = window.location.href;
+
+    if (navigator.share) {
+      navigator.share({ title: 'HarvestFile ARC/PLC Calculator', text, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(`${text} ${url}`).then(() => {
+        setShared(true);
+        setTimeout(() => setShared(false), 3000);
+      }).catch(() => {});
+    }
+  }, [cropName, countyName, stateAbbr]);
+
+  // ── Derived data ────────────────────────────────────────────────────────
+  const latestYear = data?.historical?.[data.historical.length - 1];
+  const hasHistorical = !!latestYear && latestYear.total > 0;
+  const hasLiveData = (data?.live_2026?.total || 0) > 0;
+  const liveVisible = data?.live_2026?.is_visible || false;
+
+  // ── Loading state ───────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="rounded-[20px] p-6 animate-pulse" style={{
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-white/[0.06]" />
+          <div className="h-4 w-48 rounded bg-white/[0.06]" />
+        </div>
+        <div className="h-3 rounded-full bg-white/[0.04] mb-3" />
+        <div className="h-10 rounded-xl bg-white/[0.03]" />
+      </div>
+    );
+  }
+
+  // ── Error / empty state ─────────────────────────────────────────────────
+  if (error || !data) return null;
+  if (!hasHistorical && !hasLiveData) return null;
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════════════
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-harvest-forest-800/20 bg-gradient-to-b from-harvest-forest-950 to-harvest-forest-900">
-      {/* Noise texture */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-soft-light"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-        }}
-      />
-
+    <div
+      className="rounded-[20px] overflow-hidden"
+      style={{
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
+        animation: 'qc-enter 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both',
+      }}
+    >
       {/* Invisible Turnstile container */}
-      <div id={turnstileContainerId} className="hidden" />
+      <div id={`turnstile-county-${countyFips}`} className="hidden" />
 
-      <div className="relative z-10 p-6 sm:p-8">
-        {/* ═══ HEADER ═══ */}
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/[0.12] border border-emerald-500/[0.2] mb-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-[0.1em]">
-                Live · {PROGRAM_YEAR} Election Data
+      {/* ═══ HEADER ═══ */}
+      <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4">
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+            <IconUsers />
+          </div>
+          <h3 className="text-[15px] font-bold text-white tracking-[-0.01em]">
+            What is {countyName} choosing?
+          </h3>
+        </div>
+        <p className="text-[12px] text-white/30 ml-[38px]">
+          {cropName} · ARC-CO vs PLC · Real USDA data
+        </p>
+      </div>
+
+      {/* ═══ HISTORICAL CONTEXT ═══ */}
+      {hasHistorical && (
+        <div className="px-5 sm:px-6 pb-4">
+          <div className="mb-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-bold text-white/30 uppercase tracking-wider">
+                {latestYear.year} Enrollment
+              </span>
+              <span className="text-[11px] text-white/20">
+                {formatAcres(latestYear.total)} base acres
               </span>
             </div>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-              What is {countyName} choosing?
-            </h3>
-            <p className="mt-1.5 text-sm text-white/50 leading-relaxed max-w-md">
-              See how your neighbors are deciding between ARC-CO and PLC for {PROGRAM_YEAR}. 
-              Anonymous and aggregated — only county totals are shown.
-            </p>
-          </div>
-
-          {/* Social proof badge */}
-          {socialProof.state_total > 0 && (
-            <div className="hidden sm:flex flex-col items-end text-right shrink-0">
-              <div className="text-2xl font-extrabold text-white tabular-nums">
-                {socialProof.state_total.toLocaleString()}
-              </div>
-              <div className="text-[11px] text-white/40 font-medium">
-                {stateAbbr} farmers shared
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ═══ BENCHMARK RESULTS (locked or unlocked) ═══ */}
-        <div ref={resultsRef}>
-          {benchmarks.length > 0 ? (
-            <div className="space-y-3 mb-6">
-              {benchmarks.map((b) => {
-                const crop = availableCrops.find(c => c.code === b.commodity_code);
-                if (!crop) return null;
-
-                const isLocked = !b.is_visible && !hasContributed;
-                const showData = b.is_visible || hasContributed;
-
-                return (
-                  <div
-                    key={b.commodity_code}
-                    className={`relative rounded-xl border transition-all duration-500 ${
-                      justUnlocked
-                        ? 'border-emerald-500/30 bg-emerald-500/[0.06]'
-                        : 'border-white/[0.08] bg-white/[0.04]'
-                    } ${isLocked ? 'overflow-hidden' : ''}`}
-                  >
-                    {/* Blur overlay for locked state */}
-                    {isLocked && (
-                      <div className="absolute inset-0 z-10 backdrop-blur-md bg-black/30 rounded-xl flex items-center justify-center">
-                        <div className="text-center px-4">
-                          <div className="text-sm font-semibold text-white/70 mb-1">
-                            {b.total_count} of {UNLOCK_THRESHOLD} needed to unlock
-                          </div>
-                          <div className="w-32 h-1.5 rounded-full bg-white/10 mx-auto overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-700"
-                              style={{ width: `${Math.min(100, (b.total_count / UNLOCK_THRESHOLD) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="p-4">
-                      {/* Crop header */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-lg">{CROP_EMOJI[b.commodity_code] || '🌾'}</span>
-                          <span className="font-bold text-white text-sm">{crop.name}</span>
-                        </div>
-                        <div className="text-xs text-white/30 tabular-nums">
-                          {b.total_count} farmer{b.total_count !== 1 ? 's' : ''}
-                        </div>
-                      </div>
-
-                      {/* ARC/PLC bar */}
-                      <div className="relative h-10 rounded-lg overflow-hidden bg-white/[0.06] border border-white/[0.06]">
-                        {showData && b.arc_co_pct != null && b.plc_pct != null ? (
-                          <>
-                            <div
-                              className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-1000 ease-out flex items-center"
-                              style={{
-                                width: `${b.arc_co_pct}%`,
-                                minWidth: b.arc_co_pct > 0 ? '60px' : '0',
-                              }}
-                            >
-                              <span className="pl-3 text-xs font-bold text-white whitespace-nowrap">
-                                ARC-CO {b.arc_co_pct}%
-                              </span>
-                            </div>
-                            <div
-                              className="absolute inset-y-0 right-0 bg-gradient-to-l from-blue-600 to-blue-500 transition-all duration-1000 ease-out flex items-center justify-end"
-                              style={{
-                                width: `${b.plc_pct}%`,
-                                minWidth: b.plc_pct > 0 ? '50px' : '0',
-                              }}
-                            >
-                              <span className="pr-3 text-xs font-bold text-white whitespace-nowrap">
-                                {b.plc_pct}% PLC
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <span className="text-xs text-white/25">
-                              {b.total_count > 0
-                                ? `${UNLOCK_THRESHOLD - b.total_count} more needed to reveal`
-                                : 'Be the first to share'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center mb-6">
-              <div className="text-3xl mb-3">🗳️</div>
-              <div className="text-sm font-semibold text-white/60 mb-1">
-                No {PROGRAM_YEAR} election data yet for {countyName}
-              </div>
-              <div className="text-xs text-white/30">
-                Be the first farmer in your county to share — it only takes 10 seconds.
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ═══ CONTRIBUTION CTA — ZERO FRICTION ═══ */}
-        {!hasContributed && !showForm && (
-          <button
-            onClick={() => {
-              setShowForm(true);
-              setTimeout(() => {
-                formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }, 100);
-            }}
-            className="group relative w-full rounded-xl border border-amber-500/25 bg-gradient-to-r from-amber-500/[0.08] to-amber-400/[0.03] hover:from-amber-500/[0.15] hover:to-amber-400/[0.08] transition-all duration-300 p-4 text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                🗳️
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-amber-200">
-                  Share your {PROGRAM_YEAR} election — unlock your county&apos;s data
-                </div>
-                <div className="text-xs text-white/35 mt-0.5">
-                  Anonymous · 10 seconds · No email required
-                </div>
-              </div>
-              <svg className="w-5 h-5 text-amber-400/60 shrink-0 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </div>
-          </button>
-        )}
-
-        {/* ═══ CONTRIBUTION FORM — NO EMAIL, JUST PICK AND SUBMIT ═══ */}
-        {showForm && !hasContributed && (
-          <div
-            ref={formRef}
-            className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5 sm:p-6 animate-in fade-in slide-in-from-bottom-4 duration-300"
-          >
-            <div className="flex items-center gap-2.5 mb-5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center text-sm">🗳️</div>
-              <div>
-                <div className="text-sm font-bold text-white">Share your planned election</div>
-                <div className="text-[11px] text-white/35">Anonymous — only county totals are ever shown</div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {/* Crop selector */}
-              <div>
-                <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5">
-                  Crop
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {availableCrops.slice(0, 6).map((crop) => (
-                    <button
-                      key={crop.code}
-                      onClick={() => setSelectedCrop(crop.code)}
-                      className={`px-3 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                        selectedCrop === crop.code
-                          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                          : 'border-white/[0.08] bg-white/[0.03] text-white/50 hover:border-white/15 hover:text-white/70'
-                      }`}
-                    >
-                      <span className="mr-1.5">{CROP_EMOJI[crop.code] || '🌾'}</span>
-                      {crop.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Election choice */}
-              <div>
-                <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5">
-                  Your {PROGRAM_YEAR} election for {availableCrops.find(c => c.code === selectedCrop)?.name || 'this crop'}
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setSelectedElection('ARC-CO')}
-                    className={`relative px-4 py-4 rounded-xl border text-left transition-all ${
-                      selectedElection === 'ARC-CO'
-                        ? 'border-emerald-500/40 bg-emerald-500/15 ring-1 ring-emerald-500/20'
-                        : 'border-white/[0.08] bg-white/[0.03] hover:border-emerald-500/20'
-                    }`}
-                  >
-                    <div className={`text-base font-extrabold tracking-tight ${
-                      selectedElection === 'ARC-CO' ? 'text-emerald-400' : 'text-white/60'
-                    }`}>
-                      ARC-CO
-                    </div>
-                    <div className="text-[11px] text-white/30 mt-0.5">
-                      Agriculture Risk Coverage
-                    </div>
-                    {selectedElection === 'ARC-CO' && (
-                      <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => setSelectedElection('PLC')}
-                    className={`relative px-4 py-4 rounded-xl border text-left transition-all ${
-                      selectedElection === 'PLC'
-                        ? 'border-blue-500/40 bg-blue-500/15 ring-1 ring-blue-500/20'
-                        : 'border-white/[0.08] bg-white/[0.03] hover:border-blue-500/20'
-                    }`}
-                  >
-                    <div className={`text-base font-extrabold tracking-tight ${
-                      selectedElection === 'PLC' ? 'text-blue-400' : 'text-white/60'
-                    }`}>
-                      PLC
-                    </div>
-                    <div className="text-[11px] text-white/30 mt-0.5">
-                      Price Loss Coverage
-                    </div>
-                    {selectedElection === 'PLC' && (
-                      <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Error */}
-              {submitError && (
-                <div className="text-sm text-red-300 bg-red-500/[0.1] border border-red-500/20 rounded-lg px-3 py-2">
-                  {submitError}
-                </div>
-              )}
-
-              {/* Submit — IMMEDIATE, NO EMAIL */}
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !selectedCrop || !selectedElection}
-                className="w-full py-3.5 rounded-xl font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-[0.98]"
+            <div className="flex h-7 rounded-lg overflow-hidden">
+              <div
+                className="flex items-center justify-center transition-all duration-700"
+                style={{
+                  width: `${Math.max(latestYear.arc_pct, 5)}%`,
+                  background: 'linear-gradient(135deg, #059669, #10b981)',
+                }}
               >
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Submitting...
+                {latestYear.arc_pct >= 15 && (
+                  <span className="text-[10px] font-bold text-white/90">
+                    ARC {latestYear.arc_pct}%
                   </span>
-                ) : (
-                  'Share My Election & See Results →'
                 )}
-              </button>
-
-              {/* Privacy note */}
-              <div className="flex items-start gap-2 text-[11px] text-white/25 leading-relaxed">
-                <svg className="w-3.5 h-3.5 text-white/20 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                <span>
-                  No account or email needed. Your election stays anonymous — we store only a hashed session identifier. 
-                  Only county-level percentages are shown. Minimum {UNLOCK_THRESHOLD} farms per county before any data is revealed.
-                </span>
               </div>
-
-              {/* Cancel */}
-              <button
-                onClick={() => setShowForm(false)}
-                className="w-full text-center text-xs text-white/25 hover:text-white/50 transition-colors py-1"
+              <div
+                className="flex items-center justify-center transition-all duration-700"
+                style={{
+                  width: `${Math.max(latestYear.plc_pct, 5)}%`,
+                  background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                }}
               >
-                Not now
-              </button>
+                {latestYear.plc_pct >= 15 && (
+                  <span className="text-[10px] font-bold text-white/90">
+                    PLC {latestYear.plc_pct}%
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        )}
 
-        {/* ═══ POST-CONTRIBUTION SUCCESS STATE ═══ */}
-        {hasContributed && (
-          <div className="mt-2">
-            {/* Thank you bar */}
-            <div className="flex items-center gap-3 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/15 px-4 py-3 mb-4">
-              <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="text-xs text-emerald-300">
-                <span className="font-semibold">You&apos;re in.</span> Your election is counted in the {countyName} benchmark.
-              </div>
+          {data.historical.length >= 3 && (
+            <div className="flex items-center gap-1 mt-2">
+              <IconTrendUp />
+              <span className="text-[11px] text-white/25">
+                {data.historical.slice(-3).map(h =>
+                  `${h.year}: ${h.arc_pct}% ARC`
+                ).join(' → ')}
+              </span>
             </div>
+          )}
+        </div>
+      )}
 
-            {/* ═══ EMAIL CAPTURE — SOFT PROMPT (OPTIONAL) ═══ */}
-            {showEmailCapture && !emailSaved && (
-              <div className="rounded-lg border border-amber-500/15 bg-amber-500/[0.05] p-4 mb-4 animate-in fade-in duration-500">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-sm shrink-0">
-                    📧
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-amber-200 mb-1">
-                      Save your results?
-                    </div>
-                    <div className="text-[11px] text-white/30 mb-3">
-                      Get notified when your county benchmark changes. Completely optional.
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="email"
-                        value={captureEmail}
-                        onChange={(e) => setCaptureEmail(e.target.value)}
-                        placeholder="you@farm.com"
-                        className="flex-1 px-3 py-2 rounded-lg border border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/25 text-xs focus:outline-none focus:border-amber-500/30 transition-all"
-                        onKeyDown={(e) => e.key === 'Enter' && handleEmailCapture()}
-                      />
-                      <button
-                        onClick={handleEmailCapture}
-                        disabled={!captureEmail}
-                        className="px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold transition-all disabled:opacity-40"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowEmailCapture(false)}
-                    className="text-white/20 hover:text-white/40 transition-colors p-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+      {/* ═══ DIVIDER ═══ */}
+      <div className="mx-5 sm:mx-6 h-px" style={{
+        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)',
+      }} />
+
+      {/* ═══ SUBMISSION FORM — ZERO FRICTION (no email) ═══ */}
+      {!submitted && (
+        <div className="px-5 sm:px-6 py-5">
+          <div className="text-[13px] font-semibold text-white/60 mb-1">
+            What are you choosing for 2026?
+          </div>
+          <p className="text-[11px] text-white/25 mb-4">
+            Share your election to unlock real-time benchmarks. 
+            Anonymous — no email needed, only county totals shown.
+          </p>
+
+          {/* ARC-CO vs PLC toggle */}
+          <div className="grid grid-cols-2 gap-2.5 mb-4">
+            <button
+              onClick={() => setSelectedChoice('ARC-CO')}
+              className="relative p-3.5 rounded-xl text-center transition-all duration-200 cursor-pointer border"
+              style={{
+                background: selectedChoice === 'ARC-CO'
+                  ? 'rgba(16,185,129,0.08)'
+                  : 'rgba(255,255,255,0.02)',
+                borderColor: selectedChoice === 'ARC-CO'
+                  ? 'rgba(16,185,129,0.3)'
+                  : 'rgba(255,255,255,0.06)',
+                boxShadow: selectedChoice === 'ARC-CO'
+                  ? '0 0 20px rgba(16,185,129,0.08)'
+                  : 'none',
+              }}
+            >
+              {selectedChoice === 'ARC-CO' && (
+                <div className="absolute top-2 right-2 text-emerald-400">
+                  <IconCheck />
+                </div>
+              )}
+              <div
+                className="text-[14px] font-bold mb-0.5"
+                style={{
+                  color: selectedChoice === 'ARC-CO' ? '#34d399' : 'rgba(255,255,255,0.4)',
+                }}
+              >
+                ARC-CO
+              </div>
+              <div className="text-[10px]" style={{
+                color: selectedChoice === 'ARC-CO' ? 'rgba(52,211,153,0.5)' : 'rgba(255,255,255,0.15)',
+              }}>
+                County Revenue
+              </div>
+            </button>
+
+            <button
+              onClick={() => setSelectedChoice('PLC')}
+              className="relative p-3.5 rounded-xl text-center transition-all duration-200 cursor-pointer border"
+              style={{
+                background: selectedChoice === 'PLC'
+                  ? 'rgba(59,130,246,0.08)'
+                  : 'rgba(255,255,255,0.02)',
+                borderColor: selectedChoice === 'PLC'
+                  ? 'rgba(59,130,246,0.3)'
+                  : 'rgba(255,255,255,0.06)',
+                boxShadow: selectedChoice === 'PLC'
+                  ? '0 0 20px rgba(59,130,246,0.08)'
+                  : 'none',
+              }}
+            >
+              {selectedChoice === 'PLC' && (
+                <div className="absolute top-2 right-2 text-blue-400">
+                  <IconCheck />
+                </div>
+              )}
+              <div
+                className="text-[14px] font-bold mb-0.5"
+                style={{
+                  color: selectedChoice === 'PLC' ? '#60a5fa' : 'rgba(255,255,255,0.4)',
+                }}
+              >
+                PLC
+              </div>
+              <div className="text-[10px]" style={{
+                color: selectedChoice === 'PLC' ? 'rgba(96,165,250,0.5)' : 'rgba(255,255,255,0.15)',
+              }}>
+                Price Loss Coverage
+              </div>
+            </button>
+          </div>
+
+          {/* Submit button — IMMEDIATE, NO EMAIL */}
+          <button
+            disabled={!selectedChoice || submitting}
+            onClick={handleSubmit}
+            className="flex items-center justify-center gap-2 w-full p-3 rounded-xl text-[13px] font-bold border-none cursor-pointer transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110 active:scale-[0.97]"
+            style={{
+              background: selectedChoice
+                ? 'linear-gradient(135deg, #059669, #10b981)'
+                : 'rgba(255,255,255,0.06)',
+              color: selectedChoice ? 'white' : 'rgba(255,255,255,0.3)',
+            }}
+          >
+            {submitting ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              'Share & Unlock →'
+            )}
+          </button>
+
+          {/* Privacy note */}
+          <div className="flex items-center gap-1.5 text-[10px] text-white/15 mt-2">
+            <IconLock />
+            <span>No account needed · Anonymous · Only county totals shown</span>
+          </div>
+
+          {/* Submit error */}
+          {submitError && (
+            <div className="mt-3 text-[12px] text-red-400/80 bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-2">
+              {submitError}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ POST-SUBMISSION: Live 2026 Benchmarks ═══ */}
+      {submitted && (
+        <div
+          className="px-5 sm:px-6 py-5"
+          style={{ animation: 'qc-enter 0.5s cubic-bezier(0.16,1,0.3,1)' }}
+        >
+          {/* Success banner */}
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg" style={{
+            background: 'rgba(16,185,129,0.06)',
+            border: '1px solid rgba(16,185,129,0.15)',
+          }}>
+            <span className="text-emerald-400"><IconCheck /></span>
+            <span className="text-[12px] text-emerald-400/80 font-medium">
+              Election recorded — you chose {selectedChoice}
+            </span>
+          </div>
+
+          {/* ═══ EMAIL CAPTURE — SOFT PROMPT (OPTIONAL) ═══ */}
+          {showEmailCapture && !emailSaved && (
+            <div className="mb-4 px-3 py-3 rounded-lg animate-in fade-in duration-500" style={{
+              background: 'rgba(201,168,76,0.04)',
+              border: '1px solid rgba(201,168,76,0.12)',
+            }}>
+              <div className="text-[12px] font-semibold text-[#C9A84C]/80 mb-1">
+                Save your results?
+              </div>
+              <div className="text-[10px] text-white/25 mb-2">
+                Get notified when {countyName} benchmark data changes. Optional.
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={captureEmail}
+                  onChange={(e) => setCaptureEmail(e.target.value)}
+                  placeholder="you@farm.com"
+                  className="flex-1 px-3 py-2 rounded-lg text-[12px] text-white bg-white/[0.04] border border-white/[0.08] outline-none focus:border-[#C9A84C]/30 transition-colors placeholder:text-white/15"
+                  onKeyDown={(e) => e.key === 'Enter' && handleEmailCapture()}
+                />
+                <button
+                  onClick={handleEmailCapture}
+                  disabled={!captureEmail}
+                  className="px-3 py-2 rounded-lg text-[11px] font-bold transition-all disabled:opacity-30"
+                  style={{
+                    background: 'rgba(201,168,76,0.15)',
+                    color: '#C9A84C',
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+              <button
+                onClick={() => setShowEmailCapture(false)}
+                className="text-[10px] text-white/15 hover:text-white/30 mt-1.5 transition-colors"
+              >
+                Skip
+              </button>
+            </div>
+          )}
+
+          {/* Email saved confirmation */}
+          {emailSaved && (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg text-[11px]" style={{
+              background: 'rgba(201,168,76,0.04)',
+              border: '1px solid rgba(201,168,76,0.1)',
+              color: '#C9A84C',
+            }}>
+              <IconCheck /> Email saved — we&apos;ll notify you of changes.
+            </div>
+          )}
+
+          {/* Live 2026 bar (if enough data to show) */}
+          {hasLiveData && liveVisible && data.live_2026.arc_co_pct !== null && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-white/30 uppercase tracking-wider">
+                  2026 Live Benchmark
+                </span>
+                <span className="text-[11px] text-white/20">
+                  {data.live_2026.total} farmer{data.live_2026.total !== 1 ? 's' : ''} reported
+                </span>
+              </div>
+              <div className="flex h-8 rounded-lg overflow-hidden">
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: `${Math.max(data.live_2026.arc_co_pct, 8)}%`,
+                    background: 'linear-gradient(135deg, #059669, #10b981)',
+                  }}
+                >
+                  <span className="text-[11px] font-bold text-white">
+                    ARC {data.live_2026.arc_co_pct}%
+                  </span>
+                </div>
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: `${Math.max(data.live_2026.plc_pct!, 8)}%`,
+                    background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                  }}
+                >
+                  <span className="text-[11px] font-bold text-white">
+                    PLC {data.live_2026.plc_pct}%
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Email saved confirmation */}
-            {emailSaved && (
-              <div className="flex items-center gap-2 rounded-lg bg-amber-500/[0.06] border border-amber-500/10 px-3 py-2 mb-4 text-[11px] text-amber-300 animate-in fade-in duration-300">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                Email saved — we&apos;ll notify you when county data changes.
+          {/* Not enough data yet */}
+          {hasLiveData && !liveVisible && (
+            <div className="mb-4 px-4 py-3 rounded-xl text-center" style={{
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div className="text-[13px] text-white/40 font-medium mb-1">
+                {data.live_2026.total} of 5 farmers reported
               </div>
+              <div className="flex h-2 rounded-full overflow-hidden mb-2 mx-auto max-w-[200px]" style={{
+                background: 'rgba(255,255,255,0.04)',
+              }}>
+                <div
+                  className="h-full rounded-full bg-emerald-500/60 transition-all"
+                  style={{ width: `${(data.live_2026.total / 5) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-white/20">
+                Benchmarks unlock when 5 farmers report. Share to reach the threshold faster.
+              </p>
+            </div>
+          )}
+
+          {/* No live data — first reporter */}
+          {!hasLiveData && (
+            <div className="mb-4 px-4 py-3 rounded-xl text-center" style={{
+              background: 'rgba(201,168,76,0.03)',
+              border: '1px solid rgba(201,168,76,0.1)',
+            }}>
+              <div className="text-[13px] text-[#C9A84C]/80 font-semibold mb-1">
+                You&apos;re the first in {countyName}!
+              </div>
+              <p className="text-[11px] text-white/20">
+                Share with 4 more farmers in your county to unlock live benchmarks.
+              </p>
+            </div>
+          )}
+
+          {/* Social proof */}
+          {(data.social_proof.state_this_week > 0 || data.social_proof.state_total > 0) && (
+            <div className="flex items-center justify-center gap-4 mb-4 text-[11px] text-white/20">
+              {data.social_proof.state_this_week > 0 && (
+                <span className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {data.social_proof.state_this_week} in {stateAbbr} this week
+                </span>
+              )}
+              {data.social_proof.state_total > 0 && (
+                <span>
+                  {data.social_proof.state_total} total in {stateAbbr}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Share CTA — the viral moment */}
+          <button
+            onClick={handleShare}
+            className="flex items-center justify-center gap-2 w-full p-3 rounded-xl text-[13px] font-semibold cursor-pointer transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+            style={{
+              background: shared
+                ? 'rgba(16,185,129,0.1)'
+                : 'rgba(255,255,255,0.04)',
+              border: shared
+                ? '1px solid rgba(16,185,129,0.2)'
+                : '1px solid rgba(255,255,255,0.08)',
+              color: shared ? '#34d399' : 'rgba(255,255,255,0.4)',
+            }}
+          >
+            {shared ? (
+              <><IconCheck /> Link copied — share it!</>
+            ) : (
+              <><IconShare /> Share with your county — help unlock benchmarks</>
             )}
+          </button>
 
-            {/* Share CTA */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={() => {
-                  const primaryVis = benchmarks.find(b => b.is_visible);
-                  const text = primaryVis
-                    ? `${countyName}, ${stateAbbr} is ${primaryVis.arc_co_pct}% ARC-CO for ${primaryVis.commodity_code.toLowerCase()} — check yours:`
-                    : `I just shared my ARC/PLC election for ${countyName} — check yours:`;
-                  const url = `https://harvestfile.com/${stateName.toLowerCase().replace(/\s+/g, '-')}/${countyName.toLowerCase().replace(/\s+/g, '-').replace(/county/i, 'county')}/arc-plc`;
+          <p className="text-[10px] text-white/15 text-center mt-3">
+            Every farmer who shares helps build the first real-time ARC/PLC benchmark in America.
+          </p>
 
-                  if (navigator.share) {
-                    navigator.share({ title: 'HarvestFile County Benchmark', text, url }).catch(() => {});
-                  } else {
-                    navigator.clipboard.writeText(`${text} ${url}`);
-                    alert('Link copied to clipboard!');
-                  }
-                }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-white/[0.1] bg-white/[0.04] hover:bg-white/[0.08] text-white/60 hover:text-white/80 text-xs font-semibold transition-all"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-                Share with neighbors
-              </button>
-              <button
-                onClick={() => {
-                  const lines = benchmarks
-                    .filter(b => b.is_visible)
-                    .map(b => `${b.commodity_code}: ${b.arc_co_pct}% ARC-CO / ${b.plc_pct}% PLC (${b.total_count} farmers)`);
-                  const summary = `${countyName}, ${stateAbbr} — ${PROGRAM_YEAR} ARC/PLC Elections\n${lines.join('\n')}\n\nCheck yours: harvestfile.com`;
-                  navigator.clipboard.writeText(summary);
-                  alert('Benchmark data copied!');
-                }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-white/[0.1] bg-white/[0.04] hover:bg-white/[0.08] text-white/60 hover:text-white/80 text-xs font-semibold transition-all"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Copy data
-              </button>
-            </div>
-          </div>
-        )}
+          {/* ═══ GAMIFICATION PANEL — Phase 30 Build 4 ═══ */}
+          <GamificationPanel
+            countyFips={countyFips}
+            countyName={countyName}
+            stateName={stateAbbr}
+            stateAbbr={stateAbbr}
+            sessionId={sessionId}
+            justSubmitted={true}
+          />
+        </div>
+      )}
 
-        {/* ═══ FOOTER — LIVE TICKER / SOCIAL PROOF ═══ */}
-        {(socialProof.state_this_week > 0 || totalSubmissions > 0) && (
-          <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between">
-            <div className="flex items-center gap-4 text-[11px] text-white/25">
-              {socialProof.state_this_week > 0 && (
-                <span>
-                  <span className="text-white/40 font-semibold">{socialProof.state_this_week}</span> {stateAbbr} farmers this week
-                </span>
-              )}
-              {socialProof.state_counties_this_week > 0 && (
-                <span>
-                  <span className="text-white/40 font-semibold">{socialProof.state_counties_this_week}</span> counties active
-                </span>
-              )}
-            </div>
-            <div className="text-[10px] text-white/15">
-              Updated every 30s
-            </div>
-          </div>
-        )}
+      {/* ═══ FOOTER: Election map link ═══ */}
+      <div className="px-5 sm:px-6 pb-4 sm:pb-5">
+        <a
+          href="/elections"
+          className="flex items-center justify-center gap-2 w-full p-2.5 rounded-lg text-[11px] font-semibold text-white/25 hover:text-white/40 hover:bg-white/[0.02] transition-all no-underline"
+        >
+          <span>🗺️</span>
+          Explore the full national ARC/PLC election map →
+        </a>
       </div>
-    </section>
+    </div>
   );
 }

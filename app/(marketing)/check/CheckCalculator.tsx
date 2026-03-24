@@ -20,7 +20,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { DarkSelect } from "./DarkSelect";
-import BenchmarkWidget from "@/components/calculator/BenchmarkWidget";
+import BenchmarkWidget from "@/components/county/BenchmarkWidget";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });

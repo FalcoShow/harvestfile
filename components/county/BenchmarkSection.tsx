@@ -19,7 +19,7 @@ import { supabasePublic } from '@/lib/supabase/public';
 
 // Lazy-load the client widget — no SSR (uses localStorage, window APIs)
 const BenchmarkWidget = dynamic(
-  () => import('@/components/county/BenchmarkWidget'),
+  () => import('@/components/calculator/BenchmarkWidget'),
   { ssr: false }
 );
 
