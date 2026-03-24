@@ -512,8 +512,6 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    PHASE 9: HOMEPAGE REVOLUTION — ANIMATION ADDITIONS
-   Add this block to the END of your globals.css file (before the closing brace
-   if there is one, or just at the very bottom)
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 /* ── Hero Entrance Animation ────────────────────────────────────────────────── */
@@ -525,16 +523,6 @@
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-/* ── Gold Button Shimmer ────────────────────────────────────────────────────── */
-@keyframes hf-shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
   }
 }
 
@@ -551,12 +539,7 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    PHASE 9 BUILD 3: GRAIN TEXTURE OVERLAY
-   Append this entire block to the END of globals.css
    ═══════════════════════════════════════════════════════════════════════════════ */
-
-/* Grain texture — adds premium paper-stock feel to light sections.
-   Uses inline SVG feTurbulence (zero HTTP requests).
-   Apply with className="hf-grain" on a div inside any section. */
 .hf-grain {
   position: absolute;
   inset: 0;
@@ -569,12 +552,10 @@
   background-size: 182px;
 }
 
-/* Ensure content inside sections with grain sits above the texture */
 .hf-grain + * { position: relative; z-index: 2; }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    PHASE 12: PREMIUM AUTH PAGES — CSS ADDITIONS
-   Append this ENTIRE block to the END of globals.css
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 /* ── Aurora Background Blobs ────────────────────────────────────────────────── */
@@ -760,3 +741,19 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PHASE 30: ELECTION DASHBOARD — CUSTOM SCROLLBAR
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
