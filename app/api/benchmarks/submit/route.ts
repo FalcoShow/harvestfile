@@ -144,11 +144,15 @@ export async function POST(request: Request) {
     // ── Turnstile CAPTCHA verification (first check) ──────────────────────
     const clientIP = getClientIP(request);
 
-    if (process.env.TURNSTILE_SECRET_KEY && !turnstile_token) {
-      return NextResponse.json(
-        { error: 'CAPTCHA verification required' },
-        { status: 400 }
-      );
+    // Verify Turnstile token if provided (optional — IP rate limiting handles abuse)
+    if (turnstile_token) {
+      const isHuman = await verifyTurnstile(turnstile_token, clientIP);
+      if (!isHuman) {
+        return NextResponse.json(
+          { error: 'CAPTCHA verification failed. Please try again.' },
+          { status: 403 }
+        );
+      }
     }
 
     if (turnstile_token) {
