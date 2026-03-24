@@ -25,6 +25,7 @@ import {
 } from '@/lib/data/historical-enrollment';
 import { CountyCharts } from '@/components/county/CountyCharts';
 import { CountyBenchmarkCTA } from '@/components/county/CountyBenchmarkCTA';
+import { getBenchmarkContextForCounty } from '@/lib/cross-tool/benchmark-context';
 
 // ── ISR: Revalidate every hour ──────────────────────────────────────────
 export const revalidate = 3600;
@@ -239,11 +240,12 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
 
   const { county, state } = result;
 
-  const [cropData, enrollment, enrollmentSummary, neighbors] = await Promise.all([
+  const [cropData, enrollment, enrollmentSummary, neighbors, benchmarkContext] = await Promise.all([
     getCountyCropData(county.county_fips),
     getCountyEnrollmentHistory(county.county_fips),
     getCountyEnrollmentSummary(county.county_fips),
     getNeighborCounties(county.state_fips, county.county_fips),
+    getBenchmarkContextForCounty(county.county_fips),
   ]);
 
   // Get recommendations for each crop
@@ -628,6 +630,186 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
               stateAbbr={state.abbreviation}
             />
           </section>
+
+          {/* ── Phase 31 Build 2: Live 2026 Election Intelligence ── */}
+          {benchmarkContext && (benchmarkContext.live_2026.total > 0 || benchmarkContext.historical.length > 0) && (
+            <section className="mb-12">
+              <div className="flex items-center gap-3 mb-6">
+                <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight">
+                  Election Intelligence
+                </h2>
+                {benchmarkContext.live_2026.total > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Data
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Historical Trend Card */}
+                {benchmarkContext.historical.length > 0 && (
+                  <div className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-[#1B4332]/5 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-[#1B4332]" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-[15px] font-bold text-[#1B4332]">
+                        Historical Election Pattern
+                      </h3>
+                    </div>
+                    <p className="text-[13px] text-gray-600 leading-relaxed mb-4">
+                      {benchmarkContext.insights.summary}
+                    </p>
+                    {/* Mini trend bars — last 3 years */}
+                    <div className="space-y-2">
+                      {benchmarkContext.historical.slice(-3).map((year) => (
+                        <div key={year.year} className="flex items-center gap-3">
+                          <span className="text-[11px] font-bold text-gray-400 w-10 shrink-0 tabular-nums">
+                            {year.year}
+                          </span>
+                          <div className="flex-1 flex h-2 rounded-full overflow-hidden bg-gray-100">
+                            <div
+                              className="bg-emerald-500 transition-all"
+                              style={{ width: `${year.arc_pct}%` }}
+                            />
+                            <div
+                              className="bg-blue-500 transition-all"
+                              style={{ width: `${year.plc_pct}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-semibold text-emerald-700 w-12 text-right shrink-0">
+                            {year.arc_pct}% ARC
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[11px] font-bold ${
+                          benchmarkContext.insights.trend_direction === 'TOWARD_ARC'
+                            ? 'text-emerald-600'
+                            : benchmarkContext.insights.trend_direction === 'TOWARD_PLC'
+                            ? 'text-blue-600'
+                            : 'text-gray-500'
+                        }`}>
+                          {benchmarkContext.insights.trend_direction === 'TOWARD_ARC'
+                            ? '↑ Trending toward ARC-CO'
+                            : benchmarkContext.insights.trend_direction === 'TOWARD_PLC'
+                            ? '↑ Trending toward PLC'
+                            : '→ Stable election pattern'}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          Avg: {benchmarkContext.insights.historical_avg_arc_pct}% ARC-CO
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Live 2026 Card */}
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <h3 className="text-[15px] font-bold text-[#1B4332]">
+                      Live 2026 Farmer Reports
+                    </h3>
+                  </div>
+
+                  {benchmarkContext.live_2026.is_visible && benchmarkContext.live_2026.total >= 5 ? (
+                    <>
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex-1">
+                          <div className="flex h-4 rounded-full overflow-hidden bg-gray-100">
+                            <div
+                              className="bg-emerald-500 transition-all flex items-center justify-center"
+                              style={{ width: `${benchmarkContext.live_2026.arc_co_pct}%` }}
+                            >
+                              {(benchmarkContext.live_2026.arc_co_pct || 0) > 20 && (
+                                <span className="text-[9px] font-bold text-white">
+                                  {benchmarkContext.live_2026.arc_co_pct}%
+                                </span>
+                              )}
+                            </div>
+                            <div
+                              className="bg-blue-500 transition-all flex items-center justify-center"
+                              style={{ width: `${benchmarkContext.live_2026.plc_pct}%` }}
+                            >
+                              {(benchmarkContext.live_2026.plc_pct || 0) > 20 && (
+                                <span className="text-[9px] font-bold text-white">
+                                  {benchmarkContext.live_2026.plc_pct}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between text-[12px] font-semibold mb-4">
+                        <span className="text-emerald-700">ARC-CO {benchmarkContext.live_2026.arc_co_pct}%</span>
+                        <span className="text-blue-700">PLC {benchmarkContext.live_2026.plc_pct}%</span>
+                      </div>
+                      <p className="text-[12px] text-gray-500">
+                        Based on {benchmarkContext.live_2026.total} farmer reports for {county.display_name}.
+                        {benchmarkContext.social_proof.state_total > 0 && (
+                          <> {benchmarkContext.social_proof.state_total} farmers across {state.abbreviation} have reported.</>
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-center py-4">
+                        <div className="text-[32px] font-extrabold text-[#1B4332] tabular-nums">
+                          {benchmarkContext.live_2026.total}
+                          <span className="text-[15px] font-bold text-gray-400 ml-1">/ 5</span>
+                        </div>
+                        <p className="text-[12px] text-gray-500 mt-1">
+                          farmers reported in {county.display_name}
+                        </p>
+                        {/* Progress bar to threshold */}
+                        <div className="mt-3 mx-auto max-w-[200px]">
+                          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all"
+                              style={{ width: `${Math.min(100, (benchmarkContext.live_2026.total / 5) * 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-1.5">
+                            {Math.max(0, 5 - benchmarkContext.live_2026.total)} more needed to unlock public data
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-100 text-center">
+                        <Link
+                          href={`/check?county=${encodeURIComponent(county.display_name)}&state=${state.abbreviation}`}
+                          className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
+                        >
+                          Share your election — it's anonymous
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Social proof footer */}
+                  {benchmarkContext.social_proof.state_this_week > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-[10px] text-gray-400">
+                        {benchmarkContext.social_proof.state_this_week} farmer{benchmarkContext.social_proof.state_this_week !== 1 ? 's' : ''} in {state.abbreviation} reported this week
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* ── Enrollment Breakdown ── */}
           {enrollmentSummary && enrollmentSummary.crops.length > 0 && (
