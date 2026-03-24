@@ -1,8 +1,8 @@
 // =============================================================================
 // HarvestFile — Tools Dropdown (Client Component)
-// Phase 29.5: Updated to 16 free tools — added AI Farm Advisor
+// Phase 33: Updated to 17 free tools — added USDA Program Navigator
 //
-// Premium dropdown showing all 16 free tools with icons and descriptions.
+// Premium dropdown showing all 17 free tools with icons and descriptions.
 // Hover-activated on desktop, click on mobile. Uses CSS custom properties
 // from HeaderScrollWrapper for adaptive theming.
 // =============================================================================
@@ -14,6 +14,17 @@ import Link from 'next/link';
 
 const FREE_TOOLS = [
   {
+    href: '/navigator',
+    label: 'USDA Program Navigator',
+    description: 'Find every program you qualify for',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+      </svg>
+    ),
+    badge: 'NEW',
+  },
+  {
     href: '/advisor',
     label: 'AI Farm Advisor',
     description: 'AI-powered farm financial advisor',
@@ -22,7 +33,7 @@ const FREE_TOOLS = [
         <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93" /><path d="M8.24 9.93A4 4 0 0 1 12 2" /><path d="M12 18v-8" /><path d="m8 22 4-4 4 4" /><circle cx="12" cy="14" r="1" />
       </svg>
     ),
-    badge: 'NEW',
+    badge: null,
   },
   {
     href: '/morning',
@@ -257,7 +268,7 @@ export function ToolsDropdown() {
               className="text-[11px] font-bold uppercase tracking-[0.1em]"
               style={{ color: 'var(--dropdown-muted, rgba(255,255,255,0.3))' }}
             >
-              16 Free Tools — No Account Required
+              17 Free Tools — No Account Required
             </p>
           </div>
 

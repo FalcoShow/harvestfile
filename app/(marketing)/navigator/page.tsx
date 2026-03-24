@@ -246,43 +246,27 @@ export default function NavigatorPage() {
       {/* Subtle radial glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] rounded-full bg-[#C9A84C]/[0.04] blur-[120px]" />
 
-      {/* Header */}
-      <header className="relative z-10 border-b border-white/[0.06]">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 group">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="6" fill="#1B4332" />
-              <path d="M8 22V14l4-4 4 4v8" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M16 22V12l4-6 4 6v10" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-white font-semibold text-lg" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-              Harvest<span className="text-[#C9A84C]">File</span>
-            </span>
-          </Link>
-
-          {/* Live match counter */}
-          {totalMatched > 0 && (
-            <div className="flex items-center gap-2 bg-[#C9A84C]/10 border border-[#C9A84C]/20 rounded-full px-4 py-1.5 animate-fade-in">
-              <div className="w-2 h-2 rounded-full bg-[#C9A84C] animate-pulse" />
-              <span ref={countRef} className="text-[#C9A84C] font-bold text-sm" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-                {totalMatched} programs matched
-              </span>
-            </div>
-          )}
-
-          <button onClick={resetWizard} className="text-white/40 text-xs hover:text-white/70 transition-colors">
-            Start Over
-          </button>
-        </div>
-      </header>
-
-      {/* Progress bar */}
+      {/* Progress bar + controls */}
       <div className="relative z-10 max-w-4xl mx-auto px-6 pt-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-white/40 text-xs" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-            Step {currentStep + 1} of {visibleSteps.length}
+            Step {currentStep + 1} &middot; {progress}% complete
           </span>
-          <span className="text-white/40 text-xs">{progress}% complete</span>
+
+          <div className="flex items-center gap-4">
+            {/* Live match counter */}
+            {totalMatched > 0 && (
+              <div className="flex items-center gap-2 bg-[#C9A84C]/10 border border-[#C9A84C]/20 rounded-full px-3 py-1 animate-fade-in">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-pulse" />
+                <span ref={countRef} className="text-[#C9A84C] font-bold text-xs" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
+                  {totalMatched} programs matched
+                </span>
+              </div>
+            )}
+            <button onClick={resetWizard} className="text-white/40 text-xs hover:text-white/70 transition-colors">
+              Start Over
+            </button>
+          </div>
         </div>
         <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
           <div
@@ -605,33 +589,19 @@ function ResultsView({ results, onReset }: ResultsViewProps) {
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
       }} />
 
-      {/* Header */}
-      <header className="relative z-10 border-b border-white/[0.06]">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="6" fill="#1B4332" />
-              <path d="M8 22V14l4-4 4 4v8" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M16 22V12l4-6 4 6v10" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-white font-semibold text-lg" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-              Harvest<span className="text-[#C9A84C]">File</span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <button onClick={onReset} className="text-white/40 text-xs hover:text-white/70 transition-colors">
-              Start Over
-            </button>
-            <Link
-              href="/signup"
-              className="bg-[#C9A84C] text-[#0C1F17] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#E2C366] transition-all"
-              style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}
-            >
-              Create Free Account
-            </Link>
-          </div>
-        </div>
-      </header>
+      {/* Action bar */}
+      <div className="relative z-10 max-w-4xl mx-auto px-6 pt-4 flex items-center justify-end gap-4">
+        <button onClick={onReset} className="text-white/40 text-xs hover:text-white/70 transition-colors">
+          Start Over
+        </button>
+        <Link
+          href="/signup"
+          className="bg-[#C9A84C] text-[#0C1F17] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#E2C366] transition-all"
+          style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}
+        >
+          Create Free Account
+        </Link>
+      </div>
 
       {/* Hero stats */}
       <div className="relative z-10 max-w-4xl mx-auto px-6 pt-10 pb-8">
