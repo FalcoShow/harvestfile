@@ -1,5 +1,6 @@
 // =============================================================================
-// HarvestFile — Phase 32 Build 1: Founding Farmer 500 API
+// HarvestFile — Phase 32 Build 1.3: Founding Farmer 500 API
+// FIX: share_url now included in already_registered response
 // POST /api/founding-farmer — Register a new founding farmer
 // GET  /api/founding-farmer — Get campaign stats (public)
 // GET  /api/founding-farmer?code=XXX — Validate referral code
@@ -19,7 +20,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
 
-  // If code provided, validate it
   if (code) {
     const { data, error } = await supabaseAdmin
       .from('founding_farmers')
@@ -40,7 +40,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Otherwise return campaign stats
   try {
     const { data, error } = await supabaseAdmin.rpc('get_founding_farmer_stats');
 
@@ -74,7 +73,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, referral_code, source, utm_source, utm_medium, utm_campaign } = body;
 
-    // Validate email
     if (!email || typeof email !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Email is required' },
@@ -90,12 +88,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hash the IP for dedup (never store raw IP)
     const forwarded = request.headers.get('x-forwarded-for');
     const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
     const ipHash = crypto.createHash('sha256').update(ip + 'harvestfile-salt').digest('hex').slice(0, 16);
 
-    // Rate limit: max 5 signups per IP hash per hour
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count: recentCount } = await supabaseAdmin
       .from('founding_farmers')
@@ -110,7 +106,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Register via atomic RPC
     const { data, error } = await supabaseAdmin.rpc('register_founding_farmer', {
       p_email: email.trim(),
       p_referred_by: referral_code?.toUpperCase()?.trim() || null,
@@ -129,13 +124,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Handle already registered
+    // Handle already registered — NOW INCLUDES share_url
     if (data?.error === 'already_registered') {
       return NextResponse.json({
         success: true,
         already_registered: true,
         position: data.position,
         referral_code: data.referral_code,
+        share_url: `https://www.harvestfile.com/founding-farmer?ref=${data.referral_code}`,
         message: "You're already a Founding Farmer!",
       });
     }
@@ -158,7 +154,7 @@ export async function POST(request: Request) {
           captured_at: new Date().toISOString(),
         }, { onConflict: 'email' });
     } catch {
-      // Non-critical — don't fail the registration
+      // Non-critical
     }
 
     return NextResponse.json({
