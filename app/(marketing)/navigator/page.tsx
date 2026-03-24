@@ -33,6 +33,51 @@ const US_STATES = [
 
 const STORAGE_KEY = 'harvestfile_navigator_progress';
 
+// ─── SVG Icons for Operation Types (replaces emojis) ────────────────────────
+
+const OPERATION_ICONS: Record<string, React.ReactNode> = {
+  row_crops: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" /><path d="M7 17l4-8 4 4 4-12" />
+    </svg>
+  ),
+  livestock: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 2c-1.35 1.5-2.09 3-2.5 4.5M9 2c1.35 1.5 2.09 3 2.5 4.5" /><path d="M3 14c2.78-.5 5.22-.5 8 0s5.22.5 8 0" /><path d="M5 22v-4c0-2 1-3.5 3-4" /><path d="M19 22v-4c0-2-1-3.5-3-4" /><circle cx="8.5" cy="10" r="1" /><circle cx="15.5" cy="10" r="1" />
+    </svg>
+  ),
+  dairy: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2h8l2 5H6L8 2z" /><path d="M6 7v12a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7" /><path d="M10 12h4" />
+    </svg>
+  ),
+  specialty_crops: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22c-4-3-8-6.58-8-11.42A8.26 8.26 0 0 1 11.71 3a.64.64 0 0 1 .58 0A8.26 8.26 0 0 1 20 10.58C20 15.42 16 19 12 22Z" /><circle cx="12" cy="11" r="3" />
+    </svg>
+  ),
+  forestry: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l-8 14h5v4h6v-4h5L12 3z" />
+    </svg>
+  ),
+  aquaculture: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 16s3-4 6-4 6 4 6 4 3-4 6-4" /><path d="M2 12s3-4 6-4 6 4 6 4 3-4 6-4" /><path d="M2 20s3-4 6-4 6 4 6 4 3-4 6-4" />
+    </svg>
+  ),
+  honeybees: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12h20" /><path d="M12 2v20" /><path d="m4.93 4.93 14.14 14.14" /><path d="m19.07 4.93-14.14 14.14" /><circle cx="12" cy="12" r="4" />
+    </svg>
+  ),
+  organic: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 20h10" /><path d="M12 20v-8" /><path d="M12 4c-3 0-6 2.5-6 7h12c0-4.5-3-7-6-7z" /><path d="M12 4V2" />
+    </svg>
+  ),
+};
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function NavigatorPage() {
@@ -332,11 +377,18 @@ export default function NavigatorPage() {
                                 </svg>
                               )}
                             </div>
+                            {/* Operation type icon */}
+                            {OPERATION_ICONS[option.value] && (
+                              <div className={`mt-0.5 flex-shrink-0 transition-colors ${
+                                selected ? 'text-[#C9A84C]' : 'text-white/30'
+                              }`}>
+                                {OPERATION_ICONS[option.value]}
+                              </div>
+                            )}
                             <div>
                               <span className={`block font-medium text-sm ${
                                 selected ? 'text-[#E2C366]' : 'text-white/90'
                               }`} style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-                                {option.icon && <span className="mr-1.5">{option.icon}</span>}
                                 {option.label}
                               </span>
                               {option.description && (

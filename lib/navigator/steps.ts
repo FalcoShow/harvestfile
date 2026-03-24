@@ -23,14 +23,14 @@ export const WIZARD_STEPS: WizardStep[] = [
     type: 'multi_select',
     required: true,
     options: [
-      { value: 'row_crops', label: 'Row Crops', icon: '🌾', description: 'Corn, soybeans, wheat, cotton, rice, sorghum, barley, oats' },
-      { value: 'livestock', label: 'Livestock', icon: '🐄', description: 'Cattle, hogs, sheep, goats, poultry' },
-      { value: 'dairy', label: 'Dairy', icon: '🥛', description: 'Milk production and dairy cattle' },
-      { value: 'specialty_crops', label: 'Specialty Crops', icon: '🍎', description: 'Fruits, vegetables, tree nuts, nursery, horticulture' },
-      { value: 'forestry', label: 'Forestry', icon: '🌲', description: 'Timber, non-industrial private forest' },
-      { value: 'aquaculture', label: 'Aquaculture', icon: '🐟', description: 'Farm-raised fish and shellfish' },
-      { value: 'honeybees', label: 'Honeybees', icon: '🐝', description: 'Beekeeping and pollination services' },
-      { value: 'organic', label: 'Organic', icon: '🌿', description: 'Certified organic or transitioning' },
+      { value: 'row_crops', label: 'Row Crops', description: 'Corn, soybeans, wheat, cotton, rice, sorghum, barley, oats' },
+      { value: 'livestock', label: 'Livestock', description: 'Cattle, hogs, sheep, goats, poultry' },
+      { value: 'dairy', label: 'Dairy', description: 'Milk production and dairy cattle' },
+      { value: 'specialty_crops', label: 'Specialty Crops', description: 'Fruits, vegetables, tree nuts, nursery, horticulture' },
+      { value: 'forestry', label: 'Forestry', description: 'Timber, non-industrial private forest' },
+      { value: 'aquaculture', label: 'Aquaculture', description: 'Farm-raised fish and shellfish' },
+      { value: 'honeybees', label: 'Honeybees', description: 'Beekeeping and pollination services' },
+      { value: 'organic', label: 'Organic', description: 'Certified organic or transitioning' },
     ],
   },
 
@@ -215,6 +215,6 @@ export function getStepById(id: string): WizardStep | undefined {
 
 export function getProgress(currentStepIndex: number, profile: Partial<FarmerProfile>): number {
   const visibleSteps = getVisibleSteps(profile);
-  if (visibleSteps.length === 0) return 0;
-  return Math.round(((currentStepIndex + 1) / visibleSteps.length) * 100);
+  if (visibleSteps.length <= 1) return 0;
+  return Math.round((currentStepIndex / (visibleSteps.length - 1)) * 100);
 }
