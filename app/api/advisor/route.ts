@@ -3,6 +3,15 @@
 // app/api/advisor/route.ts
 //
 // Phase 29 Build 1: The most intelligent farm financial advisor ever built.
+// Phase 31 Build 1: CROSS-TOOL INTEGRATION — Benchmark intelligence injected.
+//
+// WHAT CHANGED (Phase 31):
+//   ✅ NEW TOOL: getCountyBenchmarkData — fetches historical enrollment,
+//      live 2026 elections, social proof, and computed insights for any county
+//   ✅ ENHANCED SYSTEM PROMPT: Cross-tool intelligence instructions tell Claude
+//      to weave benchmark data into ARC/PLC recommendations naturally
+//   ✅ IMPORTS: Uses shared lib/cross-tool/ module (unified data layer)
+//   ✅ All existing tools preserved unchanged
 //
 // Architecture:
 //   - Claude Sonnet via Vercel AI SDK + @ai-sdk/anthropic (server only)
@@ -19,6 +28,7 @@ import { streamText, tool, stepCountIs } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
+import { getBenchmarkContextForCounty } from '@/lib/cross-tool/benchmark-context';
 
 export const maxDuration = 60;
 
@@ -74,6 +84,15 @@ GRAIN MARKETING:
 - Storage cost commercial: $0.03-0.05/bu/month; on-farm: ~$0.02-0.03/bu/month
 - If carry (deferred - nearby futures) < storage cost, sell now
 - Scale-up selling: sell in 20% increments as prices rise above breakeven
+
+CROSS-TOOL INTELLIGENCE (Phase 31):
+- When a farmer asks about ARC/PLC elections, ALWAYS call getCountyBenchmarkData first to see what their neighbors are choosing
+- Weave benchmark data into your response naturally: "In your county, X% of farmers historically chose ARC-CO for corn..."
+- If benchmark data shows a strong trend (>75% one direction), mention it as a data point but remind farmers every operation is different
+- If live 2026 data is available, highlight it: "Early reports from X farmers in your county show Y% leaning toward ARC-CO"
+- Use social proof ethically — present it as information, not pressure: "This is what neighbors are doing, but your decision should be based on YOUR numbers"
+- If no benchmark data exists for the county, mention that HarvestFile is building the largest farmer-reported election database and they can contribute at harvestfile.com/check
+- When you have both benchmark data AND payment estimates, connect the dots: "Your county historically favors ARC-CO, and based on current prices, ARC-CO would pay you $X more per acre"
 
 RESPONSE GUIDELINES:
 - ALWAYS use your tools to fetch current market data before making price-dependent recommendations
@@ -255,6 +274,70 @@ const advisorTools = {
         },
       };
       return patterns[commodity] || { error: 'No data' };
+    },
+  }),
+
+  // =========================================================================
+  // Phase 31 Build 1: NEW TOOL — County Benchmark Intelligence
+  // This is the cross-tool integration that makes the AI Advisor 10x smarter.
+  // =========================================================================
+  getCountyBenchmarkData: tool({
+    description: 'Get county-level ARC/PLC election benchmark data including historical FSA enrollment trends, live 2026 crowdsourced elections, and social proof metrics. Call this ALWAYS when a farmer asks about ARC vs PLC decisions, program elections, or what their neighbors are choosing. Provide the 5-digit county FIPS code and optionally a commodity.',
+    inputSchema: z.object({
+      countyFips: z.string().describe('5-digit county FIPS code (e.g., "39153" for Summit County OH)'),
+      commodity: z.string().default('ALL').describe('Commodity code like CORN, SOYBEANS, WHEAT, or ALL for aggregate'),
+    }),
+    execute: async ({ countyFips, commodity }) => {
+      try {
+        const context = await getBenchmarkContextForCounty(countyFips, commodity.toUpperCase());
+
+        if (!context) {
+          return {
+            error: 'County not found',
+            suggestion: 'Ask the farmer for their state and county name, then look up the FIPS code.',
+          };
+        }
+
+        return {
+          county: context.county.county_name,
+          state: context.county.state_abbr,
+          commodity: context.commodity,
+          // Historical enrollment summary
+          historical: {
+            years_available: context.historical.length,
+            most_recent_year: context.insights.most_recent_year,
+            most_recent_arc_pct: context.insights.most_recent_arc_pct,
+            historical_avg_arc_pct: context.insights.historical_avg_arc_pct,
+            dominant_program: context.insights.historical_dominant,
+            trend: context.insights.trend_direction,
+            // Include last 3 years for detail
+            recent_years: context.historical.slice(-3).map(y => ({
+              year: y.year,
+              arc_pct: y.arc_pct,
+              plc_pct: y.plc_pct,
+              total_base_acres: y.total,
+            })),
+          },
+          // Live 2026 crowdsourced data
+          live_2026: {
+            total_reports: context.live_2026.total,
+            arc_co_pct: context.live_2026.arc_co_pct,
+            plc_pct: context.live_2026.plc_pct,
+            data_visible: context.live_2026.is_visible,
+            data_meaningful: context.insights.live_data_meaningful,
+          },
+          // Social proof
+          social_proof: {
+            county_total_reports: context.social_proof.county_total,
+            state_this_week: context.social_proof.state_this_week,
+            state_total_reports: context.social_proof.state_total,
+          },
+          // AI-ready summary
+          summary: context.insights.summary,
+        };
+      } catch (err: any) {
+        return { error: err.message };
+      }
     },
   }),
 };
