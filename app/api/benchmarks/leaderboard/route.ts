@@ -66,10 +66,10 @@ export async function GET(request: Request) {
     const countyFipsList = (counties || []).map(c => c.county_fips);
     const { data: countyNames } = await supabaseAdmin
       .from('counties')
-      .select('county_fips, county_name')
+      .select('county_fips, display_name')
       .in('county_fips', countyFipsList);
 
-    const nameMap = new Map((countyNames || []).map(c => [c.county_fips, c.county_name]));
+    const nameMap = new Map((countyNames || []).map(c => [c.county_fips, c.display_name]));
 
     return NextResponse.json({
       state_fips: stateFips,
