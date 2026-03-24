@@ -1,14 +1,18 @@
 // =============================================================================
-// HarvestFile — Phase 30 Build 3: Election Benchmark Submission API (v2)
+// HarvestFile — Phase 30 Build 6: Election Benchmark Submission API (v3)
 // POST /api/benchmarks/submit
 //
-// UPDATED: Added Cloudflare Turnstile server-side verification.
-// Turnstile token is verified FIRST before any other processing.
-// If TURNSTILE_SECRET_KEY is not set, Turnstile check is skipped
-// (graceful degradation for dev/test environments).
+// ZERO-FRICTION: Email is now OPTIONAL. Anonymous sessions use a session_id
+// (from Supabase Anonymous Auth or localStorage UUID) for dedup.
 //
-// Handles: Turnstile verification, validation, SHA-256 hashing, dedup,
-//          rate limiting, submission, and returns updated county benchmarks.
+// Flow:
+// 1. Verify Cloudflare Turnstile token (anti-bot)
+// 2. Validate county, crop, election choice
+// 3. Generate verification_hash from session_id OR email
+// 4. Insert submission (trigger auto-updates cache)
+// 5. Return updated county benchmarks
+//
+// Backward compatible: still accepts email-based submissions from older clients.
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -62,6 +66,11 @@ function isValidFIPS(fips: string): boolean {
   return /^\d{5}$/.test(fips);
 }
 
+function isValidSessionId(id: string): boolean {
+  // UUID v4 format or any hex string 32+ chars
+  return /^[0-9a-f-]{32,}$/i.test(id);
+}
+
 // ─── Turnstile Verification ──────────────────────────────────────────────────
 
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
@@ -88,8 +97,7 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
     return data.success === true;
   } catch (err) {
     console.error('Turnstile verification error:', err);
-    // On verification failure, allow the submission (fail open)
-    // The IP rate limiting and email dedup still protect against abuse
+    // Fail open — IP rate limiting and hash dedup still protect against abuse
     return true;
   }
 }
@@ -103,10 +111,35 @@ export async function POST(request: Request) {
       county_fips,
       commodity_code,
       election_choice,
-      email,
+      email,           // OPTIONAL now — for backward compat + email capture
+      session_id,      // NEW — anonymous session identifier
       program_year,
       turnstile_token,
     } = body;
+
+    // ── Must have either session_id or email for identity ─────────────────
+    if (!session_id && !email) {
+      return NextResponse.json(
+        { error: 'Session identifier required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate session_id format if provided
+    if (session_id && !isValidSessionId(session_id)) {
+      return NextResponse.json(
+        { error: 'Invalid session identifier' },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format if provided
+    if (email && !isValidEmail(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
 
     // ── Turnstile CAPTCHA verification (first check) ──────────────────────
     const clientIP = getClientIP(request);
@@ -148,13 +181,6 @@ export async function POST(request: Request) {
     if (!election_choice || !VALID_ELECTIONS.has(election_choice)) {
       return NextResponse.json(
         { error: 'Election choice must be ARC-CO or PLC' },
-        { status: 400 }
-      );
-    }
-
-    if (!email || !isValidEmail(email)) {
-      return NextResponse.json(
-        { error: 'Valid email address is required' },
         { status: 400 }
       );
     }
@@ -215,10 +241,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── Generate hashes ───────────────────────────────────────────────────
-    const emailHash = sha256(email);
+    // ── Generate identity hashes ──────────────────────────────────────────
+    // Primary identity: session_id (anonymous) or email (registered)
+    const identity = session_id || email!;
+    const identityType = session_id ? 'session' : 'email';
+
+    const emailHash = email ? sha256(email) : null;
     const verificationHash = sha256(
-      `${email.toLowerCase().trim()}:${commodity_code.toUpperCase()}:${county_fips}:${year}`
+      `${identity.toLowerCase().trim()}:${commodity_code.toUpperCase()}:${county_fips}:${year}`
     );
 
     // ── Insert submission (trigger auto-updates cache) ────────────────────
@@ -238,7 +268,10 @@ export async function POST(request: Request) {
       // Unique constraint violation = duplicate submission
       if (insertError.code === '23505') {
         return NextResponse.json(
-          { error: 'You have already submitted an election for this crop and county this year. You can update your choice by contacting us.' },
+          {
+            error: 'You have already submitted an election for this crop and county this year.',
+            duplicate: true,
+          },
           { status: 409 }
         );
       }
@@ -260,6 +293,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: 'Election submitted successfully',
+      identity_type: identityType,
       benchmarks: (benchmarks || []).map(b => ({
         commodity_code: b.commodity_code,
         arc_co_pct: b.is_visible ? b.arc_co_pct : null,

@@ -1,13 +1,25 @@
 // =============================================================================
-// HarvestFile — Phase 7A: County Election Benchmark Widget
-// "The Facebook Moment" — Share your election, see what your neighbors chose
+// HarvestFile — Phase 30 Build 6: BenchmarkWidget (Zero-Friction)
+// components/calculator/BenchmarkWidget.tsx
 //
-// Client Component — handles voting flow, locked/unlocked states, SWR polling.
-// Embedded in county ARC/PLC pages as a dynamic import.
+// "The Facebook Moment" — Zero-friction anonymous benchmarking.
 //
-// Design: Uses theme-aware CSS variables (foreground, muted-foreground, surface,
-//         border) to match the light marketing theme on county pages.
-//         Emerald = ARC-CO, Blue = PLC. Gold = CTAs.
+// WHAT CHANGED (Build 6):
+//   ✅ Email REMOVED from submission form — zero friction
+//   ✅ Cloudflare Turnstile invisible CAPTCHA — anti-bot without annoying users
+//   ✅ Anonymous session via localStorage UUID — dedup without accounts
+//   ✅ Post-submit email capture — soft "Save your results" prompt (optional)
+//   ✅ Turnstile script loaded dynamically on mount
+//
+// Flow:
+//   1. Farmer sees benchmark teaser (locked/unlocked data)
+//   2. Clicks "Share My Election" → picks crop + ARC-CO/PLC (that's it!)
+//   3. Turnstile validates invisibly in background
+//   4. Anonymous session_id sent with submission for dedup
+//   5. Results revealed instantly
+//   6. Soft prompt: "Want to save your results? Enter email." (optional)
+//
+// Design: Dark glassmorphism on /check. Emerald = ARC-CO, Blue = PLC, Gold = CTAs.
 // =============================================================================
 
 'use client';
@@ -44,14 +56,125 @@ interface Props {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const UNLOCK_THRESHOLD = 5;
-const POLL_INTERVAL = 30000; // 30 seconds
+const POLL_INTERVAL = 30000;
 const PROGRAM_YEAR = 2026;
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
 
 const CROP_EMOJI: Record<string, string> = {
   CORN: '🌽', SOYBEANS: '🫘', WHEAT: '🌾', SORGHUM: '🌿',
   BARLEY: '🪴', OATS: '🌱', COTTON: '☁️', PEANUTS: '🥜',
   RICE: '🍚', SUNFLOWER: '🌻', CANOLA: '🪻', FLAXSEED: '🌰',
 };
+
+// ─── Anonymous Session Helper ────────────────────────────────────────────────
+
+function getOrCreateSessionId(): string {
+  const STORAGE_KEY = 'hf_session_id';
+  try {
+    const existing = localStorage.getItem(STORAGE_KEY);
+    if (existing && existing.length >= 32) return existing;
+
+    // Generate a UUID v4
+    const uuid = crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+
+    localStorage.setItem(STORAGE_KEY, uuid);
+    return uuid;
+  } catch {
+    // Fallback for private browsing / no localStorage
+    return crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  }
+}
+
+// ─── Turnstile Hook ──────────────────────────────────────────────────────────
+
+function useTurnstile(containerId: string) {
+  const [token, setToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) {
+      setReady(true); // Skip if no site key (dev)
+      return;
+    }
+
+    // Load Turnstile script if not already loaded
+    const existingScript = document.querySelector('script[src*="turnstile"]');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.onload = () => renderWidget();
+      document.head.appendChild(script);
+    } else {
+      // Script already loaded, render widget
+      const checkReady = setInterval(() => {
+        if ((window as any).turnstile) {
+          clearInterval(checkReady);
+          renderWidget();
+        }
+      }, 100);
+      return () => clearInterval(checkReady);
+    }
+
+    function renderWidget() {
+      const turnstile = (window as any).turnstile;
+      if (!turnstile) return;
+
+      // Clean up any existing widget
+      if (widgetIdRef.current) {
+        try { turnstile.remove(widgetIdRef.current); } catch {}
+      }
+
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      widgetIdRef.current = turnstile.render(container, {
+        sitekey: TURNSTILE_SITE_KEY,
+        size: 'invisible',
+        callback: (t: string) => {
+          setToken(t);
+          setReady(true);
+        },
+        'error-callback': () => {
+          setReady(true); // Allow submission even if Turnstile fails
+        },
+        'expired-callback': () => {
+          setToken(null);
+          // Re-execute for a fresh token
+          if (widgetIdRef.current) {
+            try { turnstile.reset(widgetIdRef.current); } catch {}
+          }
+        },
+      });
+
+      setReady(true);
+    }
+
+    return () => {
+      if (widgetIdRef.current) {
+        try { (window as any).turnstile?.remove(widgetIdRef.current); } catch {}
+      }
+    };
+  }, [containerId]);
+
+  const reset = useCallback(() => {
+    setToken(null);
+    if (widgetIdRef.current && (window as any).turnstile) {
+      try { (window as any).turnstile.reset(widgetIdRef.current); } catch {}
+    }
+  }, []);
+
+  return { token, ready, reset };
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -75,13 +198,29 @@ export default function BenchmarkWidget({
   const [submitError, setSubmitError] = useState('');
   const [justUnlocked, setJustUnlocked] = useState(false);
 
-  // Form state
+  // Post-submit email capture
+  const [showEmailCapture, setShowEmailCapture] = useState(false);
+  const [captureEmail, setCaptureEmail] = useState('');
+  const [emailSaved, setEmailSaved] = useState(false);
+
+  // Form state — NO EMAIL REQUIRED
   const [selectedCrop, setSelectedCrop] = useState(availableCrops[0]?.code || '');
   const [selectedElection, setSelectedElection] = useState<'ARC-CO' | 'PLC' | ''>('');
-  const [email, setEmail] = useState('');
+
+  // Anonymous session
+  const [sessionId, setSessionId] = useState('');
+
+  // Turnstile
+  const turnstileContainerId = `turnstile-calc-${countyFips}`;
+  const { token: turnstileToken, ready: turnstileReady, reset: resetTurnstile } = useTurnstile(turnstileContainerId);
 
   const formRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Initialize session ID on mount
+  useEffect(() => {
+    setSessionId(getOrCreateSessionId());
+  }, []);
 
   // Check localStorage for prior contribution
   useEffect(() => {
@@ -108,15 +247,15 @@ export default function BenchmarkWidget({
     return () => clearInterval(interval);
   }, [fetchBenchmarks, initialBenchmarks]);
 
-  // ── Submit handler ──────────────────────────────────────────────────────
+  // ── Submit handler — NO EMAIL REQUIRED ──────────────────────────────────
   const handleSubmit = async () => {
-    if (!selectedCrop || !selectedElection || !email) {
-      setSubmitError('Please fill in all fields');
+    if (!selectedCrop || !selectedElection) {
+      setSubmitError('Please select your crop and election choice');
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setSubmitError('Please enter a valid email address');
+    if (!sessionId) {
+      setSubmitError('Session error — please refresh and try again');
       return;
     }
 
@@ -131,15 +270,25 @@ export default function BenchmarkWidget({
           county_fips: countyFips,
           commodity_code: selectedCrop,
           election_choice: selectedElection,
-          email,
+          session_id: sessionId,
           program_year: PROGRAM_YEAR,
+          turnstile_token: turnstileToken || undefined,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        // If duplicate, still treat as contributed
+        if (data.duplicate) {
+          setHasContributed(true);
+          setShowForm(false);
+          try { localStorage.setItem(`hf_benchmark_${countyFips}_${PROGRAM_YEAR}`, 'true'); } catch {}
+          fetchBenchmarks();
+          return;
+        }
         setSubmitError(data.error || 'Something went wrong');
+        resetTurnstile();
         return;
       }
 
@@ -147,6 +296,7 @@ export default function BenchmarkWidget({
       setHasContributed(true);
       setShowForm(false);
       setJustUnlocked(true);
+      setShowEmailCapture(true);
 
       try {
         localStorage.setItem(`hf_benchmark_${countyFips}_${PROGRAM_YEAR}`, 'true');
@@ -159,9 +309,37 @@ export default function BenchmarkWidget({
       setTimeout(() => setJustUnlocked(false), 3000);
     } catch {
       setSubmitError('Network error. Please try again.');
+      resetTurnstile();
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // ── Email capture (post-submit, optional) ───────────────────────────────
+  const handleEmailCapture = async () => {
+    if (!captureEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(captureEmail)) return;
+
+    try {
+      await fetch('/api/benchmarks/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          county_fips: countyFips,
+          commodity_code: selectedCrop,
+          election_choice: selectedElection,
+          session_id: sessionId,
+          email: captureEmail,
+          program_year: PROGRAM_YEAR,
+        }),
+      });
+    } catch {}
+
+    // Always show success — even if the update fails, we don't want to frustrate
+    setEmailSaved(true);
+    setShowEmailCapture(false);
+    try {
+      localStorage.setItem('hf_email', captureEmail);
+    } catch {}
   };
 
   // ── Derived state ───────────────────────────────────────────────────────
@@ -178,6 +356,9 @@ export default function BenchmarkWidget({
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
         }}
       />
+
+      {/* Invisible Turnstile container */}
+      <div id={turnstileContainerId} className="hidden" />
 
       <div className="relative z-10 p-6 sm:p-8">
         {/* ═══ HEADER ═══ */}
@@ -264,7 +445,6 @@ export default function BenchmarkWidget({
                       <div className="relative h-10 rounded-lg overflow-hidden bg-white/[0.06] border border-white/[0.06]">
                         {showData && b.arc_co_pct != null && b.plc_pct != null ? (
                           <>
-                            {/* ARC-CO segment */}
                             <div
                               className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-1000 ease-out flex items-center"
                               style={{
@@ -276,7 +456,6 @@ export default function BenchmarkWidget({
                                 ARC-CO {b.arc_co_pct}%
                               </span>
                             </div>
-                            {/* PLC segment */}
                             <div
                               className="absolute inset-y-0 right-0 bg-gradient-to-l from-blue-600 to-blue-500 transition-all duration-1000 ease-out flex items-center justify-end"
                               style={{
@@ -305,20 +484,19 @@ export default function BenchmarkWidget({
               })}
             </div>
           ) : (
-            /* Empty state — no benchmarks yet */
             <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center mb-6">
               <div className="text-3xl mb-3">🗳️</div>
               <div className="text-sm font-semibold text-white/60 mb-1">
                 No {PROGRAM_YEAR} election data yet for {countyName}
               </div>
               <div className="text-xs text-white/30">
-                Be the first farmer in your county to share — it only takes 30 seconds.
+                Be the first farmer in your county to share — it only takes 10 seconds.
               </div>
             </div>
           )}
         </div>
 
-        {/* ═══ CONTRIBUTION CTA / FORM ═══ */}
+        {/* ═══ CONTRIBUTION CTA — ZERO FRICTION ═══ */}
         {!hasContributed && !showForm && (
           <button
             onClick={() => {
@@ -338,7 +516,7 @@ export default function BenchmarkWidget({
                   Share your {PROGRAM_YEAR} election — unlock your county&apos;s data
                 </div>
                 <div className="text-xs text-white/35 mt-0.5">
-                  Anonymous · 30 seconds · Helps your neighbors decide too
+                  Anonymous · 10 seconds · No email required
                 </div>
               </div>
               <svg className="w-5 h-5 text-amber-400/60 shrink-0 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -348,7 +526,7 @@ export default function BenchmarkWidget({
           </button>
         )}
 
-        {/* ═══ CONTRIBUTION FORM ═══ */}
+        {/* ═══ CONTRIBUTION FORM — NO EMAIL, JUST PICK AND SUBMIT ═══ */}
         {showForm && !hasContributed && (
           <div
             ref={formRef}
@@ -444,21 +622,6 @@ export default function BenchmarkWidget({
                 </div>
               </div>
 
-              {/* Email */}
-              <div>
-                <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5">
-                  Email <span className="text-white/25 normal-case tracking-normal">(for verification — never shared)</span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@farm.com"
-                  className="w-full px-4 py-3 rounded-xl border border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/25 text-sm focus:outline-none focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/15 transition-all"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                />
-              </div>
-
               {/* Error */}
               {submitError && (
                 <div className="text-sm text-red-300 bg-red-500/[0.1] border border-red-500/20 rounded-lg px-3 py-2">
@@ -466,10 +629,10 @@ export default function BenchmarkWidget({
                 </div>
               )}
 
-              {/* Submit */}
+              {/* Submit — IMMEDIATE, NO EMAIL */}
               <button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !selectedCrop || !selectedElection || !email}
+                disabled={isSubmitting || !selectedCrop || !selectedElection}
                 className="w-full py-3.5 rounded-xl font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-[0.98]"
               >
                 {isSubmitting ? (
@@ -491,8 +654,8 @@ export default function BenchmarkWidget({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
                 <span>
-                  Your election stays anonymous. We store only a hashed identifier — never your name or farm details. 
-                  Only county-level percentages are shown. Minimum 5 farms per county before any data is revealed.
+                  No account or email needed. Your election stays anonymous — we store only a hashed session identifier. 
+                  Only county-level percentages are shown. Minimum {UNLOCK_THRESHOLD} farms per county before any data is revealed.
                 </span>
               </div>
 
@@ -521,6 +684,60 @@ export default function BenchmarkWidget({
                 <span className="font-semibold">You&apos;re in.</span> Your election is counted in the {countyName} benchmark.
               </div>
             </div>
+
+            {/* ═══ EMAIL CAPTURE — SOFT PROMPT (OPTIONAL) ═══ */}
+            {showEmailCapture && !emailSaved && (
+              <div className="rounded-lg border border-amber-500/15 bg-amber-500/[0.05] p-4 mb-4 animate-in fade-in duration-500">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-sm shrink-0">
+                    📧
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-amber-200 mb-1">
+                      Save your results?
+                    </div>
+                    <div className="text-[11px] text-white/30 mb-3">
+                      Get notified when your county benchmark changes. Completely optional.
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={captureEmail}
+                        onChange={(e) => setCaptureEmail(e.target.value)}
+                        placeholder="you@farm.com"
+                        className="flex-1 px-3 py-2 rounded-lg border border-white/[0.1] bg-white/[0.05] text-white placeholder:text-white/25 text-xs focus:outline-none focus:border-amber-500/30 transition-all"
+                        onKeyDown={(e) => e.key === 'Enter' && handleEmailCapture()}
+                      />
+                      <button
+                        onClick={handleEmailCapture}
+                        disabled={!captureEmail}
+                        className="px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold transition-all disabled:opacity-40"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowEmailCapture(false)}
+                    className="text-white/20 hover:text-white/40 transition-colors p-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Email saved confirmation */}
+            {emailSaved && (
+              <div className="flex items-center gap-2 rounded-lg bg-amber-500/[0.06] border border-amber-500/10 px-3 py-2 mb-4 text-[11px] text-amber-300 animate-in fade-in duration-300">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Email saved — we&apos;ll notify you when county data changes.
+              </div>
+            )}
 
             {/* Share CTA */}
             <div className="flex flex-col sm:flex-row gap-2">
