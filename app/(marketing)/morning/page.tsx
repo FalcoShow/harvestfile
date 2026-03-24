@@ -1,12 +1,18 @@
 // =============================================================================
-// HarvestFile — Phase 26 Build 4 HOTFIX: Morning Farm Dashboard
+// HarvestFile — Phase 31 Build 3: Morning Farm Dashboard + Benchmark Alerts
 // app/(marketing)/morning/page.tsx
 //
-// FIX: Weather card now correctly reads from the actual /api/weather response:
+// PHASE 31 BUILD 3 CHANGES:
+//   ✅ NEW: Import BenchmarkAlertCard component
+//   ✅ NEW: Render <BenchmarkAlertCard /> between NWS alerts and Weather/Spray
+//   ✅ Reads calculator bridge data from localStorage automatically
+//   ✅ Shows personalized election intelligence (aligned/contrarian/general)
+//
+// Previous fixes preserved:
 //   - data.forecast.daily[0] for today's weather (not data.current)
 //   - data.soil[0] for soil temps (array, not object)
 //   - data.gdd.total_14day for GDD total (not data.gdd.total)
-//   - data.alerts[] for NWS weather alerts (NEW — surfaces severe weather)
+//   - data.alerts[] for NWS weather alerts
 //
 // FREE TOOL #11 — "The Farmer's Bloomberg Terminal"
 // =============================================================================
@@ -16,6 +22,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
+import BenchmarkAlertCard from "./_components/BenchmarkAlertCard";
 
 // ─── Commodity Config ────────────────────────────────────────────────────────
 
@@ -217,6 +224,9 @@ export default function MorningDashboard() {
             ))}
           </div>
         )}
+
+        {/* ── Benchmark Election Intelligence (Phase 31 Build 3) ── */}
+        <BenchmarkAlertCard />
 
         {/* ── Weather + Spray ─────────────────────────────────── */}
         {location && (
