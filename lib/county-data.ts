@@ -273,7 +273,8 @@ export async function getStateSummary(stateSlug: string): Promise<{
  */
 export function generateCountyNarrative(profile: CountyProfile): string {
   const paragraphs: string[] = []
-  const { county_name, state_name, state_abbr } = profile
+  const { state_name, state_abbr } = profile
+  const county_name = toProperCountyName(profile.county_name)
   
   // Opening paragraph — always unique because data differs
   if (profile.total_farms && profile.total_farmland_acres) {
@@ -397,7 +398,8 @@ export function generateCountyNarrative(profile: CountyProfile): string {
  */
 export function generateCountyFAQs(profile: CountyProfile): Array<{ question: string; answer: string }> {
   const faqs: Array<{ question: string; answer: string }> = []
-  const { county_name, state_name } = profile
+  const { state_name } = profile
+  const county_name = toProperCountyName(profile.county_name)
   
   // FAQ 1: ARC vs PLC recommendation
   const topCrop = profile.top_crops?.[0]
@@ -483,7 +485,7 @@ export function generateCountyFAQs(profile: CountyProfile): Array<{ question: st
       question: `How does ${county_name} compare to neighboring counties for ARC/PLC?`,
       answer: `ARC-CO and PLC calculations vary significantly between counties because they use ` +
         `county-specific benchmark yields and revenue data. Neighboring counties like ` +
-        `${neighbors.map(n => n.name).join(', ')} may have different yield histories, different ` +
+        `${neighbors.map(n => toProperCountyName(n.name)).join(', ')} may have different yield histories, different ` +
         `top crops, and different ARC-CO payment likelihoods. Use our county comparison tool to ` +
         `see how ${county_name}'s ARC/PLC projections compare to nearby counties.`
     })
@@ -497,7 +499,8 @@ export function generateCountyFAQs(profile: CountyProfile): Array<{ question: st
 // ============================================================
 
 export function generateCountyJsonLd(profile: CountyProfile): object {
-  const { county_name, state_name, state_abbr } = profile
+  const { state_name, state_abbr } = profile
+  const county_name = toProperCountyName(profile.county_name)
   
   const schemas: any[] = []
   
@@ -610,6 +613,65 @@ export function generateCountyJsonLd(profile: CountyProfile): object {
 // ============================================================
 // Helpers
 // ============================================================
+
+/**
+ * Convert NASS uppercase county names to proper title case.
+ * Handles edge cases: "MC LEAN" → "McLean County", "DE KALB" → "DeKalb County",
+ * "ST CLAIR" → "St. Clair County", "O BRIEN" → "O'Brien County".
+ * If the name already contains "County", it won't be appended again.
+ */
+function toProperCountyName(raw: string): string {
+  if (!raw) return ''
+  
+  const trimmed = raw.trim()
+  
+  // If it's already mixed case (not all uppercase), return as-is with County suffix
+  if (trimmed !== trimmed.toUpperCase()) {
+    return trimmed.includes('County') ? trimmed : `${trimmed} County`
+  }
+  
+  // Handle common prefixes before title-casing
+  let name = trimmed
+    // MC prefix: "MC LEAN" → "McLean"
+    .replace(/\bMC\s+(\w)/gi, (_, letter) => `Mc${letter.toUpperCase()}`)
+    // DE prefix: "DE KALB" → "DeKalb", "DE WITT" → "DeWitt"
+    .replace(/\bDE\s+(\w)/gi, (_, letter) => `De${letter.toUpperCase()}`)
+    // ST prefix: "ST CLAIR" → "St. Clair"
+    .replace(/\bST\s+/gi, 'St. ')
+    // O' prefix: "O BRIEN" → "O'Brien"
+    .replace(/\bO\s+(\w)/gi, (_, letter) => `O'${letter.toUpperCase()}`)
+    // LA prefix for Louisiana-style names: "LA SALLE" → "LaSalle"
+    .replace(/\bLA\s+(\w)/gi, (_, letter) => `La${letter.toUpperCase()}`)
+  
+  // Title-case the rest
+  name = name
+    .toLowerCase()
+    .split(' ')
+    .map(word => {
+      // Preserve already-processed prefixes (Mc, De, St., O', La)
+      if (/^(mc|de|st\.|o'|la)[a-z]/i.test(word)) return word
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
+  
+  // Re-apply prefix capitalizations that may have been lowered
+  name = name
+    .replace(/^Mc(\w)/, (_, l) => `Mc${l.toUpperCase()}`)
+    .replace(/\sMc(\w)/g, (_, l) => ` Mc${l.toUpperCase()}`)
+    .replace(/^De(\w)/, (_, l) => `De${l.toUpperCase()}`)
+    .replace(/\sDe(\w)/g, (_, l) => ` De${l.toUpperCase()}`)
+    .replace(/^O'(\w)/, (_, l) => `O'${l.toUpperCase()}`)
+    .replace(/\sO'(\w)/g, (_, l) => ` O'${l.toUpperCase()}`)
+    .replace(/^La(\w)/, (_, l) => `La${l.toUpperCase()}`)
+    .replace(/\sLa(\w)/g, (_, l) => ` La${l.toUpperCase()}`)
+  
+  // Append "County" if not already present
+  if (!name.toLowerCase().includes('county')) {
+    name = `${name} County`
+  }
+  
+  return name
+}
 
 function formatList(items: string[]): string {
   if (items.length === 0) return ''
