@@ -51,26 +51,10 @@ const nextConfig = {
   },
 
   // ── Redirects ─────────────────────────────────────────────────────────
-  // Execution order: headers → redirects → middleware → rewrites
-  // These run BEFORE middleware, at the routing layer with zero latency.
+  // NOTE: www → non-www redirect is handled by Vercel edge (Domains settings)
+  // which is faster than Next.js config redirects. Do NOT add it here.
   async redirects() {
     return [
-      // ── WWW → non-WWW canonical redirect ──────────────────────────────
-      // CRITICAL for SEO: stops Google from splitting crawl signals
-      // between www.harvestfile.com and harvestfile.com.
-      // GSC is registered for https://harvestfile.com/ (non-www).
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.harvestfile.com',
-          },
-        ],
-        destination: 'https://harvestfile.com/:path*',
-        permanent: true,
-      },
-
       // ── Legacy auth route redirects ───────────────────────────────────
       {
         source: '/auth/login',
