@@ -50,9 +50,28 @@ const nextConfig = {
     ];
   },
 
-  // ── Redirects (consolidate duplicate routes) ──────────────────────────
+  // ── Redirects ─────────────────────────────────────────────────────────
+  // Execution order: headers → redirects → middleware → rewrites
+  // These run BEFORE middleware, at the routing layer with zero latency.
   async redirects() {
     return [
+      // ── WWW → non-WWW canonical redirect ──────────────────────────────
+      // CRITICAL for SEO: stops Google from splitting crawl signals
+      // between www.harvestfile.com and harvestfile.com.
+      // GSC is registered for https://harvestfile.com/ (non-www).
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.harvestfile.com',
+          },
+        ],
+        destination: 'https://harvestfile.com/:path*',
+        permanent: true,
+      },
+
+      // ── Legacy auth route redirects ───────────────────────────────────
       {
         source: '/auth/login',
         destination: '/login',
@@ -63,6 +82,8 @@ const nextConfig = {
         destination: '/login',
         permanent: true,
       },
+
+      // ── Trailing slash removal ────────────────────────────────────────
       {
         source: '/:path+/',
         destination: '/:path+',
