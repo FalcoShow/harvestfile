@@ -1,12 +1,19 @@
 // =============================================================================
-// HarvestFile — Phase 25 Build 1: County ARC/PLC Detail Page
-// /{state}/{county}/arc-plc — THE primary SEO page
+// HarvestFile — Consolidation Phase 1, Build 2C: Enriched County Page
+// /{state}/{county}/arc-plc — THE definitive county-level ARC/PLC resource
 //
-// 3,000+ unique county pages, each packed with genuine USDA data.
-// This is the page farmers land on from Google. It must be incredible.
+// 3,000+ unique county pages with genuinely different data per county.
+// Each page has 8-15 unique data points, conditional narrative text,
+// data-driven FAQs, and 5-type JSON-LD schema.
+//
+// Data sources:
+//   - county_crop_data (ARC/PLC payments, benchmarks, yields)
+//   - county_profiles (census, climate, soil, insurance, ERS, narrative)
+//   - historical_enrollment (election breakdowns)
+//   - benchmarks (live 2026 farmer reports)
 //
 // Server Component with client islands for charts and interactivity.
-// ISR with 1-hour revalidation + on-demand revalidation on benchmark updates.
+// ISR with 1-hour revalidation + on-demand revalidation on data updates.
 // =============================================================================
 
 import { Metadata } from 'next';
@@ -26,6 +33,13 @@ import {
 import { CountyCharts } from '@/components/county/CountyCharts';
 import { CountyBenchmarkCTA } from '@/components/county/CountyBenchmarkCTA';
 import { getBenchmarkContextForCounty } from '@/lib/cross-tool/benchmark-context';
+import {
+  getCountyProfile,
+  generateCountyNarrative,
+  generateCountyFAQs,
+  generateCountyJsonLd,
+  type CountyProfile,
+} from '@/lib/county-data';
 
 // ── ISR: Revalidate every hour ──────────────────────────────────────────
 export const revalidate = 3600;
@@ -33,7 +47,6 @@ export const dynamicParams = true;
 
 // ── Generate top 200 counties at build time ─────────────────────────────
 export async function generateStaticParams() {
-  // Import here to avoid top-level side effects during build
   const { supabasePublic } = await import('@/lib/supabase/public');
 
   const { data } = await supabasePublic
@@ -62,17 +75,32 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!result) return { title: 'County Not Found | HarvestFile' };
 
   const { county: c, state: s } = result;
-  const enrollment = await getCountyEnrollmentSummary(c.county_fips);
+
+  // Pull enrichment data for richer meta description
+  const [enrollment, profile] = await Promise.all([
+    getCountyEnrollmentSummary(c.county_fips),
+    getCountyProfile(state, county),
+  ]);
+
   const acresStr = c.total_base_acres
     ? `${(c.total_base_acres / 1000).toFixed(0)}K`
     : '';
 
+  // Build a rich, unique meta description from real data
+  const descParts: string[] = [];
+  descParts.push(`Free ARC-CO vs PLC analysis for ${c.display_name}, ${s.name}.`);
+  if (acresStr) descParts.push(`${acresStr} enrolled base acres.`);
+  if (profile?.total_farms) descParts.push(`${profile.total_farms.toLocaleString()} farms.`);
+  if (enrollment) {
+    descParts.push(
+      `${enrollment.top_crop}: ${enrollment.top_crop_arcco_pct}% ARC-CO, ${enrollment.top_crop_plc_pct}% PLC.`
+    );
+  }
+  descParts.push('Real USDA data, payment history, and 2026 recommendations under OBBBA.');
+
+  const description = descParts.join(' ');
+
   const title = `${c.display_name}, ${s.abbreviation} ARC/PLC Data — Payment Projections & Election History | HarvestFile`;
-  const description = `Free ARC-CO vs PLC analysis for ${c.display_name}, ${s.name}. ${acresStr ? `${acresStr} enrolled base acres. ` : ''}${
-    enrollment
-      ? `${enrollment.top_crop}: ${enrollment.top_crop_arcco_pct}% ARC-CO, ${enrollment.top_crop_plc_pct}% PLC. `
-      : ''
-  }Real USDA data, payment history, and 2026 recommendations under OBBBA.`;
 
   return {
     title,
@@ -100,6 +128,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 function formatAcres(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${Math.round(n / 1000).toLocaleString()}K`;
+  return n.toLocaleString();
+}
+
+function formatNumber(n: number): string {
   return n.toLocaleString();
 }
 
@@ -133,17 +165,33 @@ function getRecBadgeColor(rec: string): string {
   }
 }
 
-// ── JSON-LD Structured Data ─────────────────────────────────────────────
+// ── Enhanced JSON-LD Structured Data ────────────────────────────────────
+// Uses county_profiles data when available for 5-type schema:
+// Dataset, BreadcrumbList, Place, GovernmentService, FAQPage
 
 function CountyJsonLd({
   county,
   state,
   cropData,
+  profile,
 }: {
   county: any;
   state: any;
   cropData: CommodityGroup[];
+  profile: CountyProfile | null;
 }) {
+  // If we have a county profile, use the enhanced 5-type JSON-LD generator
+  if (profile) {
+    const enhancedJsonLd = generateCountyJsonLd(profile);
+    return (
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(enhancedJsonLd) }}
+      />
+    );
+  }
+
+  // Fallback: original 3-type JSON-LD for counties without profiles
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -240,12 +288,13 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
 
   const { county, state } = result;
 
-  const [cropData, enrollment, enrollmentSummary, neighbors, benchmarkContext] = await Promise.all([
+  const [cropData, enrollment, enrollmentSummary, neighbors, benchmarkContext, profile] = await Promise.all([
     getCountyCropData(county.county_fips),
     getCountyEnrollmentHistory(county.county_fips),
     getCountyEnrollmentSummary(county.county_fips),
     getNeighborCounties(county.state_fips, county.county_fips),
     getBenchmarkContextForCounty(county.county_fips),
+    getCountyProfile(stateSlug, countySlug),
   ]);
 
   // Get recommendations for each crop
@@ -261,9 +310,13 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
   // Latest enrollment year data
   const latestYear = enrollmentSummary?.latest_year;
 
+  // Generate enrichment content from county_profiles
+  const narrative = profile ? generateCountyNarrative(profile) : null;
+  const faqs = profile ? generateCountyFAQs(profile) : [];
+
   return (
     <>
-      <CountyJsonLd county={county} state={state} cropData={cropData} />
+      <CountyJsonLd county={county} state={state} cropData={cropData} profile={profile} />
 
       <div className="min-h-screen bg-[#FAFAF8]">
         {/* ═══ HERO ═══ */}
@@ -322,7 +375,7 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
               Beautiful Bill Act.
             </p>
 
-            {/* KPI Cards */}
+            {/* KPI Cards — Enhanced with profile data */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {county.total_base_acres > 0 && (
                 <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-sm px-4 py-3.5">
@@ -404,6 +457,206 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
               </Link>
             </div>
           </div>
+
+          {/* ══ BUILD 2C: Agricultural Profile ══ */}
+          {profile && (profile.total_farms || profile.total_farmland_acres || profile.cropland_acres) && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+                Agricultural Profile
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {profile.total_farms && (
+                  <div className="rounded-xl border border-gray-200/80 bg-white px-4 py-4 shadow-sm">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">
+                      Total Farms
+                    </div>
+                    <div className="text-[22px] font-extrabold text-[#1B4332] tracking-tight">
+                      {formatNumber(profile.total_farms)}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      USDA Census of Agriculture
+                    </div>
+                  </div>
+                )}
+                {profile.total_farmland_acres && (
+                  <div className="rounded-xl border border-gray-200/80 bg-white px-4 py-4 shadow-sm">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">
+                      Farmland
+                    </div>
+                    <div className="text-[22px] font-extrabold text-[#1B4332] tracking-tight">
+                      {formatAcres(profile.total_farmland_acres)}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      acres total
+                    </div>
+                  </div>
+                )}
+                {profile.avg_farm_size_acres && (
+                  <div className="rounded-xl border border-gray-200/80 bg-white px-4 py-4 shadow-sm">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">
+                      Avg Farm Size
+                    </div>
+                    <div className="text-[22px] font-extrabold text-[#1B4332] tracking-tight">
+                      {formatNumber(profile.avg_farm_size_acres)}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      acres per farm
+                    </div>
+                  </div>
+                )}
+                {profile.cropland_acres && (
+                  <div className="rounded-xl border border-gray-200/80 bg-white px-4 py-4 shadow-sm">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">
+                      Cropland
+                    </div>
+                    <div className="text-[22px] font-extrabold text-[#1B4332] tracking-tight">
+                      {formatAcres(profile.cropland_acres)}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      acres in crops
+                    </div>
+                  </div>
+                )}
+                {profile.prime_farmland_pct && (
+                  <div className="rounded-xl border border-gray-200/80 bg-white px-4 py-4 shadow-sm">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1">
+                      Prime Farmland
+                    </div>
+                    <div className="text-[22px] font-extrabold text-[#1B4332] tracking-tight">
+                      {profile.prime_farmland_pct.toFixed(0)}%
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      NRCS designation
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Top Crops from county_profiles */}
+              {profile.top_crops && profile.top_crops.length > 0 && (
+                <div className="mt-4 rounded-xl border border-gray-200/80 bg-white shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100">
+                    <h3 className="text-[14px] font-bold text-[#1B4332]">
+                      Top Crops by Harvested Acres
+                    </h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[13px]">
+                      <thead>
+                        <tr className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 border-b border-gray-100">
+                          <th className="text-left px-5 py-2.5">Crop</th>
+                          <th className="text-right px-3 py-2.5">Harvested Acres</th>
+                          <th className="text-right px-3 py-2.5">Avg Yield</th>
+                          <th className="text-right px-3 py-2.5">State Avg</th>
+                          <th className="text-right px-5 py-2.5">vs. State</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {profile.top_crops
+                          .filter((c) => c.harvested_acres && c.harvested_acres > 0)
+                          .slice(0, 5)
+                          .map((crop) => {
+                            const stateAvg = profile.state_averages?.[crop.crop];
+                            const diff =
+                              crop.yield && stateAvg?.yield
+                                ? ((crop.yield - stateAvg.yield) / stateAvg.yield) * 100
+                                : null;
+                            return (
+                              <tr
+                                key={crop.crop}
+                                className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                              >
+                                <td className="px-5 py-2.5 font-semibold text-gray-700">
+                                  {crop.crop}
+                                </td>
+                                <td className="text-right px-3 py-2.5 text-gray-600 tabular-nums">
+                                  {(crop.harvested_acres || 0).toLocaleString()}
+                                </td>
+                                <td className="text-right px-3 py-2.5 text-gray-600 tabular-nums">
+                                  {crop.yield
+                                    ? `${crop.yield.toFixed(1)} ${crop.yield_unit || 'bu/acre'}`
+                                    : '—'}
+                                </td>
+                                <td className="text-right px-3 py-2.5 text-gray-500 tabular-nums">
+                                  {stateAvg?.yield
+                                    ? `${stateAvg.yield.toFixed(1)} ${crop.yield_unit || 'bu/acre'}`
+                                    : '—'}
+                                </td>
+                                <td
+                                  className={`text-right px-5 py-2.5 font-semibold tabular-nums ${
+                                    diff !== null
+                                      ? diff > 5
+                                        ? 'text-emerald-700'
+                                        : diff < -5
+                                        ? 'text-red-600'
+                                        : 'text-gray-500'
+                                      : 'text-gray-400'
+                                  }`}
+                                >
+                                  {diff !== null
+                                    ? `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`
+                                    : '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Classification badges */}
+              {(profile.is_farming_dependent || profile.economic_typology || profile.rural_urban_desc) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {profile.is_farming_dependent && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Farming-Dependent County
+                    </span>
+                  )}
+                  {profile.economic_typology && !profile.is_farming_dependent && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
+                      {profile.economic_typology}
+                    </span>
+                  )}
+                  {profile.rural_urban_desc && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
+                      {profile.rural_urban_desc}
+                    </span>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ══ BUILD 2C: County Analysis Narrative ══ */}
+          {narrative && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-4">
+                {county.display_name} ARC/PLC Analysis
+              </h2>
+              <div className="rounded-2xl border border-gray-200/80 bg-white p-6 sm:p-8 shadow-sm">
+                <div className="prose prose-sm max-w-none text-gray-600 leading-relaxed">
+                  {narrative.split('\n\n').map((paragraph, i) => (
+                    <p key={i} className={i > 0 ? 'mt-4' : ''}>
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+                <div className="mt-5 pt-4 border-t border-gray-100 flex items-center gap-2">
+                  <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-[11px] text-gray-400">
+                    Analysis based on USDA NASS, FSA, ERS, and NRCS data. Last updated: {profile?.updated_at ? new Date(profile.updated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Recently'}.
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* ── Crop-by-Crop Analysis ── */}
           {cropData.length > 0 && (
@@ -906,8 +1159,47 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
             </div>
           </section>
 
+          {/* ══ BUILD 2C: Data-Driven FAQ Section ══ */}
+          {faqs.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+                Frequently Asked Questions — {county.display_name}
+              </h2>
+              <div className="space-y-3">
+                {faqs.map((faq, i) => (
+                  <details
+                    key={i}
+                    className="group rounded-xl border border-gray-200/80 bg-white shadow-sm overflow-hidden"
+                  >
+                    <summary className="flex items-center justify-between px-5 py-4 cursor-pointer select-none hover:bg-gray-50/50 transition-colors">
+                      <h3 className="text-[14px] font-bold text-[#1B4332] pr-4">
+                        {faq.question}
+                      </h3>
+                      <svg
+                        className="w-4 h-4 text-gray-400 shrink-0 transition-transform group-open:rotate-180"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </summary>
+                    <div className="px-5 pb-5">
+                      <p className="text-[13px] text-gray-600 leading-relaxed">
+                        {faq.answer}
+                      </p>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* ── FSA Office Info ── */}
-          {(county.fsa_office_phone || county.fsa_office_address) && (
+          {(county.fsa_office_phone || county.fsa_office_address || profile?.fsa_office_phone || profile?.fsa_office_address) && (
             <section className="mb-12">
               <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-4">
                 Local FSA Office
@@ -916,19 +1208,22 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
                 <p className="text-[14px] text-gray-700 font-medium mb-1">
                   {county.display_name} FSA Service Center
                 </p>
-                {county.fsa_office_address && (
+                {(county.fsa_office_address || profile?.fsa_office_address) && (
                   <p className="text-[13px] text-gray-500">
-                    {county.fsa_office_address}
+                    {county.fsa_office_address || profile?.fsa_office_address}
+                    {profile?.fsa_office_city && profile?.fsa_office_state && profile?.fsa_office_zip && (
+                      <>, {profile.fsa_office_city}, {profile.fsa_office_state} {profile.fsa_office_zip}</>
+                    )}
                   </p>
                 )}
-                {county.fsa_office_phone && (
+                {(county.fsa_office_phone || profile?.fsa_office_phone) && (
                   <p className="text-[13px] text-gray-500 mt-1">
                     Phone:{' '}
                     <a
-                      href={`tel:${county.fsa_office_phone}`}
+                      href={`tel:${county.fsa_office_phone || profile?.fsa_office_phone}`}
                       className="text-[#1B4332] font-medium hover:underline"
                     >
-                      {county.fsa_office_phone}
+                      {county.fsa_office_phone || profile?.fsa_office_phone}
                     </a>
                   </p>
                 )}
@@ -1027,7 +1322,9 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
           <div className="border-t border-gray-200 pt-6">
             <p className="text-[10px] text-gray-400 leading-relaxed max-w-4xl">
               Data sources: USDA Farm Service Agency ARC/PLC Program Data, USDA
-              NASS Quick Stats API. This page is not official USDA guidance.
+              NASS Quick Stats API, USDA Census of Agriculture, USDA Economic
+              Research Service County Typology Codes, USDA NRCS Soil Data.
+              This page is not official USDA guidance.
               HarvestFile is not affiliated with USDA. ARC/PLC election decisions
               should be made in consultation with your local FSA office or
               agricultural advisor. Payment projections are estimates based on
