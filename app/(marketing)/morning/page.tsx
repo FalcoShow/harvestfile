@@ -163,9 +163,9 @@ function formatDateHeader(): string {
   });
 }
 
-// Default coordinates (central Iowa — heart of corn belt)
-const DEFAULT_LAT = 41.878;
-const DEFAULT_LNG = -93.098;
+// Default coordinates (Akron/Summit County, Ohio)
+const DEFAULT_LAT = 41.085;
+const DEFAULT_LNG = -81.518;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SKELETON COMPONENTS
@@ -240,20 +240,74 @@ function MarketsSkeleton() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function WeatherIcon({ code, size = 32 }: { code: number; size?: number }) {
-  // WMO weather interpretation codes → simplified icon
-  // 0=clear, 1-3=partly cloudy, 45-48=fog, 51-55=drizzle,
-  // 61-65=rain, 71-77=snow, 80-82=showers, 95-99=thunderstorm
-  let icon: string;
-  if (code === 0) icon = '☀️';
-  else if (code <= 3) icon = '⛅';
-  else if (code <= 48) icon = '🌫️';
-  else if (code <= 55) icon = '🌦️';
-  else if (code <= 65) icon = '🌧️';
-  else if (code <= 77) icon = '🌨️';
-  else if (code <= 82) icon = '🌧️';
-  else icon = '⛈️';
+  // WMO weather codes → SVG icons (no emojis)
+  const s = size;
+  const half = s / 2;
 
-  return <span style={{ fontSize: size, lineHeight: 1 }}>{icon}</span>;
+  if (code === 0) {
+    // Clear sky — sun
+    return (
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="6" fill="#F59E0B" />
+        {[0,45,90,135,180,225,270,315].map(angle => (
+          <line key={angle} x1="16" y1="4" x2="16" y2="7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round"
+            transform={`rotate(${angle} 16 16)`} />
+        ))}
+      </svg>
+    );
+  }
+  if (code <= 3) {
+    // Partly cloudy — sun + cloud
+    return (
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <circle cx="12" cy="12" r="5" fill="#F59E0B" />
+        {[0,60,120,180,240,300].map(angle => (
+          <line key={angle} x1="12" y1="4" x2="12" y2="6" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round"
+            transform={`rotate(${angle} 12 12)`} />
+        ))}
+        <path d="M10 20a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 25 21a4 4 0 0 1-4 4H12a4 4 0 0 1-2-7Z" fill="#94A3B8" />
+      </svg>
+    );
+  }
+  if (code <= 48) {
+    // Fog
+    return (
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M6 14h20M8 18h16M6 22h20" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" />
+        <path d="M10 10a4 4 0 0 1 3.9-3 3 3 0 0 1 5.5.8A3.5 3.5 0 0 1 22 11a3.5 3.5 0 0 1-3.5 3h-7A3.5 3.5 0 0 1 8 11" fill="#CBD5E1" />
+      </svg>
+    );
+  }
+  if (code <= 65) {
+    // Rain
+    return (
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M8 16a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 17a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#94A3B8" />
+        <line x1="12" y1="24" x2="11" y2="28" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="17" y1="24" x2="16" y2="28" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="22" y1="24" x2="21" y2="27" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (code <= 77) {
+    // Snow
+    return (
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+        <path d="M8 16a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 17a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#94A3B8" />
+        <circle cx="12" cy="26" r="1.2" fill="#93C5FD" />
+        <circle cx="17" cy="25" r="1.2" fill="#93C5FD" />
+        <circle cx="22" cy="27" r="1.2" fill="#93C5FD" />
+      </svg>
+    );
+  }
+  // Thunderstorm / showers
+  return (
+    <svg width={s} height={s} viewBox="0 0 32 32" fill="none">
+      <path d="M8 14a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 15a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#64748B" />
+      <path d="M17 22l-2 4h4l-2 4" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="12" y1="22" x2="11" y2="26" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -543,14 +597,20 @@ function MarketsCard({
             return (
               <div key={code} className="py-4 first:pt-0 last:pb-0">
                 <div className="flex items-center gap-3">
-                  {/* Commodity icon + name */}
+                  {/* Commodity icon */}
                   <div
                     className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
                     style={{ background: `${cfg.color}12` }}
                   >
-                    <span className="text-lg">
-                      {code === 'CORN' ? '🌽' : code === 'SOYBEANS' ? '🫘' : '🌾'}
-                    </span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={cfg.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      {code === 'CORN' ? (
+                        <><path d="M12 2v20"/><path d="M8 6c0 0 4 2 4 6s-4 6-4 6"/><path d="M16 6c0 0-4 2-4 6s4 6 4 6"/></>
+                      ) : code === 'SOYBEANS' ? (
+                        <><circle cx="9" cy="12" r="4"/><circle cx="15" cy="12" r="4"/><path d="M12 8v-4"/></>
+                      ) : (
+                        <><path d="M12 2v10"/><path d="M8 6l4-4 4 4"/><path d="M4 22c0-4 4-8 8-10"/><path d="M20 22c0-4-4-8-8-10"/></>
+                      )}
+                    </svg>
                   </div>
 
                   {/* Name + PLC badge */}
@@ -748,27 +808,32 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuickActions() {
-  const actions = [
-    { href: '/check', label: 'ARC/PLC Calculator', icon: '📊' },
-    { href: '/farm-score', label: 'Farm Score', icon: '🎯' },
-    { href: '/weather', label: 'Full Weather', icon: '🌤️' },
-    { href: '/markets', label: 'All Markets', icon: '📈' },
-  ];
-
   return (
     <div className="grid grid-cols-4 gap-2">
-      {actions.map(a => (
-        <Link
-          key={a.href}
-          href={a.href}
-          className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group"
-        >
-          <span className="text-xl group-hover:scale-110 transition-transform">{a.icon}</span>
-          <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">
-            {a.label}
-          </span>
-        </Link>
-      ))}
+      <Link href="/check" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+          <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+        </svg>
+        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">ARC/PLC Calculator</span>
+      </Link>
+      <Link href="/farm-score" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+        </svg>
+        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">Farm Score</span>
+      </Link>
+      <Link href="/weather" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+          <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+        </svg>
+        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">Full Weather</span>
+      </Link>
+      <Link href="/markets" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+          <path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>
+        </svg>
+        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">All Markets</span>
+      </Link>
     </div>
   );
 }
