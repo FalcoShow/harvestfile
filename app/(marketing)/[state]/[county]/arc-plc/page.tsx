@@ -33,6 +33,7 @@ import {
 import { CountyCharts } from '@/components/county/CountyCharts';
 import { CountyBenchmarkCTA } from '@/components/county/CountyBenchmarkCTA';
 import { getBenchmarkContextForCounty } from '@/lib/cross-tool/benchmark-context';
+import { GrainBidCard } from '@/components/county/GrainBidCard';
 import {
   getCountyProfile,
   generateCountyNarrative,
@@ -878,6 +879,18 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
           {/* ── Benchmark CTA (Client Island) ── */}
           <section className="mb-12">
             <CountyBenchmarkCTA
+              countyFips={county.county_fips}
+              countyName={county.display_name}
+              stateAbbr={state.abbreviation}
+            />
+          </section>
+
+          {/* ── Nearby Grain Bids (Barchart) ── */}
+          <section className="mb-12">
+            <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+              Nearby Grain Bids — {county.display_name}
+            </h2>
+            <GrainBidCard
               countyFips={county.county_fips}
               countyName={county.display_name}
               stateAbbr={state.abbreviation}
