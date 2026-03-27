@@ -1160,7 +1160,7 @@ export default function GrainMarketingPage() {
             >
               Start Free Trial — 14 Days
             </Link>
-            <span className="text-white/30 text-xs">15 free tools · No credit card required · Cancel anytime</span>
+            <span className="text-white/30 text-xs">Free forever · No credit card required · Cancel anytime</span>
           </div>
         </div>
 

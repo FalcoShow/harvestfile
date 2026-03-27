@@ -11,6 +11,10 @@
 //   commodity — commodity code or "ALL" (default: ALL)
 //
 // Response: { counties, names, kpi, year, commodity }
+//
+// Build 5 Fix: names object now includes ALL 3,143 counties, not just
+// those with election data. This fixes the "County 32023" tooltip bug
+// where gray/no-data counties showed FIPS codes instead of names.
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -128,43 +132,54 @@ export async function GET(request: Request) {
       }
     }
 
-    // ── Fetch county names for tooltip ────────────────────────────────────
-    const fipsList = Object.keys(counties);
+    // ── Fetch ALL county names for tooltip ─────────────────────────────────
+    // Build 5 Fix: Fetch names for ALL counties, not just those with
+    // election data. This ensures gray/no-data counties on the TopoJSON
+    // map show proper names like "Nye County" instead of "County 32023".
     const names: Record<string, { name: string; state: string }> = {};
 
-    if (fipsList.length > 0) {
-      // Fetch in batches to avoid URL length limits
-      const batchSize = 500;
-      for (let i = 0; i < fipsList.length; i += batchSize) {
-        const batch = fipsList.slice(i, i + batchSize);
-        const { data: countyRows } = await supabase
-          .from('counties')
-          .select('county_fips, display_name, state_fips')
-          .in('county_fips', batch);
+    // Fetch all counties in batches (3,143 total — need pagination)
+    let nameOffset = 0;
+    const namePageSize = 1000;
+    let hasMoreNames = true;
 
-        for (const row of (countyRows || [])) {
-          names[row.county_fips] = {
-            name: row.display_name || row.county_fips,
-            state: row.state_fips || '',
-          };
-        }
+    while (hasMoreNames) {
+      const { data: countyRows, error: nameError } = await supabase
+        .from('counties')
+        .select('county_fips, display_name, state_fips')
+        .range(nameOffset, nameOffset + namePageSize - 1)
+        .order('county_fips');
+
+      if (nameError || !countyRows || countyRows.length === 0) {
+        hasMoreNames = false;
+        break;
       }
 
-      // Fetch state abbreviations
-      const stateFipsList = Array.from(new Set(Object.values(names).map(n => n.state)));
-      if (stateFipsList.length > 0) {
-        const { data: stateRows } = await supabase
-          .from('states')
-          .select('state_fips, abbreviation')
-          .in('state_fips', stateFipsList);
+      for (const row of countyRows) {
+        names[row.county_fips] = {
+          name: row.display_name || row.county_fips,
+          state: row.state_fips || '',
+        };
+      }
 
-        const stateMap: Record<string, string> = {};
-        for (const s of (stateRows || [])) {
-          stateMap[s.state_fips] = s.abbreviation;
-        }
-        for (const fips of Object.keys(names)) {
-          names[fips].state = stateMap[names[fips].state] || names[fips].state;
-        }
+      nameOffset += namePageSize;
+      if (countyRows.length < namePageSize) hasMoreNames = false;
+    }
+
+    // Fetch state abbreviations for all unique state FIPS codes
+    const stateFipsList = Array.from(new Set(Object.values(names).map(n => n.state)));
+    if (stateFipsList.length > 0) {
+      const { data: stateRows } = await supabase
+        .from('states')
+        .select('state_fips, abbreviation')
+        .in('state_fips', stateFipsList);
+
+      const stateMap: Record<string, string> = {};
+      for (const s of (stateRows || [])) {
+        stateMap[s.state_fips] = s.abbreviation;
+      }
+      for (const fips of Object.keys(names)) {
+        names[fips].state = stateMap[names[fips].state] || names[fips].state;
       }
     }
 
