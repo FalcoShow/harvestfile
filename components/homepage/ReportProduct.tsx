@@ -44,7 +44,7 @@ const reportSections = [
 export function ReportProduct() {
   return (
     <section
-      className="relative py-[120px] lg:py-[160px] overflow-hidden"
+      className="relative py-[80px] lg:py-[100px] overflow-hidden"
       style={{ background: '#F5F0E6' }}
     >
       {/* Grain texture */}

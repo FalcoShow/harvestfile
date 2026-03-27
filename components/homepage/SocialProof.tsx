@@ -13,9 +13,9 @@
 import { RevealOnScroll } from './shared/RevealOnScroll';
 
 const stats = [
-  { value: '50', label: 'States', detail: 'Every state covered' },
-  { value: '2,000+', label: 'Counties', detail: 'With real USDA data' },
-  { value: '16', label: 'Commodities', detail: 'All covered crops' },
+  { value: '10yr', label: 'Yield History', detail: 'Per county, per crop' },
+  { value: '24M+', label: 'Data Points', detail: 'From USDA databases' },
+  { value: '7yr', label: 'Election Data', detail: 'ARC vs PLC trends' },
   { value: '$0', label: 'To Start', detail: 'Free forever' },
 ];
 
@@ -28,7 +28,7 @@ const dataSources = [
 
 export function SocialProof() {
   return (
-    <section className="relative py-[120px] lg:py-[140px] overflow-hidden" style={{ background: '#F5F0E6' }}>
+    <section className="relative py-[80px] lg:py-[100px] overflow-hidden" style={{ background: '#F5F0E6' }}>
       {/* Grain texture */}
       <div className="hf-grain" />
 

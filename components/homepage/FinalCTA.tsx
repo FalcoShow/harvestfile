@@ -13,7 +13,7 @@ import { RevealOnScroll } from './shared/RevealOnScroll';
 
 export function FinalCTA() {
   return (
-    <section className="relative overflow-hidden bg-harvest-forest-950 py-[120px] lg:py-[160px]">
+    <section className="relative overflow-hidden bg-harvest-forest-950 py-[80px] lg:py-[120px]">
       {/* Noise */}
       <div className="hf-noise-subtle" />
 

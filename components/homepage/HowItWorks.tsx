@@ -18,7 +18,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="relative py-[120px] lg:py-[160px] overflow-hidden" style={{ background: '#F5F0E6' }}>
+    <section className="relative py-[80px] lg:py-[100px] overflow-hidden" style={{ background: '#F5F0E6' }}>
       <div className="hf-grain" />
       <div className="absolute inset-0 pointer-events-none" style={{
         backgroundImage: [
@@ -29,7 +29,7 @@ export function HowItWorks() {
 
       <div className="relative z-10 mx-auto max-w-[900px] px-6">
         <RevealOnScroll>
-          <div className="text-center mb-20">
+          <div className="text-center mb-14">
             <SectionBadgeLight className="mb-5">How It Works</SectionBadgeLight>
             <h2 className="text-[clamp(28px,4vw,44px)] font-extrabold text-harvest-forest-950 tracking-[-0.03em] leading-[1.1]">
               Three steps.{' '}<span className="font-serif italic font-normal">Real money.</span>
