@@ -1,19 +1,23 @@
 // =============================================================================
 // HarvestFile — HeroSection (Client Component)
-// Build 3 Phase A: The Credit Karma Moment
+// Build 5 Deploy 1: IP Geolocation Personalization
 //
 // The #1 most important component on the entire platform.
-// A farmer lands → types their county → sees data. No friction. No buttons.
-// The search IS the product. Everything else exists to convince farmers
-// who didn't type immediately.
+// A farmer lands → their county is auto-detected → they see personalized
+// ARC/PLC data immediately. The search bar remains the primary CTA for
+// farmers who weren't detected or want a different county.
+//
+// NEW IN BUILD 5:
+//   - Calls /api/geo/detect on mount to resolve visitor's county
+//   - Shows personalized banner with county name + top crop recommendation
+//   - Caches detected county in localStorage for instant subsequent visits
+//   - Dismissible via "Not yours?" link (stored in localStorage)
+//   - Falls back gracefully to standard hero when geo unavailable
 //
 // Architecture:
-//   - County search bar is the PRIMARY CTA (replaces "Calculate My Payment")
-//   - Headline is action-oriented: drives toward the search
-//   - Trust signals sit directly beneath search to answer "can I trust this?"
-//   - Stats row provides data credibility
-//   - Secondary CTAs (Calculator, Election Map) are below-fold safety nets
-//   - All search logic ported from CountySearchSection.tsx
+//   - Geo banner sits between the badge and the headline
+//   - County search bar remains the PRIMARY CTA below headline
+//   - All existing search logic is completely preserved
 // =============================================================================
 
 'use client';
@@ -31,6 +35,32 @@ interface CountyItem {
   ss: string;  // state slug (e.g., "ohio")
   sa: string;  // state abbreviation (e.g., "OH")
 }
+
+interface GeoDetectedCounty {
+  detected: boolean;
+  countyFips?: string;
+  displayName?: string;
+  stateAbbr?: string;
+  stateName?: string;
+  stateSlug?: string;
+  countySlug?: string;
+  hasArcPlcData?: boolean;
+  topCrop?: {
+    name: string;
+    recommendation: 'ARC-CO' | 'PLC' | 'NEUTRAL';
+    arcPaymentRate: number;
+    plcPaymentRate: number;
+    advantagePerAcre: number;
+    advantageLabel: string;
+  } | null;
+  nearCity?: string;
+}
+
+// ─── Constants ──────────────────────────────────────────────────────────────────
+
+const GEO_CACHE_KEY = 'hf-detected-county';
+const GEO_DISMISS_KEY = 'hf-geo-dismissed';
+const GEO_CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
 // ─── Popular Counties (shown on focus, no query) ────────────────────────────────
 const POPULAR_COUNTIES = [
@@ -55,6 +85,81 @@ export function HeroSection() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // ── Geo detection state ─────────────────────────────────────────────────
+  const [detectedCounty, setDetectedCounty] = useState<GeoDetectedCounty | null>(null);
+  const [geoDismissed, setGeoDismissed] = useState(false);
+  const [geoAnimating, setGeoAnimating] = useState(false);
+
+  // ── Geo detection on mount ──────────────────────────────────────────────
+  useEffect(() => {
+    // Check if user previously dismissed
+    try {
+      if (localStorage.getItem(GEO_DISMISS_KEY) === 'true') {
+        setGeoDismissed(true);
+        return;
+      }
+
+      // Check localStorage cache first for instant display
+      const cached = localStorage.getItem(GEO_CACHE_KEY);
+      if (cached) {
+        try {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < GEO_CACHE_TTL && data?.detected) {
+            setDetectedCounty(data);
+            setGeoAnimating(true);
+            return; // Don't re-fetch if cache is fresh
+          }
+        } catch {
+          localStorage.removeItem(GEO_CACHE_KEY);
+        }
+      }
+    } catch {
+      // localStorage unavailable (private browsing, etc.)
+    }
+
+    // Fetch geo detection from API
+    let cancelled = false;
+    async function detectLocation() {
+      try {
+        const res = await fetch('/api/geo/detect');
+        if (!res.ok) return;
+        const data: GeoDetectedCounty = await res.json();
+
+        if (cancelled) return;
+
+        if (data.detected) {
+          setDetectedCounty(data);
+          setGeoAnimating(true);
+
+          // Cache in localStorage
+          try {
+            localStorage.setItem(
+              GEO_CACHE_KEY,
+              JSON.stringify({ data, timestamp: Date.now() })
+            );
+          } catch {
+            // Storage full or unavailable
+          }
+        }
+      } catch {
+        // Geo detection is progressive enhancement — silent failure is fine
+      }
+    }
+
+    detectLocation();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Dismiss geo banner ──────────────────────────────────────────────────
+  const dismissGeo = useCallback(() => {
+    setGeoDismissed(true);
+    try {
+      localStorage.setItem(GEO_DISMISS_KEY, 'true');
+    } catch {
+      // Storage unavailable
+    }
+  }, []);
 
   // ── Fetch all counties on mount ───────────────────────────────────────────
   useEffect(() => {
@@ -145,6 +250,9 @@ export function HeroSection() {
   const showDropdown = focused && (results.length > 0 || (query.length < 2));
   const showPopular = focused && query.length < 2;
 
+  // ── Geo banner visibility ─────────────────────────────────────────────────
+  const showGeoBanner = detectedCounty?.detected && !geoDismissed && geoAnimating;
+
   return (
     <section className="relative min-h-[94dvh] flex flex-col items-center justify-center overflow-hidden bg-harvest-forest-950 pt-24 pb-16">
       {/* ── Gradient Mesh Background ──────────────────────────────────────── */}
@@ -189,6 +297,101 @@ export function HeroSection() {
             </span>
           </div>
         </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            GEO DETECTION BANNER — Build 5 Deploy 1
+            Shows when IP geolocation detects the farmer's county.
+            Personalized ARC/PLC recommendation appears within 200-500ms.
+           ═══════════════════════════════════════════════════════════════════ */}
+        {showGeoBanner && detectedCounty && (
+          <div
+            className="max-w-[620px] mx-auto mb-8"
+            style={{
+              animation: 'hf-geo-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both',
+            }}
+          >
+            <div className="relative rounded-2xl border border-harvest-gold/20 bg-white/[0.04] backdrop-blur-md overflow-hidden">
+              {/* Subtle gold top border */}
+              <div
+                className="absolute top-0 left-0 right-0 h-[1px]"
+                style={{
+                  background: 'linear-gradient(90deg, transparent 10%, rgba(201,168,76,0.4) 50%, transparent 90%)',
+                }}
+              />
+
+              <div className="px-5 py-4">
+                {/* County Name Row */}
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    {/* Map pin icon */}
+                    <div className="w-7 h-7 rounded-lg bg-harvest-gold/15 flex items-center justify-center flex-shrink-0">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="text-[14px] font-bold text-white/90">
+                        {detectedCounty.displayName}, {detectedCounty.stateAbbr}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dismiss button */}
+                  <button
+                    onClick={dismissGeo}
+                    className="text-[11px] text-white/25 hover:text-white/50 transition-colors flex items-center gap-1 flex-shrink-0"
+                  >
+                    Not yours?
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Recommendation Row */}
+                {detectedCounty.topCrop && detectedCounty.topCrop.recommendation !== 'NEUTRAL' && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <span
+                      className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold tracking-wide"
+                      style={{
+                        background: detectedCounty.topCrop.recommendation === 'ARC-CO'
+                          ? 'rgba(16, 185, 129, 0.15)'
+                          : 'rgba(59, 130, 246, 0.15)',
+                        color: detectedCounty.topCrop.recommendation === 'ARC-CO'
+                          ? '#6ee7b7'
+                          : '#93c5fd',
+                      }}
+                    >
+                      {detectedCounty.topCrop.recommendation}
+                    </span>
+                    <span className="text-[13px] text-white/50">
+                      projected {detectedCounty.topCrop.advantageLabel} for{' '}
+                      <span className="text-white/70 font-medium">{detectedCounty.topCrop.name.toLowerCase()}</span>
+                    </span>
+                  </div>
+                )}
+
+                {/* CTA Link */}
+                {detectedCounty.hasArcPlcData && detectedCounty.stateSlug && detectedCounty.countySlug && (
+                  <Link
+                    href={`/${detectedCounty.stateSlug}/${detectedCounty.countySlug}/arc-plc`}
+                    className="group inline-flex items-center gap-2 text-[13px] font-semibold text-harvest-gold hover:text-harvest-gold-bright transition-colors"
+                  >
+                    View {detectedCounty.displayName} Data
+                    <svg
+                      className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Headline */}
         <h1
@@ -532,6 +735,20 @@ export function HeroSection() {
 
       {/* ── Subtle gradient that content continues below ──────────────── */}
       <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none bg-gradient-to-t from-harvest-forest-950/50 to-transparent" />
+
+      {/* ── Geo Banner Animation Keyframe (injected via style tag) ─────── */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes hf-geo-slide-in {
+          from {
+            opacity: 0;
+            transform: translateY(-12px) scale(0.97);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}} />
     </section>
   );
 }

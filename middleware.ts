@@ -1,10 +1,11 @@
 // =============================================================================
 // HarvestFile — Consolidated Middleware
 // Phase 19: Added SMS webhook route exclusions
+// Build 5 Deploy 1: Added geo detection API route exclusion
 //
 // Handles: auth session refresh, dashboard route protection, auth redirects
-// CRITICAL: Stripe webhook + SMS webhooks are EXCLUDED from the matcher to
-// prevent 307 redirects that kill webhook delivery.
+// CRITICAL: Stripe webhook + SMS webhooks + geo detection are EXCLUDED from
+// the matcher to prevent 307 redirects and avoid unnecessary auth overhead.
 // =============================================================================
 
 import { createServerClient } from '@supabase/ssr';
@@ -23,7 +24,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/benchmarks') ||
     pathname.startsWith('/api/counties') ||
     pathname.startsWith('/api/inngest') ||
-    pathname.startsWith('/api/sms/status') ||   // Phase 19: Twilio delivery status
+    pathname.startsWith('/api/geo') ||           // Build 5: Geo detection (public, no auth needed)
+    pathname.startsWith('/api/grain-bids') ||    // Build 5: Grain bids (public)
+    pathname.startsWith('/api/sms/status') ||    // Phase 19: Twilio delivery status
     pathname.startsWith('/api/sms/inbound')      // Phase 19: Twilio inbound SMS
   ) {
     return NextResponse.next();
