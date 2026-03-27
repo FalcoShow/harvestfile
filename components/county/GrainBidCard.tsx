@@ -2,12 +2,14 @@
 
 // =============================================================================
 // HarvestFile — Grain Bid Card (Client Island)
-// Build 6 Deploy 1: Updated for corrected Barchart response format
+// Build 6 Deploy 2: Added FIPS-to-coordinates fallback
 //
-// Displays nearby elevator bids on county pages and morning dashboard.
-// Fetches from /api/grain-bids (server-proxied Barchart data).
+// When a FIPS lookup returns no elevators (suburban/urban counties with no
+// grain facilities within the county boundary), automatically retries using
+// the county's centroid coordinates with a 50-mile radius to find nearby
+// elevators in adjacent counties.
 //
-// Props: countyFips, countyName, stateAbbr, zipCode (optional fallback)
+// Props: countyFips, countyName, stateAbbr, latitude, longitude, zipCode, compact
 // =============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
@@ -59,9 +61,9 @@ interface GrainBidResponse {
 // ── Commodity config ─────────────────────────────────────────────────────
 
 const COMMODITY_TABS = [
-  { key: 'corn', label: 'Corn', icon: '🌽' },
-  { key: 'soybeans', label: 'Soybeans', icon: '🫘' },
-  { key: 'wheat', label: 'Wheat', icon: '🌾' },
+  { key: 'corn', label: 'Corn' },
+  { key: 'soybeans', label: 'Soybeans' },
+  { key: 'wheat', label: 'Wheat' },
 ] as const;
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -70,6 +72,11 @@ interface GrainBidCardProps {
   countyFips: string;
   countyName: string;
   stateAbbr: string;
+  /** County centroid latitude — used for fallback when FIPS returns empty */
+  latitude?: number;
+  /** County centroid longitude — used for fallback when FIPS returns empty */
+  longitude?: number;
+  /** ZIP code — tertiary fallback */
   zipCode?: string;
   /** Compact mode for Morning Dashboard (fewer rows, no tabs) */
   compact?: boolean;
@@ -79,6 +86,8 @@ export function GrainBidCard({
   countyFips,
   countyName,
   stateAbbr,
+  latitude,
+  longitude,
   zipCode,
   compact = false,
 }: GrainBidCardProps) {
@@ -87,36 +96,75 @@ export function GrainBidCard({
   const [error, setError] = useState(false);
   const [activeCommodity, setActiveCommodity] = useState<string>('corn');
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [searchRadius, setSearchRadius] = useState<string | null>(null);
 
   const fetchBids = useCallback(async () => {
     setLoading(true);
     setError(false);
-    try {
-      // Prefer FIPS code (maps directly to county pages); fall back to zip
-      const param = countyFips ? `fips=${countyFips}` : `zip=${zipCode}`;
-      const res = await fetch(`/api/grain-bids?${param}&max=20`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: GrainBidResponse = await res.json();
-      setElevators(data.elevators || []);
-      setLastFetched(new Date());
+    setSearchRadius(null);
 
-      // Auto-select first available commodity
-      if (data.commodities && data.commodities.length > 0) {
-        const firstAvailable = COMMODITY_TABS.find((t) =>
-          data.commodities.some(
-            (c) => c.toLowerCase() === t.key
-          )
+    try {
+      // Step 1: Try FIPS code (direct county boundary)
+      const fipsRes = await fetch(`/api/grain-bids?fips=${countyFips}&max=20`);
+      if (!fipsRes.ok) throw new Error(`HTTP ${fipsRes.status}`);
+      const fipsData: GrainBidResponse = await fipsRes.json();
+
+      if (fipsData.elevators && fipsData.elevators.length > 0) {
+        setElevators(fipsData.elevators);
+        setLastFetched(new Date());
+        autoSelectCommodity(fipsData.commodities);
+        return;
+      }
+
+      // Step 2: FIPS returned empty — fallback to county centroid coordinates
+      if (latitude && longitude) {
+        const coordRes = await fetch(
+          `/api/grain-bids?lat=${latitude}&lng=${longitude}&max=20`
         );
-        if (firstAvailable) {
-          setActiveCommodity(firstAvailable.key);
+        if (coordRes.ok) {
+          const coordData: GrainBidResponse = await coordRes.json();
+          if (coordData.elevators && coordData.elevators.length > 0) {
+            setElevators(coordData.elevators);
+            setLastFetched(new Date());
+            setSearchRadius('50mi');
+            autoSelectCommodity(coordData.commodities);
+            return;
+          }
         }
       }
+
+      // Step 3: Coordinates also empty — try ZIP if provided
+      if (zipCode) {
+        const zipRes = await fetch(`/api/grain-bids?zip=${zipCode}&max=20`);
+        if (zipRes.ok) {
+          const zipData: GrainBidResponse = await zipRes.json();
+          if (zipData.elevators && zipData.elevators.length > 0) {
+            setElevators(zipData.elevators);
+            setLastFetched(new Date());
+            setSearchRadius('50mi');
+            autoSelectCommodity(zipData.commodities);
+            return;
+          }
+        }
+      }
+
+      // All methods returned empty
+      setElevators([]);
+      setLastFetched(new Date());
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [countyFips, zipCode]);
+  }, [countyFips, latitude, longitude, zipCode]);
+
+  function autoSelectCommodity(commodities: string[] | undefined) {
+    if (!commodities || commodities.length === 0) return;
+    const first = COMMODITY_TABS.find((t) =>
+      commodities.some((c) => c.toLowerCase() === t.key)
+    );
+    if (first) setActiveCommodity(first.key);
+  }
 
   useEffect(() => {
     fetchBids();
@@ -130,7 +178,6 @@ export function GrainBidCard({
         (b) => b.commodity.toLowerCase() === activeCommodity
       );
       if (commodityBids.length === 0) return null;
-      // Pick the highest cash price bid for this commodity
       const bestBid = commodityBids.sort(
         (a, b) => b.cashPrice - a.cashPrice
       )[0];
@@ -138,10 +185,8 @@ export function GrainBidCard({
     })
     .filter(Boolean) as Array<Elevator & { bestBid: NormalizedBid }>;
 
-  // Sort by cash price descending
   filteredElevators.sort((a, b) => b.bestBid.cashPrice - a.bestBid.cashPrice);
 
-  // Which commodity tabs have data?
   const availableTabs = COMMODITY_TABS.filter((t) =>
     elevators.some((e) =>
       e.bids.some((b) => b.commodity.toLowerCase() === t.key)
@@ -210,9 +255,12 @@ export function GrainBidCard({
             <p className="text-[12px] text-gray-400">
               {error
                 ? 'Unable to load grain bid data. Please try again later.'
-                : `No grain bid data available near ${countyName}, ${stateAbbr}.`}
+                : `No grain elevator data available near ${countyName}, ${stateAbbr}. This area may not have active grain buying facilities.`}
             </p>
           </div>
+        </div>
+        <div className="mt-3">
+          <BarchartAttribution variant="compact" />
         </div>
       </div>
     );
@@ -254,6 +302,11 @@ export function GrainBidCard({
                 {filteredElevators.length} elevator
                 {filteredElevators.length !== 1 ? 's' : ''} near{' '}
                 {countyName}, {stateAbbr}
+                {searchRadius && (
+                  <span className="text-amber-500 ml-1">
+                    (within {searchRadius} radius)
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -299,7 +352,6 @@ export function GrainBidCard({
         {filteredElevators.slice(0, maxRows).map((elevator, index) => {
           const isTop = index === 0;
           const basis = elevator.bestBid.basis;
-          // Basis is in dollars from Barchart. Display color based on value.
           const basisColor =
             basis >= 0
               ? 'text-emerald-600'
@@ -307,7 +359,6 @@ export function GrainBidCard({
                 ? 'text-amber-600'
                 : 'text-red-500';
 
-          // Daily change color
           const changeColor =
             elevator.bestBid.change > 0
               ? 'text-emerald-600'
@@ -358,9 +409,11 @@ export function GrainBidCard({
                       ` · ${elevator.distance.toFixed(0)} mi`}
                   </span>
                   {elevator.bestBid.change !== 0 && (
-                    <span className={`text-[10px] font-semibold tabular-nums ${changeColor}`}>
-                      {elevator.bestBid.change > 0 ? '▲' : '▼'}
-                      {Math.abs(elevator.bestBid.change).toFixed(4)}
+                    <span
+                      className={`text-[10px] font-semibold tabular-nums ${changeColor}`}
+                    >
+                      {elevator.bestBid.change > 0 ? '+' : ''}
+                      {elevator.bestBid.change.toFixed(4)}
                     </span>
                   )}
                 </div>
