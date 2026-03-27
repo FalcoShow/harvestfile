@@ -28,9 +28,6 @@ function IconBrain({ className }: { className?: string }) {
 function IconBell({ className }: { className?: string }) {
   return (<svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>);
 }
-function IconFileText({ className }: { className?: string }) {
-  return (<svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>);
-}
 
 function MiniCalculatorMockup() {
   return (
@@ -114,13 +111,13 @@ function FeatureCard({ Icon, title, description, iconBg, iconColor, accentColor,
 
 export function FeatureShowcase() {
   return (
-    <section className="relative py-[100px] sm:py-[120px] lg:py-[160px] overflow-hidden" style={{ background: '#F5F0E6' }}>
+    <section className="relative py-[80px] sm:py-[90px] lg:py-[100px] overflow-hidden" style={{ background: '#F5F0E6' }}>
       <div className="hf-grain" />
       <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: ['radial-gradient(ellipse 600px 400px at 15% 25%, rgba(12,31,23,0.05) 0%, transparent 70%)', 'radial-gradient(ellipse 500px 500px at 80% 60%, rgba(201,168,76,0.07) 0%, transparent 70%)', 'radial-gradient(ellipse 400px 300px at 30% 85%, rgba(45,94,71,0.04) 0%, transparent 70%)'].join(', ') }} />
 
       <div className="relative z-10 mx-auto max-w-[1100px] px-5 sm:px-6">
         <RevealOnScroll>
-          <div className="mb-12 sm:mb-16">
+          <div className="mb-10 sm:mb-12">
             <SectionBadgeLight variant="gold" className="mb-5">Built for Farmers</SectionBadgeLight>
             <h2 className="text-[clamp(28px,4vw,46px)] font-extrabold text-harvest-forest-950 tracking-[-0.03em] leading-[1.1] max-w-[480px]">Government data,{' '}<span className="font-serif italic font-normal">finally useful</span></h2>
           </div>
@@ -131,10 +128,9 @@ export function FeatureShowcase() {
             <FeatureCard Icon={IconCalculator} title="ARC/PLC Decision Calculator" description="Side-by-side payment comparison using your county's real yield history. Updated for 2025 OBBBA reference prices. See exactly how much you'd receive under each program." iconBg="bg-amber-50" iconColor="text-amber-700" accentColor="linear-gradient(90deg, #9E7E30, #C9A84C, #E2C366)" highlight><MiniCalculatorMockup /></FeatureCard>
           </RevealOnScroll>
           <RevealOnScroll delay={80}><FeatureCard Icon={IconMap} title="County Election Intelligence" description="7 years of FSA enrollment history for every farming county. See exactly how your neighbors have voted." iconBg="bg-emerald-50" iconColor="text-emerald-700" accentColor="#10b981" /></RevealOnScroll>
-          <RevealOnScroll delay={160}><FeatureCard Icon={IconTrendUp} title="Multi-Year Scenario Modeler" description="Project ARC vs PLC payments across 5 years with interactive price and yield sliders. Model any scenario." iconBg="bg-blue-50" iconColor="text-blue-700" accentColor="#3b82f6" /></RevealOnScroll>
+          <RevealOnScroll delay={160}><FeatureCard Icon={IconTrendUp} title="Morning Dashboard" description="Weather, commodity prices, payment estimates, and market alerts — personalized to your county. Check it every morning like a farmer's Bloomberg terminal." iconBg="bg-blue-50" iconColor="text-blue-700" accentColor="#3b82f6" /></RevealOnScroll>
           <RevealOnScroll delay={240}><FeatureCard Icon={IconBrain} title="AI-Powered Farm Reports" description="Our AI analyzes your operation and generates a professional PDF with projections and an FSA prep guide." iconBg="bg-purple-50" iconColor="text-purple-700" accentColor="#8b5cf6" /></RevealOnScroll>
           <RevealOnScroll delay={320}><FeatureCard Icon={IconBell} title="Commodity Price Alerts" description="Get notified instantly when corn, soybeans, or wheat prices cross your thresholds. Never miss a move." iconBg="bg-orange-50" iconColor="text-orange-700" accentColor="#f59e0b" /></RevealOnScroll>
-          <RevealOnScroll delay={400}><FeatureCard Icon={IconFileText} title="OBBBA Farm Bill Guide" description="The most comprehensive guide to the 2025 farm bill changes. New reference prices, base acres, and ARC+SCO stacking." iconBg="bg-teal-50" iconColor="text-teal-700" accentColor="#14b8a6" /></RevealOnScroll>
         </div>
       </div>
     </section>
