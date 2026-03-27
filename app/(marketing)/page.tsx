@@ -1,10 +1,15 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Phase 9 Build 4: Unified Cream — Final Polish
+// Build 3 Phase A: Credit Karma Conversion Architecture
 //
-// ONE golden cream #F5F0E6 for ALL light sections.
-// No more background alternation = no more dirty transitions.
-// Scrim transitions: dark → #F5F0E6, #F5F0E6 → dark.
+// KEY CHANGE: County search is now embedded in the HeroSection.
+// CountySearchSection removed from Chapter 3 (was redundant — farmer already
+// has search in the hero). BenchmarkTeaser now flows directly into FinalCTA.
+//
+// Section order:
+//   CHAPTER 1 (Dark):  Hero w/ county search → Election Map
+//   CHAPTER 2 (Cream): Features → How It Works → AI Report → Social Proof
+//   CHAPTER 3 (Dark):  Benchmark Teaser → Final CTA
 // =============================================================================
 
 import { HeroSection } from '@/components/homepage/HeroSection';
@@ -14,7 +19,6 @@ import { HowItWorks } from '@/components/homepage/HowItWorks';
 import { BenchmarkTeaser } from '@/components/homepage/BenchmarkTeaser';
 import { ReportProduct } from '@/components/homepage/ReportProduct';
 import { SocialProof } from '@/components/homepage/SocialProof';
-import { CountySearchSection } from '@/components/marketing/CountySearchSection';
 import { FinalCTA } from '@/components/homepage/FinalCTA';
 
 function GoldSeparator() {
@@ -72,7 +76,7 @@ function LightToDarkTransition() {
 export default function Home() {
   return (
     <>
-      {/* CHAPTER 1 — DARK */}
+      {/* CHAPTER 1 — DARK: Hero with County Search + Election Map */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
         <HeroSection />
         <ElectionMapTeaser />
@@ -80,7 +84,7 @@ export default function Home() {
 
       <DarkToLightTransition />
 
-      {/* CHAPTER 2 — UNIFIED GOLDEN CREAM */}
+      {/* CHAPTER 2 — UNIFIED GOLDEN CREAM: Features + How It Works + Report + Trust */}
       <div data-nav-theme="light" style={{ background: '#F5F0E6' }}>
         <FeatureShowcase />
         <GoldSeparator />
@@ -93,11 +97,9 @@ export default function Home() {
 
       <LightToDarkTransition />
 
-      {/* CHAPTER 3 — DARK */}
+      {/* CHAPTER 3 — DARK: Benchmark + Final CTA */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
         <BenchmarkTeaser />
-        <DarkGoldSeparator />
-        <CountySearchSection />
         <DarkGoldSeparator />
         <FinalCTA />
       </div>
