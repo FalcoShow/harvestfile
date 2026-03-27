@@ -1,18 +1,15 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Build 3 Phase D: Final Homepage Polish — tightened transitions
-//
-// KEY CHANGE: County search is now embedded in the HeroSection.
-// CountySearchSection removed from Chapter 3 (was redundant — farmer already
-// has search in the hero). BenchmarkTeaser now flows directly into FinalCTA.
+// Build 7 Deploy 1: Added MarketTicker between Hero and Election Map
 //
 // Section order:
-//   CHAPTER 1 (Dark):  Hero w/ county search → Election Map
+//   CHAPTER 1 (Dark):  Hero w/ county search → MARKET TICKER (NEW) → Election Map
 //   CHAPTER 2 (Cream): Features → How It Works → AI Report → Social Proof
 //   CHAPTER 3 (Dark):  Benchmark Teaser → Final CTA
 // =============================================================================
 
 import { HeroSection } from '@/components/homepage/HeroSection';
+import { MarketTicker } from '@/components/homepage/MarketTicker';
 import { ElectionMapTeaser } from '@/components/homepage/ElectionMapTeaser';
 import { FeatureShowcase } from '@/components/homepage/FeatureShowcase';
 import { HowItWorks } from '@/components/homepage/HowItWorks';
@@ -76,9 +73,12 @@ function LightToDarkTransition() {
 export default function Home() {
   return (
     <>
-      {/* CHAPTER 1 — DARK: Hero with County Search + Election Map */}
+      {/* CHAPTER 1 — DARK: Hero → Market Ticker → Election Map */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
         <HeroSection />
+        <DarkGoldSeparator />
+        <MarketTicker />
+        <DarkGoldSeparator />
         <ElectionMapTeaser />
       </div>
 
