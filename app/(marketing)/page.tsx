@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Build 3 Phase A: Credit Karma Conversion Architecture
+// Build 3 Phase D: Final Homepage Polish — tightened transitions
 //
 // KEY CHANGE: County search is now embedded in the HeroSection.
 // CountySearchSection removed from Chapter 3 (was redundant — farmer already
@@ -40,7 +40,7 @@ function DarkGoldSeparator() {
 // Scrim: Dark → Golden Cream (#F5F0E6)
 function DarkToLightTransition() {
   return (
-    <div className="relative w-full overflow-hidden" style={{ height: '160px', background: '#F5F0E6' }} aria-hidden="true">
+    <div className="relative w-full overflow-hidden" style={{ height: '100px', background: '#F5F0E6' }} aria-hidden="true">
       <div className="absolute inset-0 pointer-events-none" style={{
         background: `linear-gradient(to bottom,
           rgba(12,31,23,1) 0%, rgba(12,31,23,0.987) 8.1%, rgba(12,31,23,0.951) 15.5%,
@@ -58,7 +58,7 @@ function DarkToLightTransition() {
 // Scrim: Golden Cream (#F5F0E6) → Dark
 function LightToDarkTransition() {
   return (
-    <div className="relative w-full overflow-hidden" style={{ height: '160px', background: '#0C1F17' }} aria-hidden="true">
+    <div className="relative w-full overflow-hidden" style={{ height: '100px', background: '#0C1F17' }} aria-hidden="true">
       <div className="absolute inset-0 pointer-events-none" style={{
         background: `linear-gradient(to bottom,
           rgba(245,240,230,1) 0%, rgba(245,240,230,0.987) 8.1%, rgba(245,240,230,0.951) 15.5%,
