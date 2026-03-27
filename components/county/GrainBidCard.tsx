@@ -2,48 +2,66 @@
 
 // =============================================================================
 // HarvestFile — Grain Bid Card (Client Island)
-// Displays nearby elevator bids on county pages and other surfaces.
+// Build 6 Deploy 1: Updated for corrected Barchart response format
+//
+// Displays nearby elevator bids on county pages and morning dashboard.
 // Fetches from /api/grain-bids (server-proxied Barchart data).
 //
 // Props: countyFips, countyName, stateAbbr, zipCode (optional fallback)
 // =============================================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { BarchartAttribution } from './BarchartAttribution';
 
-// ── Types ────────────────────────────────────────────────────────────────
+// ── Types (matching normalized output from lib/barchart/client.ts) ───────
 
-interface Bid {
+interface NormalizedBid {
   commodity: string;
+  displayName: string;
   symbol: string;
-  deliveryPeriod: string;
+  symRoot: string;
+  deliveryMonth: string;
+  deliveryStart: string;
+  deliveryEnd: string;
+  basisMonth: string;
   basis: number;
   cashPrice: number;
-  futuresPrice: number | null;
-  futuresMonth: string;
+  change: number;
+  changePercent: number;
   lastUpdate: string;
+  basisSymbol: string;
+  cashPriceSymbol: string;
+  basisRollingSymbol: string;
+  active: boolean;
 }
 
 interface Elevator {
   id: string;
   name: string;
+  facilityType: string;
   city: string;
   state: string;
   phone: string;
+  website: string;
   distance: number;
-  bids: Bid[];
+  latitude: number;
+  longitude: number;
+  bids: NormalizedBid[];
 }
 
 interface GrainBidResponse {
   elevators: Elevator[];
+  commodities: string[];
+  count: number;
   attribution: string;
 }
 
 // ── Commodity config ─────────────────────────────────────────────────────
 
-const COMMODITIES = [
-  { key: 'corn', label: 'Corn', color: 'emerald' },
-  { key: 'soybeans', label: 'Soybeans', color: 'amber' },
-  { key: 'wheat', label: 'Wheat', color: 'orange' },
+const COMMODITY_TABS = [
+  { key: 'corn', label: 'Corn', icon: '🌽' },
+  { key: 'soybeans', label: 'Soybeans', icon: '🫘' },
+  { key: 'wheat', label: 'Wheat', icon: '🌾' },
 ] as const;
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -53,6 +71,8 @@ interface GrainBidCardProps {
   countyName: string;
   stateAbbr: string;
   zipCode?: string;
+  /** Compact mode for Morning Dashboard (fewer rows, no tabs) */
+  compact?: boolean;
 }
 
 export function GrainBidCard({
@@ -60,73 +80,100 @@ export function GrainBidCard({
   countyName,
   stateAbbr,
   zipCode,
+  compact = false,
 }: GrainBidCardProps) {
   const [elevators, setElevators] = useState<Elevator[]>([]);
-  const [attribution, setAttribution] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeCommodity, setActiveCommodity] = useState<string>('corn');
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
-  useEffect(() => {
-    async function fetchBids() {
-      setLoading(true);
-      setError(false);
-      try {
-        // Prefer FIPS code; fall back to zip
-        const param = zipCode
-          ? `zip=${zipCode}`
-          : `fips=${countyFips}`;
-        const res = await fetch(`/api/grain-bids?${param}&max=20`);
-        if (!res.ok) throw new Error('Fetch failed');
-        const data: GrainBidResponse = await res.json();
-        setElevators(data.elevators || []);
-        setAttribution(data.attribution || '');
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
+  const fetchBids = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      // Prefer FIPS code (maps directly to county pages); fall back to zip
+      const param = countyFips ? `fips=${countyFips}` : `zip=${zipCode}`;
+      const res = await fetch(`/api/grain-bids?${param}&max=20`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: GrainBidResponse = await res.json();
+      setElevators(data.elevators || []);
+      setLastFetched(new Date());
+
+      // Auto-select first available commodity
+      if (data.commodities && data.commodities.length > 0) {
+        const firstAvailable = COMMODITY_TABS.find((t) =>
+          data.commodities.some(
+            (c) => c.toLowerCase() === t.key
+          )
+        );
+        if (firstAvailable) {
+          setActiveCommodity(firstAvailable.key);
+        }
       }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
     }
-
-    fetchBids();
   }, [countyFips, zipCode]);
 
-  // ── Filter elevators that have bids for the active commodity ──────────
+  useEffect(() => {
+    fetchBids();
+  }, [fetchBids]);
+
+  // ── Filter and sort elevators for active commodity ────────────────────
+
   const filteredElevators = elevators
     .map((e) => {
       const commodityBids = e.bids.filter(
         (b) => b.commodity.toLowerCase() === activeCommodity
       );
       if (commodityBids.length === 0) return null;
-      // Pick the best (highest cash price) bid for this commodity
-      const bestBid = commodityBids.sort((a, b) => b.cashPrice - a.cashPrice)[0];
+      // Pick the highest cash price bid for this commodity
+      const bestBid = commodityBids.sort(
+        (a, b) => b.cashPrice - a.cashPrice
+      )[0];
       return { ...e, bestBid };
     })
-    .filter(Boolean) as Array<Elevator & { bestBid: Bid }>;
+    .filter(Boolean) as Array<Elevator & { bestBid: NormalizedBid }>;
 
   // Sort by cash price descending
   filteredElevators.sort((a, b) => b.bestBid.cashPrice - a.bestBid.cashPrice);
 
-  // ── Determine which commodities have any data ─────────────────────────
-  const availableCommodities = COMMODITIES.filter((c) =>
+  // Which commodity tabs have data?
+  const availableTabs = COMMODITY_TABS.filter((t) =>
     elevators.some((e) =>
-      e.bids.some((b) => b.commodity.toLowerCase() === c.key)
+      e.bids.some((b) => b.commodity.toLowerCase() === t.key)
     )
   );
 
-  // ── Loading state ─────────────────────────────────────────────────────
+  const maxRows = compact ? 5 : 10;
+
+  // ── Loading skeleton ──────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-8 h-8 rounded-lg bg-[#1B4332]/5 flex items-center justify-center">
-            <svg className="w-4 h-4 text-[#1B4332] animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+            <svg
+              className="w-4 h-4 text-[#1B4332] animate-pulse"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M3 21V8l9-5 9 5v13" />
+              <path d="M9 21V12h6v9" />
             </svg>
           </div>
           <div>
-            <h3 className="text-[15px] font-bold text-[#1B4332]">Loading Grain Bids...</h3>
-            <p className="text-[11px] text-gray-400">Fetching nearby elevator prices</p>
+            <h3 className="text-[15px] font-bold text-[#1B4332]">
+              Loading Grain Bids...
+            </h3>
+            <p className="text-[11px] text-gray-400">
+              Fetching nearby elevator prices
+            </p>
           </div>
         </div>
         <div className="space-y-3">
@@ -138,22 +185,32 @@ export function GrainBidCard({
     );
   }
 
-  // ── Error / no data state ─────────────────────────────────────────────
+  // ── Error / no data ───────────────────────────────────────────────────
   if (error || elevators.length === 0) {
     return (
       <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
-            <svg className="w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            <svg
+              className="w-4 h-4 text-gray-400"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
             </svg>
           </div>
           <div>
-            <h3 className="text-[15px] font-bold text-[#1B4332]">Grain Bids</h3>
+            <h3 className="text-[15px] font-bold text-[#1B4332]">
+              Grain Bids
+            </h3>
             <p className="text-[12px] text-gray-400">
               {error
                 ? 'Unable to load grain bid data. Please try again later.'
-                : `No grain bid data available near ${countyName}.`}
+                : `No grain bid data available near ${countyName}, ${stateAbbr}.`}
             </p>
           </div>
         </div>
@@ -161,11 +218,12 @@ export function GrainBidCard({
     );
   }
 
-  // ── Best bid summary ──────────────────────────────────────────────────
+  // ── Summary stats ─────────────────────────────────────────────────────
   const topBid = filteredElevators[0]?.bestBid;
-  const worstBid = filteredElevators[filteredElevators.length - 1]?.bestBid;
+  const worstBid =
+    filteredElevators[filteredElevators.length - 1]?.bestBid;
   const spread =
-    topBid && worstBid
+    topBid && worstBid && filteredElevators.length > 1
       ? (topBid.cashPrice - worstBid.cashPrice).toFixed(2)
       : null;
 
@@ -176,27 +234,40 @@ export function GrainBidCard({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#1B4332]/5 flex items-center justify-center">
-              <svg className="w-4 h-4 text-[#1B4332]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <svg
+                className="w-4 h-4 text-[#1B4332]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
                 <path d="M3 21V8l9-5 9 5v13" />
                 <path d="M9 21V12h6v9" />
               </svg>
             </div>
             <div>
               <h3 className="text-[15px] font-bold text-[#1B4332]">
-                Nearby Grain Bids
+                {compact ? 'Local Grain Bids' : 'Nearby Grain Bids'}
               </h3>
               <p className="text-[11px] text-gray-400">
-                {filteredElevators.length} elevator{filteredElevators.length !== 1 ? 's' : ''} near {countyName}, {stateAbbr}
+                {filteredElevators.length} elevator
+                {filteredElevators.length !== 1 ? 's' : ''} near{' '}
+                {countyName}, {stateAbbr}
               </p>
             </div>
           </div>
-          {spread && parseFloat(spread) > 0 && (
+
+          {/* Top bid highlight */}
+          {topBid && (
             <div className="text-right">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                Price Spread
+                {spread && parseFloat(spread) > 0 ? 'Price Spread' : 'Best Bid'}
               </span>
               <span className="text-[16px] font-extrabold text-emerald-700 tabular-nums">
-                ${spread}
+                {spread && parseFloat(spread) > 0
+                  ? `$${spread}`
+                  : `$${topBid.cashPrice.toFixed(2)}`}
               </span>
               <span className="text-[10px] text-gray-400">/bu</span>
             </div>
@@ -204,19 +275,19 @@ export function GrainBidCard({
         </div>
 
         {/* Commodity tabs */}
-        {availableCommodities.length > 1 && (
+        {availableTabs.length > 1 && !compact && (
           <div className="flex gap-1.5">
-            {availableCommodities.map((c) => (
+            {availableTabs.map((t) => (
               <button
-                key={c.key}
-                onClick={() => setActiveCommodity(c.key)}
+                key={t.key}
+                onClick={() => setActiveCommodity(t.key)}
                 className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
-                  activeCommodity === c.key
+                  activeCommodity === t.key
                     ? 'bg-[#1B4332] text-white shadow-sm'
                     : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                 }`}
               >
-                {c.label}
+                {t.label}
               </button>
             ))}
           </div>
@@ -225,15 +296,28 @@ export function GrainBidCard({
 
       {/* Elevator list */}
       <div className="divide-y divide-gray-50">
-        {filteredElevators.slice(0, 10).map((elevator, index) => {
+        {filteredElevators.slice(0, maxRows).map((elevator, index) => {
           const isTop = index === 0;
           const basis = elevator.bestBid.basis;
+          // Basis is in dollars from Barchart. Display color based on value.
           const basisColor =
-            basis >= 0 ? 'text-emerald-600' : basis > -30 ? 'text-amber-600' : 'text-red-500';
+            basis >= 0
+              ? 'text-emerald-600'
+              : basis > -0.30
+                ? 'text-amber-600'
+                : 'text-red-500';
+
+          // Daily change color
+          const changeColor =
+            elevator.bestBid.change > 0
+              ? 'text-emerald-600'
+              : elevator.bestBid.change < 0
+                ? 'text-red-500'
+                : 'text-gray-400';
 
           return (
             <div
-              key={elevator.id}
+              key={`${elevator.id}-${index}`}
               className={`flex items-center px-5 py-3.5 hover:bg-gray-50/50 transition-colors ${
                 isTop ? 'bg-emerald-50/30' : ''
               }`}
@@ -267,18 +351,32 @@ export function GrainBidCard({
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] text-gray-400">
-                  {elevator.city}, {elevator.state}
-                  {elevator.distance > 0 && ` · ${elevator.distance.toFixed(0)} mi`}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-gray-400">
+                    {elevator.city}, {elevator.state}
+                    {elevator.distance > 0 &&
+                      ` · ${elevator.distance.toFixed(0)} mi`}
+                  </span>
+                  {elevator.bestBid.change !== 0 && (
+                    <span className={`text-[10px] font-semibold tabular-nums ${changeColor}`}>
+                      {elevator.bestBid.change > 0 ? '▲' : '▼'}
+                      {Math.abs(elevator.bestBid.change).toFixed(4)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Basis */}
               <div className="text-right mr-5 shrink-0">
-                <span className={`text-[12px] font-bold tabular-nums ${basisColor}`}>
-                  {basis >= 0 ? '+' : ''}{basis}
+                <span
+                  className={`text-[12px] font-bold tabular-nums ${basisColor}`}
+                >
+                  {basis >= 0 ? '+' : ''}
+                  {(basis * 100).toFixed(0)}¢
                 </span>
-                <span className="block text-[9px] text-gray-400 uppercase">Basis</span>
+                <span className="block text-[9px] text-gray-400 uppercase">
+                  Basis
+                </span>
               </div>
 
               {/* Cash price */}
@@ -290,22 +388,32 @@ export function GrainBidCard({
                 >
                   ${elevator.bestBid.cashPrice.toFixed(2)}
                 </span>
-                <span className="block text-[9px] text-gray-400 uppercase">Cash/Bu</span>
+                <span className="block text-[9px] text-gray-400 uppercase">
+                  Cash/Bu
+                </span>
               </div>
             </div>
           );
         })}
       </div>
 
+      {/* Show more link if truncated */}
+      {filteredElevators.length > maxRows && (
+        <div className="px-5 py-2 text-center border-t border-gray-50">
+          <span className="text-[11px] text-[#1B4332] font-semibold">
+            +{filteredElevators.length - maxRows} more elevators
+          </span>
+        </div>
+      )}
+
       {/* Footer with attribution */}
       <div className="px-5 py-3 bg-gray-50/50 border-t border-gray-100">
         <div className="flex items-center justify-between">
-          <p className="text-[9px] text-gray-400 leading-relaxed max-w-md">
-            {attribution || 'Market data provided by Barchart. Cash grain bids are for informational purposes only and subject to change.'}
-          </p>
-          {topBid?.lastUpdate && (
+          <BarchartAttribution variant="compact" />
+          {lastFetched && (
             <span className="text-[9px] text-gray-300 shrink-0 ml-3">
-              Updated: {new Date(topBid.lastUpdate).toLocaleString('en-US', {
+              Updated:{' '}
+              {lastFetched.toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',
                 hour: 'numeric',
