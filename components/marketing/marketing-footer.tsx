@@ -1,31 +1,42 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase 33: Updated to 17 free tools — added USDA Program Navigator
+// THE GREAT CONSOLIDATION — Build 1
 //
-// CHANGES:
-//   - Added USDA Program Navigator (/navigator) to Free Tools column
-//   - Updated tool count to 17
+// FROM: "The farmer's Bloomberg Terminal. 17 free tools..."
+// TO:   "The free farm financial co-pilot for every farm decision."
+//
+// Footer reorganized to reflect the platform architecture:
+//   - Platform (the 4 core surfaces)
+//   - Tools (remaining tools — still important for SEO crawling)
+//   - Learn (educational content)
+//   - Top Counties (SEO internal links)
+//   - Company
+//
+// All existing tool links preserved for SEO. Every URL stays alive.
+// The 50-state grid stays — it's a massive SEO asset.
 // =============================================================================
 
 import Link from "next/link";
 import { Logo } from "./logo";
 
-// ── Footer link columns ─────────────────────────────────────────────────
 const footerLinks = {
-  "Free Tools": [
-    { label: "USDA Program Navigator", href: "/navigator" },
-    { label: "AI Farm Advisor", href: "/advisor" },
+  Platform: [
+    { label: "ARC/PLC Calculator", href: "/check" },
+    { label: "Commodity Markets", href: "/markets" },
     { label: "Morning Dashboard", href: "/morning" },
+    { label: "AI Farm Advisor", href: "/advisor" },
+    { label: "Election Map", href: "/elections" },
+    { label: "USDA Programs", href: "/navigator" },
+  ],
+  Tools: [
     { label: "Grain Marketing", href: "/grain" },
     { label: "Cash Flow Forecaster", href: "/cashflow" },
     { label: "Farm Score", href: "/farm-score" },
     { label: "Breakeven Calculator", href: "/breakeven" },
-    { label: "Commodity Markets", href: "/markets" },
-    { label: "Insurance Calculator", href: "/insurance" },
+    { label: "Crop Insurance", href: "/insurance" },
     { label: "Election Optimizer", href: "/optimize" },
-    { label: "ARC/PLC Calculator", href: "/check" },
-    { label: "Ag Weather Dashboard", href: "/weather" },
-    { label: "Spray Window Calculator", href: "/spray-window" },
+    { label: "Ag Weather", href: "/weather" },
+    { label: "Spray Window", href: "/spray-window" },
     { label: "Payment Scanner", href: "/payments" },
     { label: "Base Acre Analyzer", href: "/fba" },
     { label: "SDRP Checker", href: "/sdrp" },
@@ -33,10 +44,11 @@ const footerLinks = {
   ],
   Learn: [
     { label: "OBBBA Guide", href: "/obbba" },
-    { label: "Election Map", href: "/elections" },
     { label: "How ARC-CO Works", href: "/programs/arc-co" },
     { label: "How PLC Works", href: "/programs/plc" },
     { label: "EQIP Guide", href: "/programs/eqip" },
+    { label: "CRP Guide", href: "/programs/crp" },
+    { label: "CSP Guide", href: "/programs/csp" },
   ],
   "Top Counties": [
     { label: "Champaign County, IL", href: "/illinois/champaign-county/arc-plc" },
@@ -57,7 +69,6 @@ const footerLinks = {
   ],
 };
 
-// ── All 50 states (sorted by abbreviation) ──────────────────────────────
 const STATES = [
   { abbr: "AL", slug: "alabama" },
   { abbr: "AK", slug: "alaska" },
@@ -120,15 +131,18 @@ export function MarketingFooter() {
         {/* Top section: logo + link columns */}
         <div className="flex flex-wrap justify-between gap-10 mb-12">
           {/* Brand */}
-          <div className="min-w-[200px] max-w-[240px]">
+          <div className="min-w-[200px] max-w-[260px]">
             <Link href="/" className="flex items-center gap-2.5 mb-4">
               <Logo size={26} />
               <span className="text-[17px] font-extrabold tracking-[-0.04em] text-white">
                 Harvest<span className="text-harvest-gold">File</span>
               </span>
             </Link>
-            <p className="text-[13px] text-white/20 leading-relaxed">
-              The farmer&apos;s Bloomberg Terminal. 17 free tools powered by live USDA data for every farming county in America.
+            <p className="text-[13px] text-white/25 leading-relaxed mb-4">
+              The free farm financial co-pilot for every farm decision. Live USDA data, AI-powered insights, and local grain bids — for every farming county in America.
+            </p>
+            <p className="text-[12px] text-white/15 leading-relaxed">
+              Trusted by farmers across 2,000+ counties.
             </p>
           </div>
 
@@ -189,7 +203,7 @@ export function MarketingFooter() {
           </p>
           <p className="text-[11px] text-white/10 max-w-[500px] text-right leading-relaxed">
             HarvestFile is not affiliated with, endorsed by, or connected to the USDA, FSA, or any government agency.
-            Data sourced from USDA NASS, ERS, and FSA public databases.
+            Data sourced from USDA NASS, ERS, and FSA public databases. Market data provided by Barchart.
           </p>
         </div>
       </div>

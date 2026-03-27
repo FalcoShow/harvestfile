@@ -1,14 +1,25 @@
 // =============================================================================
 // HarvestFile — Marketing Header (Server Component)
-// Phase 25 Build 2: Added "Find County" search trigger (Cmd+K command palette)
+// THE GREAT CONSOLIDATION — Build 1: Navigation Overhaul
 //
-// CHANGES:
-//   - "Free Tools" dropdown replaces single "Calculator" link
-//   - All 7 free tools visible with icons and descriptions
-//   - "Find County" search icon + Cmd+K shortcut hint between nav and CTAs
-//   - Clean nav: Free Tools | Election Map | OBBBA Guide | Pricing | About
-//   - Auth-aware CTA (Dashboard vs Get Started)
-//   - Adaptive text colors via CSS custom properties from HeaderScrollWrapper
+// FROM: "Free Tools" mega-dropdown listing 17 separate tools
+// TO:   5-item nav presenting HarvestFile as ONE platform
+//
+// Nav structure:
+//   Calculator → /check (the franchise, primary SEO page)
+//   Markets   → /markets (commodity prices + ARC/PLC payment impact)
+//   Dashboard → /morning (the daily engagement anchor)
+//   Advisor   → /advisor (AI-powered conversational interface)
+//   More      → dropdown (Election Map, OBBBA Guide, Pricing, About)
+//
+// Every existing tool URL stays alive. The nav just stops presenting
+// HarvestFile as a collection of tools and starts presenting it as
+// one product with depth. This is the Credit Karma moment — they
+// don't list "Credit Score Tool, Credit Card Finder, Loan Matcher"
+// in their nav. They show ONE product.
+//
+// Auth-aware CTA: Dashboard (logged in) vs Get Started (anonymous)
+// Adaptive colors via CSS custom properties from HeaderScrollWrapper
 // =============================================================================
 
 import Link from 'next/link';
@@ -16,7 +27,7 @@ import { createClient } from '@/lib/supabase/server';
 import { HeaderScrollWrapper } from './header-scroll-wrapper';
 import { MobileMenu } from './mobile-menu';
 import { Logo } from './logo';
-import { ToolsDropdown } from './tools-dropdown';
+import { MoreDropdown } from './more-dropdown';
 import { HeaderCountySearch } from './header-county-search';
 
 export async function MarketingHeader() {
@@ -30,7 +41,7 @@ export async function MarketingHeader() {
   return (
     <HeaderScrollWrapper>
       <nav className="relative flex h-16 items-center justify-between">
-        {/* Logo — uses CSS custom property for adaptive color */}
+        {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <Logo size={28} />
           <span
@@ -41,16 +52,13 @@ export async function MarketingHeader() {
           </span>
         </Link>
 
-        {/* Desktop nav links */}
+        {/* Desktop nav — 5 items, clean and focused */}
         <div className="hidden md:flex items-center gap-7">
-          {/* Free Tools dropdown — client component */}
-          <ToolsDropdown />
-
           {[
-            { href: '/elections', label: 'Election Map' },
-            { href: '/obbba', label: 'OBBBA Guide' },
-            { href: '/pricing', label: 'Pricing' },
-            { href: '/about', label: 'About' },
+            { href: '/check', label: 'Calculator' },
+            { href: '/markets', label: 'Markets' },
+            { href: '/morning', label: 'Dashboard' },
+            { href: '/advisor', label: 'Advisor' },
           ].map((link) => (
             <Link
               key={link.href}
@@ -61,6 +69,9 @@ export async function MarketingHeader() {
               {link.label}
             </Link>
           ))}
+
+          {/* More dropdown — Election Map, OBBBA Guide, Pricing, About */}
+          <MoreDropdown />
         </div>
 
         {/* Desktop: Search + CTAs */}
@@ -80,7 +91,10 @@ export async function MarketingHeader() {
                 color: 'var(--nav-cta-text)',
               }}
             >
-              Go to Dashboard →
+              Dashboard
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+              </svg>
             </Link>
           ) : (
             <>
@@ -99,7 +113,7 @@ export async function MarketingHeader() {
                   color: 'var(--nav-cta-text)',
                 }}
               >
-                Get Started
+                Get Started Free
               </Link>
             </>
           )}
