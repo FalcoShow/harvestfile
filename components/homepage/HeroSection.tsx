@@ -226,7 +226,7 @@ export function HeroSection() {
             The farmer types, sees their county, clicks, gets data.
            ═══════════════════════════════════════════════════════════════════ */}
         <div
-          className="max-w-[560px] mx-auto mb-8"
+          className="relative z-30 max-w-[560px] mx-auto mb-8"
           style={{ animation: 'hf-hero-fade-in 0.8s ease-out 0.3s both' }}
         >
           <div ref={containerRef} className="relative">
