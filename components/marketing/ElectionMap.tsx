@@ -8,11 +8,17 @@
 //
 // Stack: react-simple-maps + us-atlas TopoJSON + d3-scale
 // Performance: ~3,100 SVG paths, React.memo'd, CSS transitions for color
+//
+// Build 4 Fix: Tooltip now uses React Portal to render at document.body level.
+// This fixes the "tooltip flies to the right" bug caused by CSS transforms
+// on ancestor elements (backdrop-filter, transform, will-change) which break
+// position:fixed positioning. Also adds viewport edge detection.
 // =============================================================================
 
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   ComposableMap,
@@ -86,7 +92,11 @@ const COLOR_SCALE = [
 
 const NO_DATA_COLOR = '#1e293b'; // slate-800
 const COUNTY_STROKE = '#0f172a'; // slate-900
-const STATE_STROKE = '#334155';  // slate-700
+
+// Tooltip dimensions for edge detection
+const TOOLTIP_WIDTH = 220;
+const TOOLTIP_HEIGHT = 160;
+const TOOLTIP_OFFSET = 16;
 
 // ─── Color Utility ───────────────────────────────────────────────────────────
 
@@ -189,6 +199,117 @@ function ColorLegend() {
   );
 }
 
+// ─── Tooltip Component (rendered via Portal) ─────────────────────────────────
+
+function MapTooltip({ tooltip, selectedYear }: { tooltip: TooltipState; selectedYear: number }) {
+  // Calculate position with viewport edge detection
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+
+  // Default: position above and to the right of cursor
+  let left = tooltip.x + TOOLTIP_OFFSET;
+  let top = tooltip.y - TOOLTIP_OFFSET;
+
+  // If tooltip would overflow right edge, flip to left side of cursor
+  if (left + TOOLTIP_WIDTH > vw - 8) {
+    left = tooltip.x - TOOLTIP_WIDTH - TOOLTIP_OFFSET;
+  }
+
+  // If tooltip would overflow left edge, clamp to left edge
+  if (left < 8) {
+    left = 8;
+  }
+
+  // If tooltip would overflow top (after translateY(-100%)), position below cursor
+  if (top - TOOLTIP_HEIGHT < 8) {
+    top = tooltip.y + TOOLTIP_OFFSET + 10;
+    // Remove the translateY(-100%) when positioning below
+    return (
+      <div
+        className="fixed z-[9999] pointer-events-none"
+        style={{ left, top }}
+      >
+        <TooltipContent tooltip={tooltip} selectedYear={selectedYear} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fixed z-[9999] pointer-events-none"
+      style={{
+        left,
+        top,
+        transform: 'translateY(-100%)',
+      }}
+    >
+      <TooltipContent tooltip={tooltip} selectedYear={selectedYear} />
+    </div>
+  );
+}
+
+function TooltipContent({ tooltip, selectedYear }: { tooltip: TooltipState; selectedYear: number }) {
+  return (
+    <div
+      className="rounded-xl border border-white/10 px-4 py-3 shadow-2xl min-w-[200px]"
+      style={{
+        background: 'rgba(15, 23, 42, 0.92)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
+      <div className="text-sm font-bold text-white mb-0.5">
+        {tooltip.name?.name || `County ${tooltip.fips}`}
+        {tooltip.name?.state && (
+          <span className="text-white/40 font-normal ml-1">{tooltip.name.state}</span>
+        )}
+      </div>
+
+      {tooltip.data ? (
+        <>
+          {/* ARC/PLC split bar */}
+          <div className="flex h-2 rounded-full overflow-hidden my-2">
+            <div
+              className="bg-emerald-500 transition-all"
+              style={{ width: `${tooltip.data.arc_pct}%` }}
+            />
+            <div
+              className="bg-blue-500 transition-all"
+              style={{ width: `${tooltip.data.plc_pct}%` }}
+            />
+          </div>
+
+          <div className="flex justify-between text-[11px]">
+            <span className="text-emerald-400 font-semibold">
+              ARC-CO {tooltip.data.arc_pct}%
+            </span>
+            <span className="text-blue-400 font-semibold">
+              PLC {tooltip.data.plc_pct}%
+            </span>
+          </div>
+
+          <div className="text-[10px] text-white/25 mt-1.5">
+            {selectedYear <= 2025
+              ? `${formatAcres(tooltip.data.total)} enrolled base acres`
+              : `${tooltip.data.total} farmers reported`}
+          </div>
+
+          <div className="text-[10px] text-harvest-gold/60 mt-1 flex items-center gap-1">
+            <span>Click for county details</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </div>
+        </>
+      ) : (
+        <div className="text-[11px] text-white/30 mt-1">
+          No election data for this county
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -205,6 +326,12 @@ export default function ElectionMap() {
   const [selectedCommodity, setSelectedCommodity] = useState('ALL');
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Track mount state for portal rendering (SSR safety)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // ── Fetch map data ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -257,7 +384,6 @@ export default function ElectionMap() {
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-');
-      // State abbr → slug lookup (we'd need full state names, use FIPS prefix instead)
       return { countySlug, stateAbbr: name.state };
     },
     [mapData]
@@ -464,74 +590,10 @@ export default function ElectionMap() {
         </span>
       </div>
 
-      {/* ═══ TOOLTIP ═══ */}
-      {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none"
-          style={{
-            left: tooltip.x + 16,
-            top: tooltip.y - 10,
-            transform: 'translateY(-100%)',
-          }}
-        >
-          <div
-            className="rounded-xl border border-white/10 px-4 py-3 shadow-2xl min-w-[200px]"
-            style={{
-              background: 'rgba(15, 23, 42, 0.92)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-            }}
-          >
-            <div className="text-sm font-bold text-white mb-0.5">
-              {tooltip.name?.name || `County ${tooltip.fips}`}
-              {tooltip.name?.state && (
-                <span className="text-white/40 font-normal ml-1">{tooltip.name.state}</span>
-              )}
-            </div>
-
-            {tooltip.data ? (
-              <>
-                {/* ARC/PLC split bar */}
-                <div className="flex h-2 rounded-full overflow-hidden my-2">
-                  <div
-                    className="bg-emerald-500 transition-all"
-                    style={{ width: `${tooltip.data.arc_pct}%` }}
-                  />
-                  <div
-                    className="bg-blue-500 transition-all"
-                    style={{ width: `${tooltip.data.plc_pct}%` }}
-                  />
-                </div>
-
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-emerald-400 font-semibold">
-                    ARC-CO {tooltip.data.arc_pct}%
-                  </span>
-                  <span className="text-blue-400 font-semibold">
-                    PLC {tooltip.data.plc_pct}%
-                  </span>
-                </div>
-
-                <div className="text-[10px] text-white/25 mt-1.5">
-                  {selectedYear <= 2025
-                    ? `${formatAcres(tooltip.data.total)} enrolled base acres`
-                    : `${tooltip.data.total} farmers reported`}
-                </div>
-
-                <div className="text-[10px] text-harvest-gold/60 mt-1 flex items-center gap-1">
-                  <span>Click for county details</span>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </>
-            ) : (
-              <div className="text-[11px] text-white/30 mt-1">
-                No election data for this county
-              </div>
-            )}
-          </div>
-        </div>
+      {/* ═══ TOOLTIP (Portal — renders at document.body to escape CSS transforms) ═══ */}
+      {tooltip && mounted && createPortal(
+        <MapTooltip tooltip={tooltip} selectedYear={selectedYear} />,
+        document.body
       )}
     </div>
   );
