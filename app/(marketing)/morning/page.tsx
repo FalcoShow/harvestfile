@@ -22,6 +22,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { GrainBidCard } from '@/components/grain/GrainBidCard';
 import {
   AreaChart,
   Area,
@@ -989,6 +990,15 @@ export default function MorningDashboard() {
         ) : (
           <MarketsCard data={prices} status={marketStatus} />
         )}
+
+        {/* Local Grain Bids */}
+        <GrainBidCard
+          lat={DEFAULT_LAT}
+          lng={DEFAULT_LNG}
+          compact={true}
+          countyName="Summit County"
+          stateAbbr="OH"
+        />
 
         {/* USDA Calendar Card */}
         <CalendarCard reports={usdaReports} />
