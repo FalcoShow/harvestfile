@@ -6,6 +6,11 @@
 // Each page has 8-15 unique data points, conditional narrative text,
 // data-driven FAQs, and 5-type JSON-LD schema.
 //
+// Build 4 Deploy 3: Added graceful fallback for counties without ARC/PLC data.
+// Instead of 404, counties without has_arc_plc_data render a partial page
+// with grain bids, neighboring county links, and a CTA. This ensures every
+// county clicked on the Election Map lands on a useful page.
+//
 // Data sources:
 //   - county_crop_data (ARC/PLC payments, benchmarks, yields)
 //   - county_profiles (census, climate, soil, insurance, ERS, narrative)
@@ -21,6 +26,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import {
   getCountyBySlug,
+  getCountyBySlugAny,
   getCountyCropData,
   getNeighborCounties,
   getRecommendation,
@@ -72,52 +78,65 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { state, county } = await params;
+
+  // Try full data county first, then fallback
   const result = await getCountyBySlug(state, county);
-  if (!result) return { title: 'County Not Found | HarvestFile' };
 
-  const { county: c, state: s } = result;
+  if (result) {
+    const { county: c, state: s } = result;
+    const [enrollment, profile] = await Promise.all([
+      getCountyEnrollmentSummary(c.county_fips),
+      getCountyProfile(state, county),
+    ]);
 
-  // Pull enrichment data for richer meta description
-  const [enrollment, profile] = await Promise.all([
-    getCountyEnrollmentSummary(c.county_fips),
-    getCountyProfile(state, county),
-  ]);
+    const acresStr = c.total_base_acres
+      ? `${(c.total_base_acres / 1000).toFixed(0)}K`
+      : '';
 
-  const acresStr = c.total_base_acres
-    ? `${(c.total_base_acres / 1000).toFixed(0)}K`
-    : '';
+    const descParts: string[] = [];
+    descParts.push(`Free ARC-CO vs PLC analysis for ${c.display_name}, ${s.name}.`);
+    if (acresStr) descParts.push(`${acresStr} enrolled base acres.`);
+    if (profile?.total_farms) descParts.push(`${profile.total_farms.toLocaleString()} farms.`);
+    if (enrollment) {
+      descParts.push(
+        `${enrollment.top_crop}: ${enrollment.top_crop_arcco_pct}% ARC-CO, ${enrollment.top_crop_plc_pct}% PLC.`
+      );
+    }
+    descParts.push('Real USDA data, payment history, and 2026 recommendations under OBBBA.');
 
-  // Build a rich, unique meta description from real data
-  const descParts: string[] = [];
-  descParts.push(`Free ARC-CO vs PLC analysis for ${c.display_name}, ${s.name}.`);
-  if (acresStr) descParts.push(`${acresStr} enrolled base acres.`);
-  if (profile?.total_farms) descParts.push(`${profile.total_farms.toLocaleString()} farms.`);
-  if (enrollment) {
-    descParts.push(
-      `${enrollment.top_crop}: ${enrollment.top_crop_arcco_pct}% ARC-CO, ${enrollment.top_crop_plc_pct}% PLC.`
-    );
+    const description = descParts.join(' ');
+    const title = `${c.display_name}, ${s.abbreviation} ARC/PLC Data — Payment Projections & Election History | HarvestFile`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title: `${c.display_name}, ${s.abbreviation} — ARC/PLC Election Data | HarvestFile`,
+        description,
+        type: 'website',
+        url: `https://harvestfile.com/${state}/${county}/arc-plc`,
+        siteName: 'HarvestFile',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `${c.display_name}, ${s.abbreviation} ARC/PLC Data`,
+        description,
+      },
+      alternates: {
+        canonical: `https://harvestfile.com/${state}/${county}/arc-plc`,
+      },
+    };
   }
-  descParts.push('Real USDA data, payment history, and 2026 recommendations under OBBBA.');
 
-  const description = descParts.join(' ');
+  // Fallback metadata for partial pages
+  const fallback = await getCountyBySlugAny(state, county);
+  if (!fallback) return { title: 'County Not Found | HarvestFile' };
 
-  const title = `${c.display_name}, ${s.abbreviation} ARC/PLC Data — Payment Projections & Election History | HarvestFile`;
-
+  const { county: c, state: s } = fallback;
   return {
-    title,
-    description,
-    openGraph: {
-      title: `${c.display_name}, ${s.abbreviation} — ARC/PLC Election Data | HarvestFile`,
-      description,
-      type: 'website',
-      url: `https://harvestfile.com/${state}/${county}/arc-plc`,
-      siteName: 'HarvestFile',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${c.display_name}, ${s.abbreviation} ARC/PLC Data`,
-      description,
-    },
+    title: `${c.display_name}, ${s.abbreviation} — Local Grain Bids & Farm Data | HarvestFile`,
+    description: `Agricultural data, local grain elevator bids, and USDA program information for ${c.display_name}, ${s.name}. Free tools for farmers.`,
+    robots: { index: false, follow: true }, // noindex partial pages
     alternates: {
       canonical: `https://harvestfile.com/${state}/${county}/arc-plc`,
     },
@@ -167,8 +186,6 @@ function getRecBadgeColor(rec: string): string {
 }
 
 // ── Enhanced JSON-LD Structured Data ────────────────────────────────────
-// Uses county_profiles data when available for 5-type schema:
-// Dataset, BreadcrumbList, Place, GovernmentService, FAQPage
 
 function CountyJsonLd({
   county,
@@ -181,7 +198,6 @@ function CountyJsonLd({
   cropData: CommodityGroup[];
   profile: CountyProfile | null;
 }) {
-  // If we have a county profile, use the enhanced 5-type JSON-LD generator
   if (profile) {
     const enhancedJsonLd = generateCountyJsonLd(profile);
     return (
@@ -192,7 +208,6 @@ function CountyJsonLd({
     );
   }
 
-  // Fallback: original 3-type JSON-LD for counties without profiles
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -277,15 +292,252 @@ function CountyJsonLd({
 }
 
 // ═════════════════════════════════════════════════════════════════════════
-// PAGE COMPONENT
+// PARTIAL COUNTY PAGE (for counties without ARC/PLC data)
+// Renders grain bids, general info, neighboring county links, and CTAs.
+// Returns HTTP 200 with noindex to avoid Google soft-404 penalties.
+// ═════════════════════════════════════════════════════════════════════════
+
+async function PartialCountyPage({
+  county,
+  state,
+  stateSlug,
+}: {
+  county: any;
+  state: any;
+  stateSlug: string;
+}) {
+  // Get neighboring counties that DO have ARC/PLC data
+  const neighbors = await getNeighborCounties(county.state_fips, county.county_fips);
+
+  return (
+    <div className="min-h-screen bg-[#FAFAF8]">
+      {/* ═══ HERO ═══ */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0C1F17] via-[#142B20] to-[#1B4332]" />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          }}
+        />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-10 sm:pb-14">
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-1.5 text-[11px] font-medium text-white/35 mb-6">
+            <Link href="/" className="hover:text-white/60 transition-colors">
+              HarvestFile
+            </Link>
+            <span className="text-white/20">/</span>
+            <Link
+              href={`/${stateSlug}/arc-plc`}
+              className="hover:text-white/60 transition-colors"
+            >
+              {state.name}
+            </Link>
+            <span className="text-white/20">/</span>
+            <span className="text-white/50">{county.display_name}</span>
+          </nav>
+
+          <h1 className="text-[clamp(28px,4.5vw,48px)] font-extrabold text-white tracking-[-0.03em] leading-[1.05] mb-4">
+            {county.display_name}
+            <span className="text-white/30 font-semibold text-[0.5em] ml-3">
+              {state.abbreviation}
+            </span>
+          </h1>
+
+          <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed max-w-2xl">
+            Agricultural data and local grain elevator bids for{' '}
+            {county.display_name}, {state.name}. Detailed ARC-CO and PLC
+            program analysis for this county is currently being compiled from
+            USDA data sources.
+          </p>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-b from-transparent to-[#FAFAF8]" />
+      </section>
+
+      {/* ═══ MAIN CONTENT ═══ */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
+        {/* Status Banner */}
+        <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-r from-amber-50 to-amber-50/50 p-5 sm:p-6 mb-10 -mt-2">
+          <div className="flex items-start gap-4">
+            <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+              <svg className="w-5 h-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-[17px] font-bold text-amber-900 mb-1">
+                ARC/PLC Analysis Coming Soon
+              </h2>
+              <p className="text-[13px] text-amber-700/70 leading-relaxed">
+                We're building detailed ARC-CO and PLC payment history,
+                benchmark yields, and program recommendations for{' '}
+                {county.display_name}. In the meantime, check local grain
+                bids below or use our free calculator to run your own analysis.
+              </p>
+              <Link
+                href="/check"
+                className="inline-flex items-center gap-2 mt-3 bg-[#1B4332] hover:bg-[#0C1F17] text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-[#1B4332]/15 transition-all text-[13px]"
+              >
+                Run Free ARC/PLC Calculator
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Grain Bids — works for ANY county via FIPS lookup */}
+        <section className="mb-12">
+          <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+            Nearby Grain Bids — {county.display_name}
+          </h2>
+          <GrainBidCard
+            fips={county.county_fips}
+            countyName={county.display_name}
+            stateAbbr={state.abbreviation}
+          />
+        </section>
+
+        {/* OBBBA Info */}
+        <section className="mb-12">
+          <div className="rounded-2xl border border-[#1B4332]/10 bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 sm:p-8 text-white">
+            <div className="flex items-start gap-4">
+              <div className="shrink-0 w-10 h-10 rounded-xl bg-[#E2C366]/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#E2C366]" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-[17px] font-bold mb-2">
+                  2026 Changes Under OBBBA
+                </h3>
+                <p className="text-[13px] text-white/50 leading-relaxed mb-3">
+                  The One Big Beautiful Bill Act significantly changes ARC/PLC
+                  for all counties. Reference prices increased (corn to $4.10/bu,
+                  soybeans to $10.00/bu), ARC guarantee rose to 90%, payment cap
+                  increased to 12%, and up to 30 million new base acres can be
+                  added. For 2026, farmers must make an affirmative annual election.
+                </p>
+                <Link
+                  href="/obbba"
+                  className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#E2C366] hover:text-[#E2C366]/80 transition-colors"
+                >
+                  Learn about OBBBA changes
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Nearby Counties with full data */}
+        {neighbors.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-4">
+              Nearby Counties with Full ARC/PLC Data
+            </h2>
+            <p className="text-[13px] text-gray-500 mb-5">
+              These counties in {state.name} have complete ARC-CO and PLC
+              payment history, benchmark yields, and program recommendations.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {neighbors.slice(0, 8).map((n) => (
+                <Link
+                  key={n.county_fips}
+                  href={`/${n.state_slug}/${n.slug}/arc-plc`}
+                  className="rounded-xl border border-gray-200/80 bg-white px-4 py-3.5 shadow-sm hover:border-[#1B4332]/20 hover:shadow-md transition-all group"
+                >
+                  <span className="text-[14px] font-semibold text-[#1B4332] group-hover:text-emerald-700 transition-colors">
+                    {n.display_name}
+                  </span>
+                  <span className="block text-[11px] text-gray-400 mt-0.5">
+                    View ARC/PLC data →
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-4 text-center">
+              <Link
+                href={`/${stateSlug}/arc-plc`}
+                className="text-[13px] font-semibold text-[#1B4332] hover:text-emerald-700 transition-colors"
+              >
+                View all counties in {state.name} →
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {/* Free Tools */}
+        <section className="mb-12">
+          <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-4">
+            Free Farm Program Tools
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[
+              { href: '/check', title: 'ARC/PLC Calculator', desc: 'Side-by-side ARC-CO vs PLC comparison with real USDA data' },
+              { href: '/insurance', title: 'Crop Insurance Optimizer', desc: 'RP + SCO + ECO stacking with 10,000 Monte Carlo simulations' },
+              { href: '/morning', title: 'Morning Dashboard', desc: 'Weather, commodity prices, payment estimates — your daily farm briefing' },
+              { href: '/payments', title: 'Payment Tracker', desc: 'Track projected ARC-CO and PLC payments as MYA prices update' },
+              { href: '/fba', title: 'Base Acre Analyzer', desc: 'Calculate new base acre eligibility under OBBBA' },
+              { href: '/calendar', title: 'Policy Calendar', desc: 'Every USDA deadline and payment date in one place' },
+            ].map((tool) => (
+              <Link
+                key={tool.href}
+                href={tool.href}
+                className="rounded-xl border border-gray-200/80 bg-white px-5 py-4 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all group"
+              >
+                <span className="text-[14px] font-bold text-[#1B4332] group-hover:text-emerald-700 transition-colors">
+                  {tool.title}
+                </span>
+                <span className="block text-[12px] text-gray-400 mt-1 leading-relaxed">
+                  {tool.desc}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Disclaimer */}
+        <div className="border-t border-gray-200 pt-6">
+          <p className="text-[10px] text-gray-400 leading-relaxed max-w-4xl">
+            Data sources: USDA Farm Service Agency, USDA NASS Quick Stats API,
+            Barchart OnDemand (grain bids). This page is not official USDA guidance.
+            HarvestFile is not affiliated with USDA.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MAIN PAGE COMPONENT
 // ═════════════════════════════════════════════════════════════════════════
 
 export default async function CountyArcPlcPage({ params }: PageProps) {
   const { state: stateSlug, county: countySlug } = await params;
 
-  // ── Fetch all data in parallel ──────────────────────────────────────
+  // ── Try full data county first ──────────────────────────────────────
   const result = await getCountyBySlug(stateSlug, countySlug);
-  if (!result) notFound();
+
+  // ── Fallback: county exists but has no ARC/PLC data ─────────────────
+  if (!result) {
+    const fallback = await getCountyBySlugAny(stateSlug, countySlug);
+    if (!fallback) notFound(); // Truly invalid URL — real 404
+
+    return (
+      <PartialCountyPage
+        county={fallback.county}
+        state={fallback.state}
+        stateSlug={stateSlug}
+      />
+    );
+  }
 
   const { county, state } = result;
 
@@ -929,7 +1181,6 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
                     <p className="text-[13px] text-gray-600 leading-relaxed mb-4">
                       {benchmarkContext.insights.summary}
                     </p>
-                    {/* Mini trend bars — last 3 years */}
                     <div className="space-y-2">
                       {benchmarkContext.historical.slice(-3).map((year) => (
                         <div key={year.year} className="flex items-center gap-3">
@@ -1037,7 +1288,6 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
                         <p className="text-[12px] text-gray-500 mt-1">
                           farmers reported in {county.display_name}
                         </p>
-                        {/* Progress bar to threshold */}
                         <div className="mt-3 mx-auto max-w-[200px]">
                           <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                             <div
@@ -1064,7 +1314,6 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
                     </>
                   )}
 
-                  {/* Social proof footer */}
                   {benchmarkContext.social_proof.state_this_week > 0 && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <p className="text-[10px] text-gray-400">
@@ -1097,7 +1346,6 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
                         {formatAcres(crop.total_acres)} acres
                       </span>
                     </div>
-                    {/* Split bar */}
                     <div className="flex h-3 rounded-full overflow-hidden mb-2.5">
                       <div
                         className="bg-emerald-500 transition-all"

@@ -1,6 +1,7 @@
 // =============================================================================
 // HarvestFile — County & State Data Queries
 // Phase 5A-2: Server-side data fetching for SEO pages
+// Build 4 Deploy 3: Added getCountyBySlugAny for 404 fallback pages
 // =============================================================================
 
 import { supabasePublic } from '@/lib/supabase/public';
@@ -111,6 +112,10 @@ export async function getCountiesForState(stateFips: string): Promise<CountyList
 
 // ─── County Queries ──────────────────────────────────────────────────────────
 
+/**
+ * Get county data for counties WITH ARC/PLC data.
+ * Used for the full county page with crop analysis, payment history, etc.
+ */
 export async function getCountyBySlug(
   stateSlug: string,
   countySlug: string
@@ -125,6 +130,30 @@ export async function getCountyBySlug(
     .eq('state_fips', state.state_fips)
     .eq('slug', countySlug)
     .eq('has_arc_plc_data', true)
+    .single();
+
+  if (error || !county) return null;
+  return { county, state };
+}
+
+/**
+ * Get county data for ANY county — no has_arc_plc_data filter.
+ * Used as a fallback for counties that exist but don't have ARC/PLC data.
+ * These render a partial page with general county info, grain bids,
+ * neighboring county links, and a CTA instead of a 404.
+ */
+export async function getCountyBySlugAny(
+  stateSlug: string,
+  countySlug: string
+): Promise<{ county: CountyData; state: StateData } | null> {
+  const state = await getStateBySlug(stateSlug);
+  if (!state) return null;
+
+  const { data: county, error } = await supabasePublic
+    .from('counties')
+    .select('county_fips, state_fips, name, display_name, slug, latitude, longitude, total_base_acres, fsa_office_phone, fsa_office_address')
+    .eq('state_fips', state.state_fips)
+    .eq('slug', countySlug)
     .single();
 
   if (error || !county) return null;
