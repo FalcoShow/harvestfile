@@ -327,28 +327,37 @@ export function MarketTicker() {
       if (!res.ok) throw new Error('Fetch failed');
       const json = await res.json();
 
-      // The existing endpoint returns prices — normalize to our format
-      // Yahoo Finance returns cents/bu for futures, requiring /100 conversion
+      // API returns: { success, data: { CORN: { latestSettle, change, changePct, ... }, SOYBEANS: {...}, WHEAT: {...} } }
+      const apiData = json.data || json;
+
       const parseCommodity = (raw: Record<string, unknown>): PriceData | null => {
         if (!raw || typeof raw !== 'object') return null;
-        const price = Number(raw.price || raw.regularMarketPrice || 0);
-        const change = Number(raw.change || raw.regularMarketChange || 0);
-        const changePct = Number(raw.changePercent || raw.regularMarketChangePercent || 0);
-        // Yahoo v8 returns cents — if price > 100, divide by 100
-        const normalizedPrice = price > 100 ? price / 100 : price;
-        const normalizedChange = price > 100 ? change / 100 : change;
+        const price = Number(raw.latestSettle || 0);
+        if (price === 0) return null;
+        const change = Number(raw.change || 0);
+        const changePct = Number(raw.changePct || raw.changePct === 0 ? raw.changePct : 0);
+        // Check if market is open: compare latestDate to today
+        const today = new Date().toISOString().split('T')[0];
+        const latestDate = String(raw.latestDate || '');
+        const isToday = latestDate === today;
+        const now = new Date();
+        const hour = now.getUTCHours();
+        // CME grain futures: open Sun 7PM CT - Fri 1:20PM CT
+        // Approximate: market open Mon-Fri 8AM-2PM CT (13:00-19:00 UTC)
+        const isWeekday = now.getUTCDay() >= 1 && now.getUTCDay() <= 5;
+        const isTradingHours = hour >= 13 && hour <= 19;
         return {
-          price: normalizedPrice,
-          change: normalizedChange,
-          changePercent: changePct,
-          marketOpen: Boolean(raw.marketOpen ?? raw.marketState === 'REGULAR'),
+          price,
+          change,
+          changePercent: Number(changePct),
+          marketOpen: isToday && isWeekday && isTradingHours,
         };
       };
 
       setData({
-        corn: parseCommodity(json.corn || json['ZC=F'] || {}),
-        soybeans: parseCommodity(json.soybeans || json['ZS=F'] || {}),
-        wheat: parseCommodity(json.wheat || json['ZW=F'] || {}),
+        corn: parseCommodity(apiData.CORN || apiData.corn || {}),
+        soybeans: parseCommodity(apiData.SOYBEANS || apiData.soybeans || {}),
+        wheat: parseCommodity(apiData.WHEAT || apiData.wheat || {}),
         lastUpdated: new Date().toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
