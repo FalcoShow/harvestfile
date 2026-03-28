@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Stripe Configuration
-// Phase 18A: Stripe Live Mode — 3-Tier Pricing (Starter, Pro, Team)
+// Build 9 Deploy 1: Added Free Tier Limits
 //
 // PRODUCTS (Live Mode):
 //   HarvestFile Starter — prod_UBXj6RqSYOsv43
@@ -21,6 +21,11 @@
 //   STRIPE_STARTER_ANNUAL_PRICE_ID, STRIPE_PRO_MONTHLY_PRICE_ID,
 //   STRIPE_PRO_ANNUAL_PRICE_ID, STRIPE_TEAM_MONTHLY_PRICE_ID,
 //   STRIPE_TEAM_ANNUAL_PRICE_ID
+//
+// WHAT CHANGED (Build 9):
+//   - Added 'free' tier to TIER_LIMITS (3 farmers, 1 user — enough to
+//     demonstrate value, not enough to run a real operation without upgrading)
+//   - Added TRIAL_TIER_LIMITS constant for documentation clarity
 // =============================================================================
 
 import Stripe from 'stripe';
@@ -63,13 +68,23 @@ export function getTierFromPriceId(priceId: string): 'starter' | 'pro' | 'team' 
 // ── Tier limits ─────────────────────────────────────────────────────────────
 // Used by webhook to set organization.max_farmers and organization.max_users
 // when provisioning or upgrading a subscription.
+//
+// BUILD 9: Added 'free' tier for post-trial downgrade. Free tier gets limited
+// access (3 farmers, 1 user) — enough to demonstrate value and keep the farmer
+// in the ecosystem, but not enough to run a real operation without upgrading.
+// This follows the Credit Karma model: free users remain monetizable through
+// the marketplace (crop insurance referrals, farm loan referrals).
 
 export const TIER_LIMITS: Record<string, { max_farmers: number; max_users: number }> = {
+  free: { max_farmers: 3, max_users: 1 },
   starter: { max_farmers: 5, max_users: 1 },
   pro: { max_farmers: 50, max_users: 1 },
   team: { max_farmers: 250, max_users: 3 },
   enterprise: { max_farmers: 99999, max_users: 99999 },
 };
+
+// ── Trial limits (same as Pro during trial period) ──────────────────────────
+export const TRIAL_TIER_LIMITS = TIER_LIMITS.pro;
 
 // ── Helper: Get or create a Stripe customer for a Supabase user ─────────────
 export async function getOrCreateCustomer(

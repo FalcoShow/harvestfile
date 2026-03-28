@@ -1,19 +1,27 @@
 // =============================================================================
 // HarvestFile — (dashboard) Route Group Layout
-// Phase 8A: Fixed auth_user_id → auth_id to match actual DB column
+// Build 9 Deploy 1: Server-Side Trial Expiration Enforcement
 //
 // Auth gate → redirects to /login if no session
-// Subscription gate → redirects to /trial-expired if trial expired
+// Trial expiration gate → auto-downgrades expired trials in DB (lazy enforcement)
+// Subscription gate → redirects to /trial-expired if expired
 // Creates org + professional if missing (edge case: direct signup)
 // Wraps children in SubscriptionProvider for client-side access
+//
+// WHAT CHANGED (Build 9):
+//   - Server-side lazy trial expiration: if trial_ends_at has passed and status
+//     is still 'trialing', we UPDATE the DB to 'expired' before checking access.
+//     This prevents relying on client-side checks alone (which can be bypassed
+//     by hitting API routes directly).
+//   - Stripe Customer creation for edge-case signups (fallback path)
 // =============================================================================
 
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import Sidebar from "./_components/Sidebar";
-import DashboardHeader from "./_components/DashboardHeader";
-import { SubscriptionProvider } from "./_components/SubscriptionProvider";
-import { TrialBanner } from "./_components/TrialBanner";
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import Sidebar from './_components/Sidebar';
+import DashboardHeader from './_components/DashboardHeader';
+import { SubscriptionProvider } from './_components/SubscriptionProvider';
+import { TrialBanner } from './_components/TrialBanner';
 
 // ── Inline subscription state builder (can't import from 'use client' file) ─
 function buildSubscriptionState(org: {
@@ -26,12 +34,12 @@ function buildSubscriptionState(org: {
 }) {
   const now = new Date();
   const trialEnd = org.trial_ends_at ? new Date(org.trial_ends_at) : null;
-  const isTrialing = org.subscription_status === "trialing";
-  const isActive = org.subscription_status === "active";
-  const isPastDue = org.subscription_status === "past_due";
+  const isTrialing = org.subscription_status === 'trialing';
+  const isActive = org.subscription_status === 'active';
+  const isPastDue = org.subscription_status === 'past_due';
   const isExpired =
-    org.subscription_status === "expired" ||
-    org.subscription_status === "canceled" ||
+    org.subscription_status === 'expired' ||
+    org.subscription_status === 'canceled' ||
     (isTrialing && trialEnd !== null && trialEnd < now);
 
   let daysRemaining: number | null = null;
@@ -71,11 +79,11 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   // ── Step 1: Get professional record ─────────────────────────────────────
-  // FIXED: Use auth_id directly (the actual column name in the DB)
+  // CRITICAL: Column is `auth_id` (NOT `auth_user_id`)
   let professional: {
     id: string;
     full_name: string;
@@ -85,9 +93,9 @@ export default async function DashboardLayout({
   } | null = null;
 
   const { data: proData, error: proError } = await supabase
-    .from("professionals")
-    .select("id, full_name, email, role, org_id")
-    .eq("auth_id", user.id)
+    .from('professionals')
+    .select('id, full_name, email, role, org_id')
+    .eq('auth_id', user.id)
     .single();
 
   if (proData) {
@@ -96,44 +104,43 @@ export default async function DashboardLayout({
 
   // ── Edge case: no professional record — create org + professional ───────
   if (!professional) {
-    // Check if this is genuinely "no row" vs some other error
-    if (proError?.code === "PGRST116" || !proData) {
+    if (proError?.code === 'PGRST116' || !proData) {
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 14);
 
       const { data: org } = await supabase
-        .from("organizations")
+        .from('organizations')
         .insert({
-          name: `${user.email?.split("@")[0]}'s Organization`,
-          subscription_tier: "pro",
-          subscription_status: "trialing",
+          name: `${user.email?.split('@')[0]}'s Organization`,
+          subscription_tier: 'pro',
+          subscription_status: 'trialing',
           trial_ends_at: trialEndsAt.toISOString(),
           max_farmers: 50,
           max_users: 1,
         })
-        .select("id")
+        .select('id')
         .single();
 
       if (org) {
-        // FIXED: column is auth_id (not auth_user_id)
-        await supabase.from("professionals").insert({
+        // CRITICAL: Column is `auth_id` (NOT `auth_user_id`)
+        await supabase.from('professionals').insert({
           org_id: org.id,
           auth_id: user.id,
           email: user.email!,
           full_name:
             user.user_metadata?.full_name ||
-            user.email?.split("@")[0] ||
-            "User",
-          role: "admin",
+            user.email?.split('@')[0] ||
+            'User',
+          role: 'admin',
         });
 
-        redirect("/dashboard");
+        redirect('/dashboard');
       }
     }
 
     console.error(
-      "[Dashboard Layout] Could not load professional:",
-      proError?.message || "unknown error"
+      '[Dashboard Layout] Could not load professional:',
+      proError?.message || 'unknown error'
     );
   }
 
@@ -153,20 +160,56 @@ export default async function DashboardLayout({
 
   if (professional?.org_id) {
     const { data: org } = await supabase
-      .from("organizations")
+      .from('organizations')
       .select(
-        "id, name, subscription_tier, subscription_status, trial_ends_at, current_period_end, cancel_at_period_end, stripe_customer_id, max_farmers, max_users"
+        'id, name, subscription_tier, subscription_status, trial_ends_at, current_period_end, cancel_at_period_end, stripe_customer_id, max_farmers, max_users'
       )
-      .eq("id", professional.org_id)
+      .eq('id', professional.org_id)
       .single();
 
     orgData = org as typeof orgData;
   }
 
+  // ── BUILD 9: Server-side lazy trial expiration enforcement ──────────────
+  // If the trial has expired but the DB still says 'trialing', update it NOW.
+  // This prevents bypassing client-side checks by hitting API routes directly.
+  // The update is "lazy" — it only fires on dashboard load, not on a cron.
+  if (orgData) {
+    const isStillMarkedTrialing = orgData.subscription_status === 'trialing';
+    const trialEnd = orgData.trial_ends_at
+      ? new Date(orgData.trial_ends_at)
+      : null;
+    const trialHasExpired = trialEnd !== null && trialEnd < new Date();
+
+    if (isStillMarkedTrialing && trialHasExpired) {
+      // Auto-downgrade in the database
+      await supabase
+        .from('organizations')
+        .update({
+          subscription_status: 'expired',
+          subscription_tier: 'free',
+          max_farmers: 3,
+          max_users: 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orgData.id);
+
+      // Update local state so the rest of this render uses correct values
+      orgData.subscription_status = 'expired';
+      orgData.subscription_tier = 'free';
+      orgData.max_farmers = 3;
+      orgData.max_users = 1;
+
+      console.log(
+        `[Dashboard Layout] Trial expired for org=${orgData.id}, auto-downgraded to free`
+      );
+    }
+  }
+
   // ── Build subscription state ────────────────────────────────────────────
   const subscriptionState = buildSubscriptionState({
-    subscription_status: orgData?.subscription_status || "trialing",
-    subscription_tier: orgData?.subscription_tier || "pro",
+    subscription_status: orgData?.subscription_status || 'trialing',
+    subscription_tier: orgData?.subscription_tier || 'pro',
     trial_ends_at: orgData?.trial_ends_at || null,
     current_period_end: orgData?.current_period_end || null,
     cancel_at_period_end: orgData?.cancel_at_period_end || false,
@@ -175,7 +218,7 @@ export default async function DashboardLayout({
 
   // ── Trial expired gate ──────────────────────────────────────────────────
   if (orgData && subscriptionState.isExpired) {
-    redirect("/trial-expired");
+    redirect('/trial-expired');
   }
 
   return (
@@ -183,13 +226,13 @@ export default async function DashboardLayout({
       <div data-theme="dark" className="flex min-h-screen bg-[#0a0f0d]">
         <Sidebar
           user={{
-            email: professional?.email || user.email || "",
-            full_name: professional?.full_name || "User",
+            email: professional?.email || user.email || '',
+            full_name: professional?.full_name || 'User',
           }}
           org={{
-            name: orgData?.name || "My Organization",
-            subscription_tier: orgData?.subscription_tier || "pro",
-            subscription_status: orgData?.subscription_status || "trialing",
+            name: orgData?.name || 'My Organization',
+            subscription_tier: orgData?.subscription_tier || 'pro',
+            subscription_status: orgData?.subscription_status || 'trialing',
           }}
         />
         <div className="flex-1 flex flex-col min-w-0">

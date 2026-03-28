@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Stripe Checkout Session Creator
-// Phase 18A: Live Mode — 3-Tier Pricing (Starter, Pro, Team)
+// Build 9 Deploy 1: Use Existing Stripe Customer from Organization
 //
 // Creates a Stripe Checkout Session for the authenticated user.
 // Supports: starter_monthly, starter_annual, pro_monthly, pro_annual,
@@ -8,6 +8,13 @@
 //
 // Auth chain: auth.users → professionals (auth_id) → organizations (org_id)
 // CRITICAL: professionals table uses `auth_id` column, NOT `auth_user_id`
+//
+// WHAT CHANGED (Build 9):
+//   - Checks org for existing stripe_customer_id FIRST before creating new one.
+//     Since Build 9 creates Stripe Customer at signup, most users will already
+//     have one. This prevents duplicate Stripe customers.
+//   - On successful checkout redirect, updates subscription_status immediately
+//     (webhook is the source of truth, but this gives instant UI feedback)
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -54,25 +61,42 @@ export async function POST(request: Request) {
 
     const orgId = professional.org_id;
 
-    // ── Get or create Stripe customer ─────────────────────────────────────
-    const customerId = await getOrCreateCustomer(
-      user.email!,
-      user.id,
-      user.user_metadata?.full_name
-    );
-
-    // Store Stripe customer ID on the organization
-    await supabase
+    // ── BUILD 9: Use existing Stripe customer if available ────────────────
+    // Since we now create Stripe Customer at signup, most users will have one.
+    // Fall back to getOrCreateCustomer only if org doesn't have one yet.
+    const { data: orgData } = await supabase
       .from('organizations')
-      .update({
-        stripe_customer_id: customerId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', orgId);
+      .select('stripe_customer_id')
+      .eq('id', orgId)
+      .single();
+
+    let customerId: string;
+
+    if (orgData?.stripe_customer_id) {
+      // Use existing customer — no duplicate creation
+      customerId = orgData.stripe_customer_id;
+    } else {
+      // Fallback: create Stripe customer (covers pre-Build-9 signups)
+      customerId = await getOrCreateCustomer(
+        user.email!,
+        user.id,
+        user.user_metadata?.full_name
+      );
+
+      // Store Stripe customer ID on the organization
+      await supabase
+        .from('organizations')
+        .update({
+          stripe_customer_id: customerId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orgId);
+    }
 
     // ── Create Stripe Checkout Session ────────────────────────────────────
     // NO trial_period_days — the user is already in a database-tracked trial
-    // When they subscribe, they're upgrading to a paid plan immediately
+    // (or their trial has expired and they're upgrading to paid).
+    // When they subscribe, they're paying immediately.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
