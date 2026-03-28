@@ -1,19 +1,18 @@
 // =============================================================================
 // HarvestFile — (dashboard) Route Group Layout
-// Build 9 Deploy 1: Server-Side Trial Expiration Enforcement
+// Build 9 Deploy 1 HOTFIX: Stripe Customer on ALL signup paths
 //
 // Auth gate → redirects to /login if no session
 // Trial expiration gate → auto-downgrades expired trials in DB (lazy enforcement)
 // Subscription gate → redirects to /trial-expired if expired
-// Creates org + professional if missing (edge case: direct signup)
+// Creates org + professional if missing (edge case: email/password signup)
 // Wraps children in SubscriptionProvider for client-side access
 //
-// WHAT CHANGED (Build 9):
-//   - Server-side lazy trial expiration: if trial_ends_at has passed and status
-//     is still 'trialing', we UPDATE the DB to 'expired' before checking access.
-//     This prevents relying on client-side checks alone (which can be bypassed
-//     by hitting API routes directly).
-//   - Stripe Customer creation for edge-case signups (fallback path)
+// HOTFIX: The edge-case org creation path (for email/password signups) was
+// missing Stripe Customer creation. Google OAuth signups go through
+// app/auth/callback/route.ts which has Stripe Customer creation, but
+// email/password signups skip that route entirely and land here.
+// Now BOTH paths create a Stripe Customer at signup.
 // =============================================================================
 
 import { redirect } from 'next/navigation';
@@ -103,6 +102,7 @@ export default async function DashboardLayout({
   }
 
   // ── Edge case: no professional record — create org + professional ───────
+  // This path fires for email/password signups (which skip the OAuth callback)
   if (!professional) {
     if (proError?.code === 'PGRST116' || !proData) {
       const trialEndsAt = new Date();
@@ -133,6 +133,32 @@ export default async function DashboardLayout({
             'User',
           role: 'admin',
         });
+
+        // ── HOTFIX: Create Stripe Customer for email/password signups ──
+        // Google OAuth signups create the Stripe Customer in the callback
+        // route, but email/password signups skip that route entirely and
+        // land here. This ensures ALL signup paths create a Stripe Customer.
+        // Non-blocking: if Stripe fails, the signup still works and the
+        // checkout route will create the customer when the user upgrades.
+        try {
+          const { getOrCreateCustomer } = await import('@/lib/stripe');
+          const stripeCustomerId = await getOrCreateCustomer(
+            user.email!,
+            user.id,
+            user.user_metadata?.full_name
+          );
+
+          await supabase
+            .from('organizations')
+            .update({
+              stripe_customer_id: stripeCustomerId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', org.id);
+        } catch (stripeErr) {
+          // Non-fatal: trial works without Stripe customer
+          console.error('[Dashboard Layout] Stripe customer creation failed:', stripeErr);
+        }
 
         redirect('/dashboard');
       }
@@ -170,10 +196,34 @@ export default async function DashboardLayout({
     orgData = org as typeof orgData;
   }
 
+  // ── BUILD 9: Backfill Stripe Customer for existing orgs without one ────
+  // This catches users who signed up before Build 9 or whose Stripe Customer
+  // creation failed on their original signup. Runs once per dashboard load
+  // until the org has a stripe_customer_id.
+  if (orgData && !orgData.stripe_customer_id && user.email) {
+    try {
+      const { getOrCreateCustomer } = await import('@/lib/stripe');
+      const stripeCustomerId = await getOrCreateCustomer(
+        user.email,
+        user.id,
+        user.user_metadata?.full_name
+      );
+
+      await supabase
+        .from('organizations')
+        .update({
+          stripe_customer_id: stripeCustomerId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orgData.id);
+
+      orgData.stripe_customer_id = stripeCustomerId;
+    } catch (stripeErr) {
+      console.error('[Dashboard Layout] Stripe customer backfill failed:', stripeErr);
+    }
+  }
+
   // ── BUILD 9: Server-side lazy trial expiration enforcement ──────────────
-  // If the trial has expired but the DB still says 'trialing', update it NOW.
-  // This prevents bypassing client-side checks by hitting API routes directly.
-  // The update is "lazy" — it only fires on dashboard load, not on a cron.
   if (orgData) {
     const isStillMarkedTrialing = orgData.subscription_status === 'trialing';
     const trialEnd = orgData.trial_ends_at
@@ -182,7 +232,6 @@ export default async function DashboardLayout({
     const trialHasExpired = trialEnd !== null && trialEnd < new Date();
 
     if (isStillMarkedTrialing && trialHasExpired) {
-      // Auto-downgrade in the database
       await supabase
         .from('organizations')
         .update({
@@ -194,7 +243,6 @@ export default async function DashboardLayout({
         })
         .eq('id', orgData.id);
 
-      // Update local state so the rest of this render uses correct values
       orgData.subscription_status = 'expired';
       orgData.subscription_tier = 'free';
       orgData.max_farmers = 3;
