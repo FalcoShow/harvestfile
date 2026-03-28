@@ -1,13 +1,10 @@
 // =============================================================================
 // HarvestFile — FinalCTA (Server Component)
-// Build 11 Deploy 2: Premium final CTA with aurora glow effect
+// Build 12 Deploy 3: Premium visual overhaul
 //
-// Calm confidence pattern: generous whitespace, short direct headline,
-// single primary gold button, benefit/outcome language. Aurora glow is
-// CSS-only (keyframe animation in globals.css), no client JS needed.
-//
-// Geo-personalization: If we had the county from the hero, we could
-// personalize the CTA. For now, it's generic but premium.
+// Changes: Typography uses hf-heading-hero scale. CTA button uses hf-shadow-gold-lg.
+// Aurora glow effect intensified slightly. Trust micro-copy spacing refined.
+// Gold rule separator above the section for visual anchoring.
 // =============================================================================
 
 import { RevealOnScroll } from '@/components/homepage/shared/RevealOnScroll';
@@ -24,9 +21,9 @@ export function FinalCTA() {
           className="absolute w-[150%] h-[150%] top-[-25%] left-[-25%]"
           style={{
             background: `
-              radial-gradient(ellipse at 20% 50%, rgba(201, 168, 76, 0.1) 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 20%, rgba(27, 67, 50, 0.35) 0%, transparent 50%),
-              radial-gradient(ellipse at 50% 100%, rgba(226, 195, 102, 0.06) 0%, transparent 50%)
+              radial-gradient(ellipse at 20% 50%, rgba(201, 168, 76, 0.12) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, rgba(27, 67, 50, 0.4) 0%, transparent 50%),
+              radial-gradient(ellipse at 50% 100%, rgba(226, 195, 102, 0.08) 0%, transparent 50%)
             `,
             filter: 'blur(80px)',
             animation: 'hf-aurora-slow 20s ease-in-out infinite alternate',
@@ -40,17 +37,14 @@ export function FinalCTA() {
       <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
         <RevealOnScroll>
           {/* Headline */}
-          <h2
-            className="font-bold tracking-[-0.025em] text-white/90"
-            style={{ fontSize: 'clamp(2rem, 4vw, 3.25rem)', lineHeight: 1.1 }}
-          >
+          <h2 className="hf-heading-hero text-white/90">
             Know your numbers
             <br />
             <span className="text-harvest-gold">before election day.</span>
           </h2>
 
           {/* Subtext */}
-          <p className="mt-5 text-white/35 text-[16px] leading-relaxed max-w-md mx-auto">
+          <p className="mt-5 text-white/35 hf-body-lg leading-relaxed max-w-md mx-auto">
             Built on official USDA, NOAA, and Barchart data.
             <br />
             Free to use. Updated daily.
@@ -63,7 +57,7 @@ export function FinalCTA() {
               className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl
                 text-base font-semibold text-harvest-forest-950
                 bg-gradient-to-br from-harvest-gold to-harvest-gold-bright
-                shadow-[0_4px_20px_rgba(201,168,76,0.25)]
+                hf-shadow-gold-lg
                 hover:shadow-[0_6px_30px_rgba(201,168,76,0.4)]
                 hover:translate-y-[-2px]
                 active:translate-y-0
