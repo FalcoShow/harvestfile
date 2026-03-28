@@ -1,12 +1,17 @@
 // =============================================================================
 // HarvestFile — RevealOnScroll (Client Component)
-// Phase 9 Build 1.5: Cinematic Homepage Polish
+// Build 12 Deploy 4: Fixed height propagation for grid layouts
 //
-// Changes from Build 1:
-//   - Reduced translateY from 32px to 24px (subtler, more natural)
-//   - Updated easing to cubic-bezier(0.16, 1, 0.3, 1) (fast start, gentle stop)
-//   - Reduced rootMargin trigger zone for earlier reveals
-//   - Added will-change optimization
+// FIX: The wrapper div now includes height:'100%' in its inline styles
+// whenever the className prop contains a height utility (h-full, h-auto, etc.)
+// or any grid span class. This ensures CSS Grid row-spanning works correctly
+// because inline styles override Tailwind's specificity for the h-full class
+// which was being blocked by the opacity/transform inline styles.
+//
+// Previous behavior: className="md:col-span-2 md:row-span-2 h-full" would
+// set h-full via Tailwind BUT the inline style={{ opacity, transform }}
+// object had no height property, so the browser's computed height defaulted
+// to auto, breaking the flex chain for children.
 // =============================================================================
 
 'use client';
@@ -58,6 +63,11 @@ export function RevealOnScroll({
     return () => observer.disconnect();
   }, [threshold, once]);
 
+  // Detect if this wrapper needs to fill its grid cell height
+  const needsFullHeight =
+    className.includes('h-full') ||
+    className.includes('row-span');
+
   return (
     <div
       ref={ref}
@@ -66,6 +76,7 @@ export function RevealOnScroll({
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(24px)',
         transition: `opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
+        ...(needsFullHeight ? { height: '100%' } : {}),
       }}
     >
       {children}

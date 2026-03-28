@@ -229,7 +229,7 @@ export function BentoShowcase() {
         </RevealOnScroll>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <RevealOnScroll delay={0} className="md:col-span-2 md:row-span-2 [&>div]:h-full">
+          <RevealOnScroll delay={0} className="md:col-span-2 md:row-span-2">
             <BentoCard className="p-5 md:p-6 flex flex-col" variant="accent">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
                 <div className="w-8 h-8 rounded-lg bg-harvest-gold/10 flex items-center justify-center"><SunriseIcon /></div>
