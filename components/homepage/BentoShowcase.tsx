@@ -96,7 +96,7 @@ function BentoCard({
           background: 'radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.05) 0%, transparent 70%)',
         }}
       />
-      <div className="relative z-10 h-full">{children}</div>
+      <div className="relative z-10 h-full flex flex-col">{children}</div>
     </div>
   );
 }
