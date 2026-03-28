@@ -1,30 +1,35 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Build 11 Deploy 1: Geo-Personalized Homepage That Shows The Product Working
+// Build 11 Deploy 2: Premium Product Showcase Sections
 //
 // ASYNC Server Component — reads Vercel IP geolocation headers, resolves the
-// visitor's county (~200ms), and passes personalized data to the new hero.
+// visitor's county (~200ms), and passes personalized data to the hero.
 //
-// Section order:
-//   CHAPTER 1 (Dark):  NEW Hero w/ live data cards → Market Ticker → Election Map
-//   CHAPTER 2 (Cream): Features → How It Works → AI Report → Social Proof
-//   CHAPTER 3 (Dark):  Benchmark Teaser → Final CTA
+// Section order (Deploy 2):
+//   CHAPTER 1 (Dark):  Hero → Market Ticker → Election Map → Trust Bar → Bento
+//   CHAPTER 2 (Cream): Tabbed Showcase → How It Works
+//   CHAPTER 3 (Dark):  Data Confidence → Final CTA
 //
-// Performance: The hero shell renders instantly. Live data cards stream in via
+// What changed from Deploy 1:
+//   REMOVED: FeatureShowcase, old HowItWorks, ReportProduct, SocialProof,
+//            BenchmarkTeaser, old FinalCTA
+//   ADDED:   TrustBar, BentoShowcase, TabbedShowcase, HowItWorks (new),
+//            DataConfidence, FinalCTA (new)
+//
+// Performance: Hero shell renders instantly. Live data cards stream via
 // Suspense. Everything below the hero renders immediately (static sections).
-// Total blocking time: ~200ms for county resolution. LCP target: <2.5s on LTE.
 // =============================================================================
 
 import { headers } from 'next/headers';
 import { HeroSection } from '@/components/homepage/HeroSection';
 import { MarketTicker } from '@/components/homepage/MarketTicker';
 import { ElectionMapTeaser } from '@/components/homepage/ElectionMapTeaser';
-import { FeatureShowcase } from '@/components/homepage/FeatureShowcase';
-import { HowItWorks } from '@/components/homepage/HowItWorks';
-import { BenchmarkTeaser } from '@/components/homepage/BenchmarkTeaser';
-import { ReportProduct } from '@/components/homepage/ReportProduct';
-import { SocialProof } from '@/components/homepage/SocialProof';
-import { FinalCTA } from '@/components/homepage/FinalCTA';
+import { TrustBar } from '@/components/homepage/TrustBar';
+import { BentoShowcase } from '@/components/homepage/BentoShowcase';
+import { TabbedShowcase } from '@/components/homepage/TabbedShowcase';
+import { HowItWorks } from '@/components/homepage/HowItWorksNew';
+import { DataConfidence } from '@/components/homepage/DataConfidence';
+import { FinalCTA } from '@/components/homepage/FinalCTANew';
 
 // Force dynamic — every visitor gets geo-personalized content
 export const dynamic = 'force-dynamic';
@@ -54,7 +59,6 @@ async function resolveVisitorCounty(
   lng: number,
 ): Promise<ResolvedCounty | null> {
   try {
-    // Import the same resolver used by /api/geo/detect
     const { resolveCountyFromCoords } = await import(
       '@/lib/geo/county-resolver'
     );
@@ -65,37 +69,16 @@ async function resolveVisitorCounty(
   }
 }
 
-// ─── Section Separators (unchanged from Build 7) ────────────────────────────
+// ─── Section Transitions ────────────────────────────────────────────────────
 
 function DarkGoldSeparator() {
   return (
-    <div
-      className="mx-auto max-w-[1000px] px-6"
-      aria-hidden="true"
-    >
+    <div className="mx-auto max-w-[1000px] px-6" aria-hidden="true">
       <div
         className="h-[1px]"
         style={{
           background:
             'linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.2) 20%, rgba(201,168,76,0.35) 50%, rgba(201,168,76,0.2) 80%, transparent 100%)',
-        }}
-      />
-    </div>
-  );
-}
-
-function GoldSeparator() {
-  return (
-    <div
-      className="mx-auto max-w-[1100px] px-6"
-      style={{ background: '#F5F0E6' }}
-      aria-hidden="true"
-    >
-      <div
-        className="h-[1px]"
-        style={{
-          background:
-            'linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.15) 20%, rgba(201,168,76,0.25) 50%, rgba(201,168,76,0.15) 80%, transparent 100%)',
         }}
       />
     </div>
@@ -182,7 +165,6 @@ export default async function Home() {
   let lng: number | undefined;
   let detected = false;
 
-  // Only resolve for US visitors with valid coords
   if (
     ipLat &&
     ipLng &&
@@ -206,7 +188,9 @@ export default async function Home() {
 
   return (
     <>
-      {/* CHAPTER 1 — DARK: Hero → Market Ticker → Election Map */}
+      {/* ═══════════════════════════════════════════════════════════════════════
+          CHAPTER 1 — DARK: Hero → Ticker → Map → Trust → Bento Showcase
+          ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
         <HeroSection
           countyFips={county?.countyFips}
@@ -221,26 +205,29 @@ export default async function Home() {
         <MarketTicker />
         <DarkGoldSeparator />
         <ElectionMapTeaser />
+        <DarkGoldSeparator />
+        <TrustBar />
+        <DarkGoldSeparator />
+        <BentoShowcase />
       </div>
 
       <DarkToLightTransition />
 
-      {/* CHAPTER 2 — UNIFIED GOLDEN CREAM: Features + How It Works + Report + Trust */}
+      {/* ═══════════════════════════════════════════════════════════════════════
+          CHAPTER 2 — CREAM: Tabbed Product Showcase → How It Works
+          ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="light" style={{ background: '#F5F0E6' }}>
-        <FeatureShowcase />
-        <GoldSeparator />
+        <TabbedShowcase />
         <HowItWorks />
-        <GoldSeparator />
-        <ReportProduct />
-        <GoldSeparator />
-        <SocialProof />
       </div>
 
       <LightToDarkTransition />
 
-      {/* CHAPTER 3 — DARK: Benchmark + Final CTA */}
+      {/* ═══════════════════════════════════════════════════════════════════════
+          CHAPTER 3 — DARK: Data Confidence → Final CTA
+          ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
-        <BenchmarkTeaser />
+        <DataConfidence />
         <DarkGoldSeparator />
         <FinalCTA />
       </div>

@@ -757,3 +757,42 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.12);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   BUILD 11 DEPLOY 2: New Animations
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tabbed Showcase: Tab content enter animation ─────────────────────────── */
+@keyframes hf-tab-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Tabbed Showcase: Progress bar fill for auto-advancing tabs ────────────── */
+@keyframes hf-tab-progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* ── Final CTA: Slow aurora drift background ──────────────────────────────── */
+@keyframes hf-aurora-slow {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(30px, -20px) rotate(3deg);
+  }
+  100% {
+    transform: translate(-20px, 15px) rotate(-2deg);
+  }
+}
