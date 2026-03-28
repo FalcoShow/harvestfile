@@ -359,14 +359,14 @@ function parseWeatherResponse(data: any): WeatherData | null {
 
   // Build current conditions from today's data
   const current = {
-    temp: Math.round(today.temp_max ?? today.temperature_2m_max ?? 72),
-    feelsLike: Math.round(today.apparent_temperature_max ?? today.temp_max ?? 72),
-    humidity: Math.round(today.relative_humidity_2m_mean ?? 65),
-    windSpeed: Math.round(today.wind_speed_10m_max ?? today.windspeed_10m_max ?? 8),
+    temp: Math.round(today.temp_max_f ?? today.temp_max ?? today.temperature_2m_max ?? 72),
+    feelsLike: Math.round(today.apparent_temperature_max ?? today.temp_max_f ?? today.temp_max ?? 72),
+    humidity: Math.round(today.humidity_mean ?? today.relative_humidity_2m_mean ?? 65),
+    windSpeed: Math.round(today.wind_speed_max_mph ?? today.wind_speed_10m_max ?? today.windspeed_10m_max ?? 8),
     windDir: windDirections[Math.round((today.wind_direction_10m_dominant ?? 0) / 22.5) % 16],
     weatherCode: today.weather_code ?? today.weathercode ?? 0,
-    description: getWeatherDescription(today.weather_code ?? today.weathercode ?? 0),
-    precip: today.precipitation_sum ?? 0,
+    description: today.conditions || getWeatherDescription(today.weather_code ?? today.weathercode ?? 0),
+    precip: today.precipitation_mm ?? today.precipitation_sum ?? 0,
   };
 
   const parsedDaily = daily.slice(0, 5).map((d: any, i: number) => {
@@ -374,12 +374,12 @@ function parseWeatherResponse(data: any): WeatherData | null {
     return {
       date: d.date || d.time,
       dayName: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' }),
-      high: Math.round(d.temp_max ?? d.temperature_2m_max ?? 72),
-      low: Math.round(d.temp_min ?? d.temperature_2m_min ?? 55),
+      high: Math.round(d.temp_max_f ?? d.temp_max ?? d.temperature_2m_max ?? 72),
+      low: Math.round(d.temp_min_f ?? d.temp_min ?? d.temperature_2m_min ?? 55),
       weatherCode: d.weather_code ?? d.weathercode ?? 0,
-      precipProb: Math.round(d.precipitation_probability_max ?? d.precip_probability ?? 0),
-      precipSum: d.precipitation_sum ?? 0,
-      windMax: Math.round(d.wind_speed_10m_max ?? d.windspeed_10m_max ?? 8),
+      precipProb: Math.round(d.precipitation_probability ?? d.precipitation_probability_max ?? d.precip_probability ?? 0),
+      precipSum: d.precipitation_mm ?? d.precipitation_sum ?? 0,
+      windMax: Math.round(d.wind_speed_max_mph ?? d.wind_speed_10m_max ?? d.windspeed_10m_max ?? 8),
       gdd: Math.round(d.gdd_base50 ?? 0),
     };
   });
