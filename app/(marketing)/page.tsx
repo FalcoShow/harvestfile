@@ -1,23 +1,20 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Build 11 Deploy 2: Premium Product Showcase Sections
+// Build 12 Deploy 2: Cream + Dark HowItWorks restructure
 //
 // ASYNC Server Component — reads Vercel IP geolocation headers, resolves the
 // visitor's county (~200ms), and passes personalized data to the hero.
 //
-// Section order (Deploy 2):
+// Section order (Build 12):
 //   CHAPTER 1 (Dark):  Hero → Market Ticker → Election Map → Trust Bar → Bento
-//   CHAPTER 2 (Cream): Tabbed Showcase → How It Works
-//   CHAPTER 3 (Dark):  Data Confidence → Final CTA
+//   CHAPTER 2 (Cream): Tabbed Showcase  [noise texture + ambient glow]
+//   CHAPTER 3 (Dark):  How It Works → Data Confidence → Final CTA
 //
-// What changed from Deploy 1:
-//   REMOVED: FeatureShowcase, old HowItWorks, ReportProduct, SocialProof,
-//            BenchmarkTeaser, old FinalCTA
-//   ADDED:   TrustBar, BentoShowcase, TabbedShowcase, HowItWorks (new),
-//            DataConfidence, FinalCTA (new)
-//
-// Performance: Hero shell renders instantly. Live data cards stream via
-// Suspense. Everything below the hero renders immediately (static sections).
+// What changed from Build 12 Deploy 1:
+//   - HowItWorks moved from cream chapter to dark chapter (component is now
+//     dark-themed with gold step circles and glass cards)
+//   - Cream section is now just TabbedShowcase — shorter, doesn't overstay
+//   - Gold separator between HowItWorks and DataConfidence
 // =============================================================================
 
 import { headers } from 'next/headers';
@@ -89,7 +86,7 @@ function DarkToLightTransition() {
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ height: '100px', background: '#F5F0E6' }}
+      style={{ height: '120px', background: '#F5F0E6' }}
       aria-hidden="true"
     >
       <div
@@ -107,10 +104,10 @@ function DarkToLightTransition() {
       <div
         className="absolute left-0 right-0 z-10"
         style={{
-          top: '50%',
+          top: '55%',
           height: '1px',
           background:
-            'linear-gradient(90deg, transparent 8%, rgba(201,168,76,0.3) 25%, rgba(201,168,76,0.5) 50%, rgba(201,168,76,0.3) 75%, transparent 92%)',
+            'linear-gradient(90deg, transparent 8%, rgba(201,168,76,0.25) 25%, rgba(201,168,76,0.45) 50%, rgba(201,168,76,0.25) 75%, transparent 92%)',
         }}
       />
     </div>
@@ -121,7 +118,7 @@ function LightToDarkTransition() {
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ height: '100px', background: '#0C1F17' }}
+      style={{ height: '120px', background: '#0C1F17' }}
       aria-hidden="true"
     >
       <div
@@ -139,10 +136,10 @@ function LightToDarkTransition() {
       <div
         className="absolute left-0 right-0 z-10"
         style={{
-          top: '50%',
+          top: '45%',
           height: '1px',
           background:
-            'linear-gradient(90deg, transparent 8%, rgba(201,168,76,0.3) 25%, rgba(201,168,76,0.5) 50%, rgba(201,168,76,0.3) 75%, transparent 92%)',
+            'linear-gradient(90deg, transparent 8%, rgba(201,168,76,0.25) 25%, rgba(201,168,76,0.45) 50%, rgba(201,168,76,0.25) 75%, transparent 92%)',
         }}
       />
     </div>
@@ -214,19 +211,26 @@ export default async function Home() {
       <DarkToLightTransition />
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          CHAPTER 2 — CREAM: Tabbed Product Showcase → How It Works
+          CHAPTER 2 — CREAM: Tabbed Product Showcase
+          hf-section-cream auto-applies noise texture + warm radial glow.
+          Content uses relative z-10 to sit above the pseudo-elements.
           ═══════════════════════════════════════════════════════════════════════ */}
-      <div data-nav-theme="light" style={{ background: '#F5F0E6' }}>
-        <TabbedShowcase />
-        <HowItWorks />
+      <div data-nav-theme="light" className="hf-section-cream">
+        <div className="relative z-10">
+          <TabbedShowcase />
+        </div>
       </div>
 
       <LightToDarkTransition />
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          CHAPTER 3 — DARK: Data Confidence → Final CTA
+          CHAPTER 3 — DARK: How It Works → Data Confidence → Final CTA
+          HowItWorks sets its own bg-harvest-forest-950 with gold accents.
+          It flows seamlessly into DataConfidence (same dark bg).
           ═══════════════════════════════════════════════════════════════════════ */}
       <div data-nav-theme="dark" className="bg-harvest-forest-950">
+        <HowItWorks />
+        <DarkGoldSeparator />
         <DataConfidence />
         <DarkGoldSeparator />
         <FinalCTA />

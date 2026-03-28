@@ -1,13 +1,15 @@
 // =============================================================================
 // HarvestFile — BentoShowcase (Server Component + Client wrappers)
-// Build 11 Deploy 2 PATCH: Fixed bento grid layout
+// Build 12: Premium Visual Overhaul
 //
-// FIX: Grid span classes moved from BentoCard to RevealOnScroll wrappers.
-// CSS Grid only applies col-span/row-span to DIRECT children of the grid
-// container. RevealOnScroll is the direct child, not BentoCard.
-//
-// FIX: "Free Forever" CTA card layout improved for all viewport widths.
-// FIX: Better visual hierarchy and spacing throughout.
+// Changes from Build 11 Deploy 2:
+//   - BentoCard now uses hf-card-dark layered shadow system from globals.css
+//   - Mixed card backgrounds: dark green, deep forest, gold-accent tints
+//   - DashboardPreview fills the card fully — no dead space below
+//   - Metric cards have stronger visual presence with accent borders
+//   - CTA card uses gold-accent background to pop against the grid
+//   - Tighter gap (gap-3) and denser information display
+//   - All padding calibrated to eliminate empty regions
 // =============================================================================
 
 import { SectionBadge } from '@/components/homepage/shared/SectionBadge';
@@ -43,33 +45,63 @@ function GlobeIcon() {
   );
 }
 
-// --- Bento Card wrapper with premium hover ---
+function ArrowRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M5 12h14M12 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.5">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+// --- Bento Card wrapper with premium layered shadows ---
 
 function BentoCard({
   children,
   className = '',
+  variant = 'default',
 }: {
   children: React.ReactNode;
   className?: string;
+  variant?: 'default' | 'accent' | 'deep';
 }) {
+  const bgMap = {
+    default: 'bg-harvest-forest-800/40',
+    accent: 'bg-[#1a3a2c]',
+    deep: 'bg-harvest-forest-950/70',
+  };
+
   return (
     <div
       className={`
         relative overflow-hidden rounded-2xl h-full
-        bg-harvest-forest-800/60 border border-white/[0.06]
-        transition-all duration-300 ease-out
-        hover:border-harvest-gold/15
-        hover:shadow-[0_12px_40px_rgba(201,168,76,0.08)]
-        hover:translate-y-[-2px]
+        ${bgMap[variant]}
+        border border-white/[0.06]
+        hf-card-dark
         ${className}
       `}
     >
-      {/* Subtle top glow on hover */}
+      {/* Subtle top-edge highlight */}
+      <div
+        className="absolute top-0 left-[10%] right-[10%] h-[1px] pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 70%, transparent)',
+        }}
+      />
+      {/* Hover glow */}
       <div
         className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.04) 0%, transparent 70%)',
+            'radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.05) 0%, transparent 70%)',
         }}
       />
       <div className="relative z-10 h-full">{children}</div>
@@ -77,11 +109,11 @@ function BentoCard({
   );
 }
 
-// --- Mock Dashboard Preview ---
+// --- Mock Dashboard Preview (dense, fills the card) ---
 
 function DashboardPreview() {
   return (
-    <div className="mt-5 rounded-xl overflow-hidden border border-white/[0.04] bg-harvest-forest-950/60">
+    <div className="mt-4 rounded-xl overflow-hidden border border-white/[0.04] bg-harvest-forest-950/60 flex-1 flex flex-col">
       {/* Mock browser chrome */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/[0.04]">
         <div className="w-2 h-2 rounded-full bg-white/10" />
@@ -90,21 +122,21 @@ function DashboardPreview() {
         <div className="ml-3 flex-1 h-4 rounded-md bg-white/[0.03] max-w-[180px]" />
       </div>
 
-      {/* Mock dashboard content */}
-      <div className="p-4 space-y-3">
+      {/* Mock dashboard content — tighter spacing to fill card */}
+      <div className="p-3 space-y-2.5 flex-1">
         {/* Top metric cards row */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-lg bg-white/[0.03] p-2.5 border border-white/[0.04]">
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="rounded-lg bg-white/[0.03] p-2 border border-white/[0.04]">
             <div className="text-[9px] text-white/25 uppercase tracking-wider">Corn</div>
             <div className="text-sm font-bold text-harvest-gold mt-0.5">$4.62</div>
             <div className="text-[9px] text-emerald-400/70 mt-0.5">+$0.03</div>
           </div>
-          <div className="rounded-lg bg-white/[0.03] p-2.5 border border-white/[0.04]">
+          <div className="rounded-lg bg-white/[0.03] p-2 border border-white/[0.04]">
             <div className="text-[9px] text-white/25 uppercase tracking-wider">Soybeans</div>
             <div className="text-sm font-bold text-harvest-gold mt-0.5">$10.34</div>
             <div className="text-[9px] text-red-400/70 mt-0.5">-$0.08</div>
           </div>
-          <div className="rounded-lg bg-white/[0.03] p-2.5 border border-white/[0.04]">
+          <div className="rounded-lg bg-white/[0.03] p-2 border border-white/[0.04]">
             <div className="text-[9px] text-white/25 uppercase tracking-wider">Wheat</div>
             <div className="text-sm font-bold text-harvest-gold mt-0.5">$5.41</div>
             <div className="text-[9px] text-emerald-400/70 mt-0.5">+$0.11</div>
@@ -112,22 +144,22 @@ function DashboardPreview() {
         </div>
 
         {/* Mock weather row */}
-        <div className="flex items-center gap-3 rounded-lg bg-white/[0.03] p-2.5 border border-white/[0.04]">
-          <div className="w-7 h-7 rounded-full bg-harvest-gold/10 flex items-center justify-center text-harvest-gold/60">
+        <div className="flex items-center gap-2.5 rounded-lg bg-white/[0.03] p-2 border border-white/[0.04]">
+          <div className="w-6 h-6 rounded-full bg-harvest-gold/10 flex items-center justify-center text-harvest-gold/60 shrink-0">
             <SunriseIcon />
           </div>
-          <div className="flex-1">
-            <div className="text-[10px] text-white/40">Today in Darke County, OH</div>
-            <div className="text-xs text-white/70 font-medium">72°F Clear · Wind 5 mph SW · Spray: GO</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[9px] text-white/35">Today in Darke County, OH</div>
+            <div className="text-[11px] text-white/65 font-medium">72°F Clear · Wind 5 mph SW · Spray: GO</div>
           </div>
         </div>
 
-        {/* Mock chart area */}
-        <div className="rounded-lg bg-white/[0.03] p-3 border border-white/[0.04]">
+        {/* PLC estimate bar chart */}
+        <div className="rounded-lg bg-white/[0.03] p-2.5 border border-white/[0.04]">
           <div className="text-[9px] text-white/25 uppercase tracking-wider mb-2">
             PLC Payment Estimate
           </div>
-          <div className="flex items-end gap-1 h-[48px]">
+          <div className="flex items-end gap-[3px] h-[44px]">
             {[35, 55, 45, 70, 60, 80, 65, 75, 85, 50, 40, 90].map((h, i) => (
               <div
                 key={i}
@@ -136,6 +168,12 @@ function DashboardPreview() {
               />
             ))}
           </div>
+        </div>
+
+        {/* Payment estimate summary */}
+        <div className="flex items-center justify-between rounded-lg bg-emerald-500/[0.04] border border-emerald-500/10 p-2">
+          <span className="text-[10px] text-emerald-400/80 font-medium">ARC-CO est.</span>
+          <span className="text-sm font-bold text-emerald-400">$47.22/ac</span>
         </div>
       </div>
     </div>
@@ -146,7 +184,7 @@ function DashboardPreview() {
 
 function CalculatorPreview() {
   return (
-    <div className="mt-4 space-y-3">
+    <div className="mt-3.5 space-y-2.5">
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-3 text-center">
           <div className="text-[9px] text-white/25 uppercase tracking-wider">ARC-CO</div>
@@ -162,9 +200,7 @@ function CalculatorPreview() {
 
       <div className="flex items-center gap-2 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15 p-2.5">
         <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.5">
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
+          <CheckIcon />
         </div>
         <span className="text-[11px] font-medium text-emerald-400/90">
           ARC-CO recommended — $47.22/acre advantage
@@ -178,7 +214,7 @@ function CalculatorPreview() {
 
 function MapPreview() {
   return (
-    <div className="mt-4 relative rounded-xl overflow-hidden border border-white/[0.04] bg-harvest-forest-950/40 p-4">
+    <div className="mt-3.5 relative rounded-xl overflow-hidden border border-white/[0.04] bg-harvest-forest-950/40 p-4">
       <svg viewBox="0 0 400 200" className="w-full h-auto opacity-60">
         <path
           d="M50 80 Q80 30 150 40 Q200 20 250 35 Q300 25 350 50 Q370 70 360 100 Q340 120 300 130 Q260 145 220 140 L200 160 Q180 155 150 145 Q100 150 70 130 Q40 120 50 80Z"
@@ -201,6 +237,10 @@ function MapPreview() {
             fill={i % 5 === 0 ? 'rgba(201,168,76,0.5)' : i % 3 === 0 ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.1)'}
           />
         ))}
+
+        {/* County highlight */}
+        <rect x="225" y="55" width="18" height="14" rx="2" fill="rgba(52,211,153,0.3)" stroke="rgba(52,211,153,0.5)" strokeWidth="0.5" />
+        <text x="234" y="86" textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="7" fontWeight="600">Darke Co, OH</text>
       </svg>
 
       <div className="flex items-center justify-center gap-4 mt-2 text-[9px] text-white/30">
@@ -211,10 +251,6 @@ function MapPreview() {
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-harvest-gold/50" />
           PLC favored
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-white/15" />
-          Neutral
         </span>
       </div>
     </div>
@@ -227,49 +263,52 @@ function MapPreview() {
 
 export function BentoShowcase() {
   return (
-    <section className="relative py-20 md:py-28" aria-label="Product showcase">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="relative py-20 md:py-24" aria-label="Product showcase">
+      {/* Subtle ambient glow behind the grid */}
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse, rgba(201,168,76,0.04) 0%, transparent 70%)',
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="relative max-w-7xl mx-auto px-6">
         {/* Section header */}
         <RevealOnScroll>
-          <div className="text-center mb-14 md:mb-20">
+          <div className="text-center mb-12 md:mb-16">
             <SectionBadge variant="gold">Three Surfaces · One Platform</SectionBadge>
-            <h2
-              className="mt-5 font-bold tracking-[-0.02em] text-white/90"
-              style={{ fontSize: 'clamp(1.75rem, 3.5vw, 2.75rem)', lineHeight: 1.15 }}
-            >
+            <h2 className="mt-5 hf-heading-section text-white/90">
               Everything you need.
               <br />
               <span className="text-harvest-gold">Nothing you don&apos;t.</span>
             </h2>
-            <p className="mt-4 text-white/40 max-w-lg mx-auto text-[15px] leading-relaxed">
+            <p className="mt-4 text-white/40 max-w-lg mx-auto hf-body-lg leading-relaxed">
               Live grain bids, ARC/PLC election optimization, and county-level intelligence — 
               personalized to your operation. Free forever.
             </p>
           </div>
         </RevealOnScroll>
 
-        {/* Bento grid — spans on RevealOnScroll (direct grid children) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
+        {/* Bento grid — tighter 3px gap, spans on RevealOnScroll wrappers */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
 
           {/* ─── Morning Dashboard (2×2 hero card) ─── */}
           <RevealOnScroll delay={0} className="md:col-span-2 md:row-span-2">
-            <BentoCard className="p-6 md:p-8">
+            <BentoCard className="p-5 md:p-6 flex flex-col" variant="accent">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
                 <div className="w-8 h-8 rounded-lg bg-harvest-gold/10 flex items-center justify-center">
                   <SunriseIcon />
                 </div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.1em]">
+                <span className="hf-eyebrow text-harvest-gold/70">
                   Morning Dashboard
                 </span>
               </div>
 
-              <h3
-                className="mt-4 font-bold text-white/90 tracking-[-0.01em]"
-                style={{ fontSize: 'clamp(1.25rem, 2vw, 1.625rem)' }}
-              >
+              <h3 className="mt-3 hf-heading-card text-white/90">
                 Start every day informed
               </h3>
-              <p className="mt-2 text-white/35 text-sm leading-relaxed max-w-sm">
+              <p className="mt-1.5 text-white/35 text-sm leading-relaxed max-w-sm">
                 Grain bids, weather, market prices, and ARC/PLC payment estimates — 
                 personalized to your county, updated before sunrise.
               </p>
@@ -280,20 +319,20 @@ export function BentoShowcase() {
 
           {/* ─── ARC/PLC Calculator (2×1 wide) ─── */}
           <RevealOnScroll delay={100} className="md:col-span-2">
-            <BentoCard className="p-6">
+            <BentoCard className="p-5 md:p-6">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
                 <div className="w-8 h-8 rounded-lg bg-harvest-gold/10 flex items-center justify-center">
                   <CalculatorIcon />
                 </div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.1em]">
+                <span className="hf-eyebrow text-harvest-gold/70">
                   ARC/PLC Calculator
                 </span>
               </div>
 
-              <h3 className="mt-4 font-bold text-white/90 tracking-[-0.01em] text-lg">
+              <h3 className="mt-3 hf-heading-card text-white/90 text-lg">
                 Optimize your farm bill elections
               </h3>
-              <p className="mt-1.5 text-white/35 text-sm leading-relaxed">
+              <p className="mt-1 text-white/35 text-sm leading-relaxed">
                 Run unlimited ARC vs PLC scenarios using official USDA data. See exactly 
                 which election maximizes your payment.
               </p>
@@ -304,20 +343,20 @@ export function BentoShowcase() {
 
           {/* ─── County Election Map (2×1 wide) ─── */}
           <RevealOnScroll delay={150} className="md:col-span-2">
-            <BentoCard className="p-6">
+            <BentoCard className="p-5 md:p-6" variant="deep">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
                 <div className="w-8 h-8 rounded-lg bg-harvest-gold/10 flex items-center justify-center">
                   <GlobeIcon />
                 </div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.1em]">
+                <span className="hf-eyebrow text-harvest-gold/70">
                   County Election Map
                 </span>
               </div>
 
-              <h3 className="mt-4 font-bold text-white/90 tracking-[-0.01em] text-lg">
+              <h3 className="mt-3 hf-heading-card text-white/90 text-lg">
                 See what your county chose
               </h3>
-              <p className="mt-1.5 text-white/35 text-sm leading-relaxed">
+              <p className="mt-1 text-white/35 text-sm leading-relaxed">
                 The only interactive map of ARC/PLC elections for every U.S. county. 
                 Know what your neighbors decided.
               </p>
@@ -326,10 +365,10 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
-          {/* ─── Metric cards (1×1 each) ─── */}
+          {/* ─── Metric card: Elevator Bids ─── */}
           <RevealOnScroll delay={200} className="md:col-span-1">
-            <BentoCard className="p-6 flex flex-col justify-between min-h-[140px]">
-              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/25">
+            <BentoCard className="p-5 flex flex-col justify-between min-h-[140px]">
+              <div className="hf-eyebrow text-white/25">
                 Elevator Bids Tracked
               </div>
               <div>
@@ -344,9 +383,10 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
+          {/* ─── Metric card: Commodities ─── */}
           <RevealOnScroll delay={250} className="md:col-span-1">
-            <BentoCard className="p-6 flex flex-col justify-between min-h-[140px]">
-              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/25">
+            <BentoCard className="p-5 flex flex-col justify-between min-h-[140px]">
+              <div className="hf-eyebrow text-white/25">
                 Commodities Covered
               </div>
               <div>
@@ -361,28 +401,31 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
-          {/* ─── Wide bottom CTA card — stacked layout for all widths ─── */}
+          {/* ─── Wide CTA card — gold accent background ─── */}
           <RevealOnScroll delay={300} className="md:col-span-2">
-            <BentoCard className="p-6">
-              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/25">
-                Free Forever
+            <BentoCard className="p-5 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <div className="hf-eyebrow text-harvest-gold/50">
+                    Free Forever
+                  </div>
+                  <div className="mt-2 text-white/80 font-semibold text-base">
+                    No credit card. No registration wall. Just your county&apos;s data.
+                  </div>
+                </div>
+                <a
+                  href="/check"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl shrink-0
+                    text-sm font-semibold text-harvest-forest-950
+                    bg-gradient-to-br from-harvest-gold to-harvest-gold-bright
+                    hf-shadow-gold
+                    hover:hf-shadow-gold-lg
+                    hover:translate-y-[-1px] transition-all duration-200"
+                >
+                  Try the Calculator
+                  <ArrowRightIcon />
+                </a>
               </div>
-              <div className="mt-3 text-white/70 font-semibold text-base">
-                No credit card. No registration wall. Just your county&apos;s data.
-              </div>
-              <a
-                href="/check"
-                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
-                  text-sm font-semibold text-harvest-forest-950
-                  bg-gradient-to-br from-harvest-gold to-harvest-gold-bright
-                  hover:shadow-[0_4px_20px_rgba(201,168,76,0.3)]
-                  hover:translate-y-[-1px] transition-all duration-200"
-              >
-                Try the Calculator
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </a>
             </BentoCard>
           </RevealOnScroll>
         </div>

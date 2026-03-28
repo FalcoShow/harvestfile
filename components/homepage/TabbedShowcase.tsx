@@ -1,11 +1,15 @@
 // =============================================================================
 // HarvestFile — TabbedShowcase (Client Component)
-// Build 11 Deploy 2 PATCH: Fixed cream section readability
+// Build 12: Premium Visual Overhaul
 //
-// FIX: Text colors strengthened throughout — replaced /60 and /50 opacity
-// values with solid colors that have proper contrast against #F5F0E6 cream.
-// Body text now uses text-harvest-forest-800/80 instead of /60.
-// Feature list text uses text-harvest-forest-800 instead of /70.
+// Changes from Build 11 Deploy 2:
+//   - REMOVED inline background — parent hf-section-cream handles noise + glow
+//   - Preview cards now use hf-card-cream layered shadow system
+//   - Tab buttons: active state uses forest green, inactive gets cream card style
+//   - Typography uses hf-heading-section and hf-heading-card scale classes
+//   - Feature checkmarks use gold circles instead of pale green
+//   - CTA button uses gold gradient (matches hero CTA) instead of forest green
+//   - Overall: editorial quality, not template quality
 // =============================================================================
 
 'use client';
@@ -61,7 +65,7 @@ const tabs = [
 
 function MorningPreview() {
   return (
-    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-5 space-y-3">
+    <div className="hf-card-cream rounded-2xl p-5 space-y-3">
       <div className="grid grid-cols-3 gap-2">
         {[
           { crop: 'Corn', price: '$4.62', change: '+0.03', up: true },
@@ -70,7 +74,7 @@ function MorningPreview() {
         ].map((item) => (
           <div
             key={item.crop}
-            className="rounded-xl bg-harvest-forest-800/[0.04] border border-harvest-forest-800/[0.08] p-3 text-center"
+            className="rounded-xl bg-harvest-forest-800/[0.03] border border-harvest-forest-800/[0.06] p-3 text-center"
           >
             <div className="text-[10px] text-harvest-forest-800/50 uppercase tracking-wider font-semibold">
               {item.crop}
@@ -85,7 +89,7 @@ function MorningPreview() {
         ))}
       </div>
 
-      <div className="flex items-center gap-3 rounded-xl bg-harvest-forest-800/[0.03] border border-harvest-forest-800/[0.06] p-3">
+      <div className="flex items-center gap-3 rounded-xl bg-harvest-forest-800/[0.02] border border-harvest-forest-800/[0.05] p-3">
         <div className="text-harvest-gold text-lg">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <circle cx="12" cy="12" r="5" />
@@ -110,7 +114,7 @@ function MorningPreview() {
 
 function CalculatorPreview() {
   return (
-    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-5 space-y-3">
+    <div className="hf-card-cream rounded-2xl p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs text-harvest-forest-800/50 font-medium">Darke County, Ohio</div>
@@ -127,7 +131,7 @@ function CalculatorPreview() {
             <span className="font-semibold text-harvest-forest-950">ARC-CO Payment</span>
             <span className="font-bold text-emerald-600">$47.22/acre</span>
           </div>
-          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.08] overflow-hidden">
+          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.06] overflow-hidden">
             <div className="h-full rounded-full bg-emerald-500 w-[85%]" />
           </div>
         </div>
@@ -136,7 +140,7 @@ function CalculatorPreview() {
             <span className="font-semibold text-harvest-forest-950">PLC Payment</span>
             <span className="font-bold text-harvest-forest-800/40">$0.00/acre</span>
           </div>
-          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.08] overflow-hidden">
+          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.06] overflow-hidden">
             <div className="h-full rounded-full bg-harvest-forest-800/15 w-[2%]" />
           </div>
         </div>
@@ -156,7 +160,7 @@ function CalculatorPreview() {
 
 function MapPreview() {
   return (
-    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-5">
+    <div className="hf-card-cream rounded-2xl p-5">
       <svg viewBox="0 0 320 180" className="w-full rounded-xl">
         <rect width="320" height="180" fill="#F8F6F0" />
         <path d="M40 60 Q80 30 130 40 Q170 25 210 35 Q250 20 280 45 Q295 65 285 85 Q270 100 240 105 Q215 115 190 110 L175 125 Q160 122 130 115 Q90 120 65 105 Q35 95 40 60Z" fill="none" stroke="#D4CFC5" strokeWidth="1" />
@@ -227,7 +231,6 @@ export function TabbedShowcase() {
   return (
     <section
       className="relative py-20 md:py-28"
-      style={{ background: '#F5F0E6' }}
       aria-label="Product deep-dive"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -236,10 +239,7 @@ export function TabbedShowcase() {
         {/* Section header */}
         <div className="text-center mb-12 md:mb-16">
           <SectionBadgeLight variant="default">Built for Farmers</SectionBadgeLight>
-          <h2
-            className="mt-5 font-bold tracking-[-0.02em] text-harvest-forest-950"
-            style={{ fontSize: 'clamp(1.75rem, 3.5vw, 2.75rem)', lineHeight: 1.15 }}
-          >
+          <h2 className="mt-5 hf-heading-section text-harvest-forest-950">
             Three tools.{' '}
             <span className="font-serif italic text-harvest-forest-700" style={{ fontFamily: 'var(--font-instrument)' }}>
               One platform.
@@ -247,24 +247,25 @@ export function TabbedShowcase() {
           </h2>
         </div>
 
-        {/* Tab selectors */}
-        <div className="flex flex-wrap justify-center gap-2 mb-10">
+        {/* Tab selectors — premium with cream card inactive style */}
+        <div className="flex flex-wrap justify-center gap-2.5 mb-12">
           {tabs.map((t, i) => (
             <button
               key={t.id}
               onClick={() => setActiveTab(i)}
               className={`
-                relative px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300
+                relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300
                 ${i === activeTab
-                  ? 'bg-harvest-forest-800 text-white shadow-[0_2px_12px_rgba(27,67,50,0.15)]'
-                  : 'bg-white/80 text-harvest-forest-800/70 hover:bg-white hover:text-harvest-forest-950 border border-harvest-forest-800/[0.06]'
+                  ? 'bg-harvest-forest-800 text-white shadow-[0_2px_12px_rgba(27,67,50,0.18),0_4px_8px_rgba(27,67,50,0.08)]'
+                  : 'bg-white/80 text-harvest-forest-800/70 hover:text-harvest-forest-950 border border-black/[0.04] shadow-[0_1px_2px_hsla(36,20%,50%,0.06),0_4px_12px_hsla(36,20%,40%,0.05)]'
                 }
               `}
             >
               {t.label}
+              {/* Gold progress bar on active tab */}
               {i === activeTab && !isPaused && (
                 <span
-                  className="absolute bottom-0 left-0 h-[2px] bg-harvest-gold rounded-full"
+                  className="absolute bottom-0 left-2 right-2 h-[2px] bg-harvest-gold rounded-full"
                   style={{
                     animation: 'hf-tab-progress 6s linear forwards',
                     width: '0%',
@@ -277,46 +278,45 @@ export function TabbedShowcase() {
 
         {/* Tab content */}
         <div
-          className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center"
+          className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14 items-center"
           key={tab.id}
           style={{
             animation: 'hf-tab-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both',
           }}
         >
-          {/* Left: copy — STRENGTHENED COLORS */}
+          {/* Left: copy */}
           <div>
-            <h3
-              className="font-bold text-harvest-forest-950 tracking-[-0.01em]"
-              style={{ fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)', lineHeight: 1.25 }}
-            >
+            <h3 className="hf-heading-card text-harvest-forest-950">
               {tab.headline}
             </h3>
-            <p className="mt-4 text-harvest-forest-800/80 text-[15px] leading-relaxed">
+            <p className="mt-4 text-harvest-forest-800/80 hf-body-lg leading-relaxed">
               {tab.body}
             </p>
 
-            {/* Feature list — STRENGTHENED COLORS */}
-            <ul className="mt-6 space-y-3">
+            {/* Feature list — gold checkmark circles */}
+            <ul className="mt-7 space-y-3.5">
               {tab.features.map((feature, i) => (
                 <li key={i} className="flex items-start gap-3">
-                  <div className="mt-1 w-5 h-5 rounded-full bg-harvest-forest-800/[0.08] flex items-center justify-center shrink-0">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="3">
+                  <div className="mt-0.5 w-5 h-5 rounded-full bg-harvest-gold/15 border border-harvest-gold/25 flex items-center justify-center shrink-0">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9E7E30" strokeWidth="3">
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   </div>
-                  <span className="text-[15px] text-harvest-forest-800">{feature}</span>
+                  <span className="text-[15px] text-harvest-forest-800 leading-snug">{feature}</span>
                 </li>
               ))}
             </ul>
 
-            {/* CTA */}
+            {/* CTA — gold gradient to match hero */}
             <a
               href={tab.ctaHref}
               className="inline-flex items-center gap-2 mt-8 px-6 py-3 rounded-xl
-                text-sm font-semibold text-white bg-harvest-forest-800
-                hover:bg-harvest-forest-700 transition-all duration-200
-                hover:shadow-[0_4px_16px_rgba(27,67,50,0.2)]
-                hover:translate-y-[-1px]"
+                text-sm font-semibold text-harvest-forest-950
+                bg-gradient-to-br from-harvest-gold to-harvest-gold-bright
+                shadow-[0_2px_8px_rgba(201,168,76,0.15),0_8px_24px_rgba(201,168,76,0.10)]
+                hover:shadow-[0_4px_12px_rgba(201,168,76,0.20),0_12px_40px_rgba(201,168,76,0.15)]
+                hover:translate-y-[-1px]
+                transition-all duration-200"
             >
               {tab.ctaText}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

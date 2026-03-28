@@ -1,9 +1,11 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   HARVESTFILE — Build 2: Premium Design System
+   HARVESTFILE — Build 12: Premium Design System + Six Visual Layers
    ═══════════════════════════════════════════════════════════════════════════════
    Three themes: light (marketing), dark (dashboard), auth (login/signup)
+   Six premium layers: noise textures, layered shadows, typography scale,
+   section depth, premium cards, ambient glows
    All semantic tokens resolve at runtime via @theme inline + CSS custom properties
    ═══════════════════════════════════════════════════════════════════════════════ */
 
@@ -23,6 +25,10 @@
   --color-harvest-gold: #C9A84C;
   --color-harvest-gold-bright: #E2C366;
   --color-harvest-gold-dim: #9E7E30;
+
+  /* Cream palette (light sections) */
+  --color-harvest-cream: #F5F0E6;
+  --color-harvest-cream-warm: #FDF8F0;
 
   /* Semantic tokens (resolved at runtime via var()) */
   --color-background: var(--hf-background);
@@ -161,14 +167,15 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   NOISE TEXTURE (extracted from inline SVG data URLs → prevents hydration errors)
+   LAYER 1: NOISE TEXTURES
+   Subtle SVG feTurbulence overlays that add tactile depth to flat sections.
+   Usage: add class to a positioned parent, or use ::before pseudo.
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Dark section noise — soft-light blend, higher opacity */
 .hf-noise {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   pointer-events: none;
   opacity: 0.22;
   mix-blend-mode: soft-light;
@@ -177,14 +184,265 @@
 
 .hf-noise-subtle {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   pointer-events: none;
   opacity: 0.12;
   mix-blend-mode: soft-light;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── NEW: Cream/light section noise — multiply blend, lower baseFrequency ── */
+.hf-cream-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
+  background-size: 182px;
+}
+
+/* ── Grain overlay (Phase 9 — preserved) ── */
+.hf-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='0.5'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 182px;
+}
+
+.hf-grain + * { position: relative; z-index: 2; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LAYER 2: LAYERED SHADOW SYSTEM
+   Hue-matched, multi-stop shadows that feel natural. Never use pure black.
+   Usage: apply as utility classes or via CSS variables.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Shadows for cards on DARK backgrounds (green-tinted) */
+.hf-shadow-dark {
+  box-shadow:
+    0 1px 2px hsla(160, 30%, 12%, 0.12),
+    0 4px 8px hsla(160, 30%, 12%, 0.10),
+    0 8px 24px hsla(160, 30%, 8%, 0.08);
+}
+
+.hf-shadow-dark-lg {
+  box-shadow:
+    0 2px 4px hsla(160, 30%, 12%, 0.14),
+    0 8px 16px hsla(160, 30%, 10%, 0.10),
+    0 16px 48px hsla(160, 30%, 6%, 0.12);
+}
+
+/* Shadows for cards on CREAM/LIGHT backgrounds (warm-tinted) */
+.hf-shadow-cream {
+  box-shadow:
+    0 1px 2px hsla(36, 20%, 50%, 0.06),
+    0 4px 12px hsla(36, 20%, 40%, 0.05),
+    0 12px 32px hsla(36, 20%, 30%, 0.04);
+}
+
+.hf-shadow-cream-lg {
+  box-shadow:
+    0 2px 4px hsla(36, 20%, 50%, 0.08),
+    0 8px 20px hsla(36, 20%, 40%, 0.06),
+    0 20px 48px hsla(36, 20%, 30%, 0.06);
+}
+
+/* Gold glow shadow for CTAs and hover states */
+.hf-shadow-gold {
+  box-shadow:
+    0 2px 8px rgba(201, 168, 76, 0.15),
+    0 8px 24px rgba(201, 168, 76, 0.10);
+}
+
+.hf-shadow-gold-lg {
+  box-shadow:
+    0 4px 12px rgba(201, 168, 76, 0.20),
+    0 12px 40px rgba(201, 168, 76, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LAYER 3: PREMIUM CARD SYSTEM
+   Cards that feel elevated, not flat. Different treatments for dark vs light.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Cards on dark sections — glass + subtle border + hue shadow */
+.hf-card-dark {
+  background: rgba(27, 67, 50, 0.30);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px hsla(160, 30%, 12%, 0.12),
+    0 4px 8px hsla(160, 30%, 12%, 0.10),
+    0 8px 24px hsla(160, 30%, 8%, 0.08);
+  transition: all 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.hf-card-dark:hover {
+  border-color: rgba(201, 168, 76, 0.12);
+  box-shadow:
+    0 2px 4px hsla(160, 30%, 12%, 0.14),
+    0 8px 16px hsla(160, 30%, 10%, 0.10),
+    0 16px 48px hsla(160, 30%, 6%, 0.12),
+    0 0 0 1px rgba(201, 168, 76, 0.06);
+  transform: translateY(-2px);
+}
+
+/* Cards on cream sections — white + warm shadow + subtle top highlight */
+.hf-card-cream {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px hsla(36, 20%, 50%, 0.06),
+    0 4px 12px hsla(36, 20%, 40%, 0.05),
+    0 12px 32px hsla(36, 20%, 30%, 0.04);
+  transition: all 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+  position: relative;
+}
+
+.hf-card-cream::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.8), transparent 50%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.hf-card-cream:hover {
+  box-shadow:
+    0 2px 4px hsla(36, 20%, 50%, 0.08),
+    0 8px 20px hsla(36, 20%, 40%, 0.06),
+    0 20px 48px hsla(36, 20%, 30%, 0.06);
+  transform: translateY(-2px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LAYER 4: AMBIENT GLOW UTILITIES
+   Soft radial gradients that create focal-point lighting effects.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Gold spotlight — centers on section focal point */
+.hf-glow-gold {
+  position: absolute;
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(201, 168, 76, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  filter: blur(40px);
+}
+
+/* Warm ambient for cream sections */
+.hf-glow-warm {
+  position: absolute;
+  width: 800px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(201, 168, 76, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Emerald accent glow */
+.hf-glow-emerald {
+  position: absolute;
+  width: 500px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(52, 211, 153, 0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LAYER 5: SECTION DEPTH UTILITIES
+   Background treatments that add dimension to flat sections.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Cream section with noise + warm radial glow (replaces flat #F5F0E6) */
+.hf-section-cream {
+  position: relative;
+  background-color: #F5F0E6;
+  overflow: hidden;
+}
+
+.hf-section-cream::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
+  background-size: 182px;
+}
+
+.hf-section-cream::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(201, 168, 76, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Dark section with subtle depth */
+.hf-section-dark {
+  position: relative;
+  background-color: #0C1F17;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LAYER 6: TYPOGRAPHY SCALE
+   Fluid responsive type with clamp(). Tight tracking at display sizes.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.hf-heading-hero {
+  font-size: clamp(2.25rem, 5vw + 0.5rem, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+
+.hf-heading-section {
+  font-size: clamp(1.75rem, 3.5vw + 0.25rem, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.hf-heading-card {
+  font-size: clamp(1.125rem, 1.5vw + 0.25rem, 1.5rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+
+.hf-body-lg {
+  font-size: clamp(0.9375rem, 1vw + 0.125rem, 1.125rem);
+  line-height: 1.65;
+}
+
+.hf-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -393,6 +651,35 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   PREMIUM GOLD LINE SEPARATOR (reusable horizontal rule)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.hf-gold-rule {
+  height: 1px;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 168, 76, 0.2) 20%,
+    rgba(201, 168, 76, 0.35) 50%,
+    rgba(201, 168, 76, 0.2) 80%,
+    transparent 100%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   STEP CONNECTOR LINE (for How It Works sections)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.hf-step-connector {
+  background: linear-gradient(
+    90deg,
+    rgba(201, 168, 76, 0) 0%,
+    rgba(201, 168, 76, 0.3) 20%,
+    rgba(201, 168, 76, 0.3) 80%,
+    rgba(201, 168, 76, 0) 100%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE
    ═══════════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
@@ -477,6 +764,21 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* Custom scrollbar for specific containers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    QUICKCHECK ANIMATIONS (extracted from /check page inline styles)
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -536,23 +838,6 @@
     transition-duration: 0.01ms !important;
   }
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   PHASE 9 BUILD 3: GRAIN TEXTURE OVERLAY
-   ═══════════════════════════════════════════════════════════════════════════════ */
-.hf-grain {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.035;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='0.5'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 182px;
-}
-
-.hf-grain + * { position: relative; z-index: 2; }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    PHASE 12: PREMIUM AUTH PAGES — CSS ADDITIONS
@@ -739,23 +1024,6 @@
     height: 50px;
     font-size: 15px;
   }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   PHASE 30: ELECTION DASHBOARD — CUSTOM SCROLLBAR
-   ═══════════════════════════════════════════════════════════════════════════════ */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.12);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
