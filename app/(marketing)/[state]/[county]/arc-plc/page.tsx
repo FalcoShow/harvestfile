@@ -41,6 +41,7 @@ import { CountyBenchmarkCTA } from '@/components/county/CountyBenchmarkCTA';
 import { getBenchmarkContextForCounty } from '@/lib/cross-tool/benchmark-context';
 import { GrainBidCard } from '@/components/county/GrainBidCard';
 import { PaymentNarrative } from '@/components/county/PaymentNarrative';
+import { PaymentImpactBridge } from '@/components/county/PaymentImpactBridge';
 import {
   getCountyProfile,
   generateCountyNarrative,
@@ -717,6 +718,30 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
             </div>
           </div>
 
+          {/* ── Live Grain Bids — ABOVE analysis for price context ── */}
+          <section className="mb-8">
+            <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
+              Local Grain Bids — {county.display_name}, {state.abbreviation}
+            </h2>
+            <GrainBidCard
+              countyFips={county.county_fips}
+              countyName={county.display_name}
+              stateAbbr={state.abbreviation}
+              latitude={county.latitude}
+              longitude={county.longitude}
+            />
+          </section>
+
+          {/* ── Price → Payment Bridge (the differentiator) ── */}
+          <section className="mb-12">
+            <PaymentImpactBridge
+              countyName={county.display_name}
+              stateAbbr={state.abbreviation}
+              cropData={cropData}
+              countyFips={county.county_fips}
+            />
+          </section>
+
           {/* ══ BUILD 2C: Agricultural Profile ══ */}
           {profile && (profile.total_farms || profile.total_farmland_acres || profile.cropland_acres) && (
             <section className="mb-12">
@@ -1142,23 +1167,6 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
               stateAbbr={state.abbreviation}
             />
           </section>
-
-          {/* ── Nearby Grain Bids (Barchart) ── */}
-          <section className="mb-12">
-            <h2 className="text-[22px] font-extrabold text-[#1B4332] tracking-tight mb-6">
-              Nearby Grain Bids — {county.display_name}
-            </h2>
-            <GrainBidCard
-              countyFips={county.county_fips}
-              countyName={county.display_name}
-              stateAbbr={state.abbreviation}
-              latitude={county.latitude}
-              longitude={county.longitude}
-            />
-          </section>
-
-          {/* ── Live Price vs. Payment Context ── */}
-          <PaymentNarrative />
 
           {/* ── Phase 31 Build 2: Live 2026 Election Intelligence ── */}
           {benchmarkContext && (benchmarkContext.live_2026.total > 0 || benchmarkContext.historical.length > 0) && (
