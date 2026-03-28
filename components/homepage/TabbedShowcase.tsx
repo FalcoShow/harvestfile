@@ -1,12 +1,11 @@
 // =============================================================================
 // HarvestFile — TabbedShowcase (Client Component)
-// Build 11 Deploy 2: Three-product tabbed deep-dive on cream background
+// Build 11 Deploy 2 PATCH: Fixed cream section readability
 //
-// Benefit-first tabs that auto-advance every 6 seconds. Each tab shows
-// a side-by-side layout: benefit copy (left) + product preview (right).
-// Replaces the old HowItWorks + ReportProduct sections.
-//
-// Cream section (#F5F0E6) for visual contrast against dark bento above.
+// FIX: Text colors strengthened throughout — replaced /60 and /50 opacity
+// values with solid colors that have proper contrast against #F5F0E6 cream.
+// Body text now uses text-harvest-forest-800/80 instead of /60.
+// Feature list text uses text-harvest-forest-800 instead of /70.
 // =============================================================================
 
 'use client';
@@ -62,8 +61,7 @@ const tabs = [
 
 function MorningPreview() {
   return (
-    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5 space-y-3">
-      {/* Top row: 3 price cards */}
+    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-5 space-y-3">
       <div className="grid grid-cols-3 gap-2">
         {[
           { crop: 'Corn', price: '$4.62', change: '+0.03', up: true },
@@ -72,9 +70,9 @@ function MorningPreview() {
         ].map((item) => (
           <div
             key={item.crop}
-            className="rounded-xl bg-harvest-forest-800/[0.03] border border-harvest-forest-800/[0.06] p-3 text-center"
+            className="rounded-xl bg-harvest-forest-800/[0.04] border border-harvest-forest-800/[0.08] p-3 text-center"
           >
-            <div className="text-[10px] text-harvest-forest-700/40 uppercase tracking-wider font-semibold">
+            <div className="text-[10px] text-harvest-forest-800/50 uppercase tracking-wider font-semibold">
               {item.crop}
             </div>
             <div className="text-base font-bold text-harvest-forest-950 mt-0.5">
@@ -87,8 +85,7 @@ function MorningPreview() {
         ))}
       </div>
 
-      {/* Weather row */}
-      <div className="flex items-center gap-3 rounded-xl bg-harvest-forest-800/[0.02] border border-harvest-forest-800/[0.05] p-3">
+      <div className="flex items-center gap-3 rounded-xl bg-harvest-forest-800/[0.03] border border-harvest-forest-800/[0.06] p-3">
         <div className="text-harvest-gold text-lg">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <circle cx="12" cy="12" r="5" />
@@ -97,16 +94,15 @@ function MorningPreview() {
         </div>
         <div>
           <div className="text-xs font-semibold text-harvest-forest-950">72°F Clear</div>
-          <div className="text-[10px] text-harvest-forest-700/50">Wind 5 mph SW · Spray: GO</div>
+          <div className="text-[10px] text-harvest-forest-800/60">Wind 5 mph SW · Spray: GO</div>
         </div>
       </div>
 
-      {/* PLC estimate */}
-      <div className="rounded-xl bg-harvest-gold/[0.06] border border-harvest-gold/15 p-3">
+      <div className="rounded-xl bg-harvest-gold/[0.08] border border-harvest-gold/20 p-3">
         <div className="text-[10px] text-harvest-gold-dim uppercase tracking-wider font-semibold">
           2026 PLC Estimate — Corn
         </div>
-        <div className="text-xl font-bold text-harvest-forest-950 mt-1">$47.22<span className="text-sm font-normal text-harvest-forest-700/40">/acre</span></div>
+        <div className="text-xl font-bold text-harvest-forest-950 mt-1">$47.22<span className="text-sm font-normal text-harvest-forest-800/50">/acre</span></div>
       </div>
     </div>
   );
@@ -114,46 +110,43 @@ function MorningPreview() {
 
 function CalculatorPreview() {
   return (
-    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5 space-y-3">
-      {/* County header */}
+    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs text-harvest-forest-700/40 font-medium">Darke County, Ohio</div>
+          <div className="text-xs text-harvest-forest-800/50 font-medium">Darke County, Ohio</div>
           <div className="text-sm font-bold text-harvest-forest-950 mt-0.5">Corn — 2026 Crop Year</div>
         </div>
-        <div className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+        <div className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/50">
           ARC-CO Recommended
         </div>
       </div>
 
-      {/* Comparison bars */}
       <div className="space-y-2.5 pt-2">
         <div>
           <div className="flex justify-between text-[11px] mb-1">
             <span className="font-semibold text-harvest-forest-950">ARC-CO Payment</span>
             <span className="font-bold text-emerald-600">$47.22/acre</span>
           </div>
-          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.06] overflow-hidden">
+          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.08] overflow-hidden">
             <div className="h-full rounded-full bg-emerald-500 w-[85%]" />
           </div>
         </div>
         <div>
           <div className="flex justify-between text-[11px] mb-1">
             <span className="font-semibold text-harvest-forest-950">PLC Payment</span>
-            <span className="font-bold text-harvest-forest-700/50">$0.00/acre</span>
+            <span className="font-bold text-harvest-forest-800/40">$0.00/acre</span>
           </div>
-          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.06] overflow-hidden">
-            <div className="h-full rounded-full bg-harvest-forest-700/20 w-[2%]" />
+          <div className="h-2.5 rounded-full bg-harvest-forest-800/[0.08] overflow-hidden">
+            <div className="h-full rounded-full bg-harvest-forest-800/15 w-[2%]" />
           </div>
         </div>
       </div>
 
-      {/* Advantage card */}
-      <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 mt-2">
+      <div className="rounded-xl bg-emerald-50 border border-emerald-200/50 p-3 mt-2">
         <div className="text-[11px] font-bold text-emerald-700">
           ARC-CO saves $47.22 per base acre
         </div>
-        <div className="text-[10px] text-emerald-600/70 mt-0.5">
+        <div className="text-[10px] text-emerald-600/80 mt-0.5">
           Based on current USDA NASS yields and live market prices
         </div>
       </div>
@@ -163,46 +156,40 @@ function CalculatorPreview() {
 
 function MapPreview() {
   return (
-    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
-      {/* Mini map */}
+    <div className="rounded-2xl border border-harvest-forest-800/10 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-5">
       <svg viewBox="0 0 320 180" className="w-full rounded-xl">
         <rect width="320" height="180" fill="#F8F6F0" />
-        {/* State outlines (simplified) */}
-        <path d="M40 60 Q80 30 130 40 Q170 25 210 35 Q250 20 280 45 Q295 65 285 85 Q270 100 240 105 Q215 115 190 110 L175 125 Q160 122 130 115 Q90 120 65 105 Q35 95 40 60Z" fill="none" stroke="#E2DDD3" strokeWidth="1" />
-        {/* County cells with election data */}
+        <path d="M40 60 Q80 30 130 40 Q170 25 210 35 Q250 20 280 45 Q295 65 285 85 Q270 100 240 105 Q215 115 190 110 L175 125 Q160 122 130 115 Q90 120 65 105 Q35 95 40 60Z" fill="none" stroke="#D4CFC5" strokeWidth="1" />
         {[
-          { x: 90, y: 55, w: 25, h: 18, color: 'rgba(52,211,153,0.25)' },
-          { x: 118, y: 50, w: 22, h: 20, color: 'rgba(201,168,76,0.25)' },
-          { x: 143, y: 48, w: 28, h: 18, color: 'rgba(52,211,153,0.3)' },
-          { x: 174, y: 45, w: 22, h: 22, color: 'rgba(52,211,153,0.2)' },
-          { x: 199, y: 42, w: 26, h: 18, color: 'rgba(201,168,76,0.3)' },
-          { x: 228, y: 40, w: 22, h: 20, color: 'rgba(52,211,153,0.25)' },
-          { x: 90, y: 76, w: 26, h: 18, color: 'rgba(201,168,76,0.2)' },
-          { x: 119, y: 73, w: 24, h: 20, color: 'rgba(52,211,153,0.35)' },
-          { x: 146, y: 70, w: 28, h: 18, color: 'rgba(201,168,76,0.2)' },
-          { x: 177, y: 70, w: 22, h: 22, color: 'rgba(52,211,153,0.2)' },
-          { x: 202, y: 63, w: 26, h: 18, color: 'rgba(52,211,153,0.3)' },
-          { x: 231, y: 63, w: 22, h: 20, color: 'rgba(201,168,76,0.25)' },
+          { x: 90, y: 55, w: 25, h: 18, color: 'rgba(52,211,153,0.3)' },
+          { x: 118, y: 50, w: 22, h: 20, color: 'rgba(201,168,76,0.3)' },
+          { x: 143, y: 48, w: 28, h: 18, color: 'rgba(52,211,153,0.35)' },
+          { x: 174, y: 45, w: 22, h: 22, color: 'rgba(52,211,153,0.25)' },
+          { x: 199, y: 42, w: 26, h: 18, color: 'rgba(201,168,76,0.35)' },
+          { x: 228, y: 40, w: 22, h: 20, color: 'rgba(52,211,153,0.3)' },
+          { x: 90, y: 76, w: 26, h: 18, color: 'rgba(201,168,76,0.25)' },
+          { x: 119, y: 73, w: 24, h: 20, color: 'rgba(52,211,153,0.4)' },
+          { x: 146, y: 70, w: 28, h: 18, color: 'rgba(201,168,76,0.25)' },
+          { x: 177, y: 70, w: 22, h: 22, color: 'rgba(52,211,153,0.25)' },
+          { x: 202, y: 63, w: 26, h: 18, color: 'rgba(52,211,153,0.35)' },
+          { x: 231, y: 63, w: 22, h: 20, color: 'rgba(201,168,76,0.3)' },
         ].map((cell, i) => (
-          <rect key={i} x={cell.x} y={cell.y} width={cell.w} height={cell.h} rx="3" fill={cell.color} stroke="#E2DDD3" strokeWidth="0.5" />
+          <rect key={i} x={cell.x} y={cell.y} width={cell.w} height={cell.h} rx="3" fill={cell.color} stroke="#D4CFC5" strokeWidth="0.5" />
         ))}
-        {/* Highlighted county */}
-        <rect x="143" y="48" width="28" height="18" rx="3" fill="rgba(52,211,153,0.5)" stroke="#34D399" strokeWidth="1.5" />
-        {/* Tooltip */}
+        <rect x="143" y="48" width="28" height="18" rx="3" fill="rgba(52,211,153,0.55)" stroke="#34D399" strokeWidth="1.5" />
         <g transform="translate(135, 25)">
           <rect x="0" y="0" width="82" height="22" rx="4" fill="#1B4332" />
           <text x="41" y="14" textAnchor="middle" fill="white" fontSize="8" fontWeight="600">Darke Co, OH</text>
         </g>
       </svg>
 
-      {/* Legend row */}
-      <div className="flex items-center justify-center gap-5 mt-3 text-[10px] text-harvest-forest-700/40">
+      <div className="flex items-center justify-center gap-5 mt-3 text-[10px] text-harvest-forest-800/50">
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400/40" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400/50" />
           ARC-CO favored
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-harvest-gold/40" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-harvest-gold/50" />
           PLC favored
         </span>
       </div>
@@ -224,7 +211,6 @@ export function TabbedShowcase() {
   const [activeTab, setActiveTab] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Auto-advance every 6 seconds
   const advance = useCallback(() => {
     setActiveTab((prev) => (prev + 1) % tabs.length);
   }, []);
@@ -271,12 +257,11 @@ export function TabbedShowcase() {
                 relative px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300
                 ${i === activeTab
                   ? 'bg-harvest-forest-800 text-white shadow-[0_2px_12px_rgba(27,67,50,0.15)]'
-                  : 'bg-white/60 text-harvest-forest-700/60 hover:bg-white hover:text-harvest-forest-800'
+                  : 'bg-white/80 text-harvest-forest-800/70 hover:bg-white hover:text-harvest-forest-950 border border-harvest-forest-800/[0.06]'
                 }
               `}
             >
               {t.label}
-              {/* Progress bar for active tab */}
               {i === activeTab && !isPaused && (
                 <span
                   className="absolute bottom-0 left-0 h-[2px] bg-harvest-gold rounded-full"
@@ -290,7 +275,7 @@ export function TabbedShowcase() {
           ))}
         </div>
 
-        {/* Tab content: copy + preview side by side */}
+        {/* Tab content */}
         <div
           className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-center"
           key={tab.id}
@@ -298,7 +283,7 @@ export function TabbedShowcase() {
             animation: 'hf-tab-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both',
           }}
         >
-          {/* Left: copy */}
+          {/* Left: copy — STRENGTHENED COLORS */}
           <div>
             <h3
               className="font-bold text-harvest-forest-950 tracking-[-0.01em]"
@@ -306,20 +291,20 @@ export function TabbedShowcase() {
             >
               {tab.headline}
             </h3>
-            <p className="mt-4 text-harvest-forest-700/60 text-[15px] leading-relaxed">
+            <p className="mt-4 text-harvest-forest-800/80 text-[15px] leading-relaxed">
               {tab.body}
             </p>
 
-            {/* Feature list */}
+            {/* Feature list — STRENGTHENED COLORS */}
             <ul className="mt-6 space-y-3">
               {tab.features.map((feature, i) => (
                 <li key={i} className="flex items-start gap-3">
-                  <div className="mt-1 w-4 h-4 rounded-full bg-harvest-forest-800/[0.06] flex items-center justify-center shrink-0">
+                  <div className="mt-1 w-5 h-5 rounded-full bg-harvest-forest-800/[0.08] flex items-center justify-center shrink-0">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="3">
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   </div>
-                  <span className="text-sm text-harvest-forest-800/70">{feature}</span>
+                  <span className="text-[15px] text-harvest-forest-800">{feature}</span>
                 </li>
               ))}
             </ul>

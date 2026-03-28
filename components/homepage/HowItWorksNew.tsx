@@ -1,10 +1,9 @@
 // =============================================================================
 // HarvestFile — HowItWorks (Server Component)
-// Build 11 Deploy 2: Simplified three-step section on cream background
+// Build 11 Deploy 2 PATCH: Fixed cream section readability
 //
-// Reduces perceived complexity for the older farmer demographic (avg age 58).
-// Three horizontal cards with large step numbers in Instrument Serif.
-// No more than 15 words per step. Body text at 18px minimum.
+// FIX: Description text strengthened from /50 to /70 opacity.
+// Cards get slightly stronger borders and shadows for definition.
 // =============================================================================
 
 import { RevealOnScroll } from '@/components/homepage/shared/RevealOnScroll';
@@ -83,10 +82,10 @@ export function HowItWorks() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           {steps.map((step, i) => (
             <RevealOnScroll key={step.number} delay={i * 100}>
-              <div className="relative rounded-2xl bg-white border border-harvest-forest-800/[0.05] p-7 md:p-8 shadow-[0_1px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] transition-shadow duration-300">
+              <div className="relative rounded-2xl bg-white border border-harvest-forest-800/[0.08] p-7 md:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.06)] transition-shadow duration-300">
                 {/* Step number */}
                 <span
-                  className="block font-serif text-harvest-gold/40 mb-4"
+                  className="block font-serif text-harvest-gold/50 mb-4"
                   style={{
                     fontFamily: 'var(--font-instrument)',
                     fontSize: 'clamp(2rem, 3vw, 2.5rem)',
@@ -97,28 +96,25 @@ export function HowItWorks() {
                 </span>
 
                 {/* Icon */}
-                <div className="w-10 h-10 rounded-xl bg-harvest-forest-800/[0.04] border border-harvest-forest-800/[0.06] flex items-center justify-center text-harvest-forest-700/60 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-harvest-forest-800/[0.05] border border-harvest-forest-800/[0.08] flex items-center justify-center text-harvest-forest-700 mb-4">
                   {step.icon}
                 </div>
 
-                {/* Content */}
+                {/* Content — STRENGTHENED COLORS */}
                 <h3 className="text-lg font-bold text-harvest-forest-950 tracking-[-0.01em]">
                   {step.headline}
                 </h3>
-                <p
-                  className="mt-2 text-harvest-forest-700/50 leading-relaxed"
-                  style={{ fontSize: '15px' }}
-                >
+                <p className="mt-2 text-harvest-forest-800/70 leading-relaxed text-[15px]">
                   {step.description}
                 </p>
 
-                {/* Connecting line (hidden on mobile, visible on desktop between cards) */}
+                {/* Connecting line */}
                 {i < steps.length - 1 && (
                   <div
                     className="hidden md:block absolute top-1/2 -right-4 md:-right-5 w-8 md:w-10 h-px"
                     style={{
                       background:
-                        'linear-gradient(90deg, rgba(201,168,76,0.2) 0%, rgba(201,168,76,0.05) 100%)',
+                        'linear-gradient(90deg, rgba(201,168,76,0.25) 0%, rgba(201,168,76,0.05) 100%)',
                     }}
                     aria-hidden="true"
                   />

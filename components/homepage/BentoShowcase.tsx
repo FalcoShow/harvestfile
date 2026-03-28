@@ -1,18 +1,13 @@
 // =============================================================================
 // HarvestFile — BentoShowcase (Server Component + Client wrappers)
-// Build 11 Deploy 2: Premium bento grid product showcase
+// Build 11 Deploy 2 PATCH: Fixed bento grid layout
 //
-// The centerpiece of the homepage. Shows all three HarvestFile products
-// in a visually rich, asymmetric bento grid with hover effects and
-// scroll-triggered reveals. This single section replaces FeatureShowcase
-// and creates the strongest "this is not farm software" reaction.
+// FIX: Grid span classes moved from BentoCard to RevealOnScroll wrappers.
+// CSS Grid only applies col-span/row-span to DIRECT children of the grid
+// container. RevealOnScroll is the direct child, not BentoCard.
 //
-// Layout (desktop): 4-column grid
-//   [Morning Dashboard — 2×2]  [ARC/PLC Calculator — 2×1]
-//                               [County Map — 2×1        ]
-//   [Metric 1×1] [Metric 1×1]
-//
-// Mobile: single column, all cards full-width
+// FIX: "Free Forever" CTA card layout improved for all viewport widths.
+// FIX: Better visual hierarchy and spacing throughout.
 // =============================================================================
 
 import { SectionBadge } from '@/components/homepage/shared/SectionBadge';
@@ -53,26 +48,23 @@ function GlobeIcon() {
 function BentoCard({
   children,
   className = '',
-  span = '',
 }: {
   children: React.ReactNode;
   className?: string;
-  span?: string;
 }) {
   return (
     <div
       className={`
-        relative overflow-hidden rounded-2xl
+        relative overflow-hidden rounded-2xl h-full
         bg-harvest-forest-800/60 border border-white/[0.06]
         transition-all duration-300 ease-out
         hover:border-harvest-gold/15
         hover:shadow-[0_12px_40px_rgba(201,168,76,0.08)]
         hover:translate-y-[-2px]
-        ${span}
         ${className}
       `}
     >
-      {/* Subtle inner glow on hover via gradient overlay */}
+      {/* Subtle top glow on hover */}
       <div
         className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none"
         style={{
@@ -85,7 +77,7 @@ function BentoCard({
   );
 }
 
-// --- Mock Dashboard Preview (SVG-based, no images needed) ---
+// --- Mock Dashboard Preview ---
 
 function DashboardPreview() {
   return (
@@ -121,7 +113,7 @@ function DashboardPreview() {
 
         {/* Mock weather row */}
         <div className="flex items-center gap-3 rounded-lg bg-white/[0.03] p-2.5 border border-white/[0.04]">
-          <div className="w-7 h-7 rounded-full bg-harvest-gold/10 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-harvest-gold/10 flex items-center justify-center text-harvest-gold/60">
             <SunriseIcon />
           </div>
           <div className="flex-1">
@@ -155,7 +147,6 @@ function DashboardPreview() {
 function CalculatorPreview() {
   return (
     <div className="mt-4 space-y-3">
-      {/* Result comparison */}
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-3 text-center">
           <div className="text-[9px] text-white/25 uppercase tracking-wider">ARC-CO</div>
@@ -169,9 +160,8 @@ function CalculatorPreview() {
         </div>
       </div>
 
-      {/* Recommendation badge */}
       <div className="flex items-center gap-2 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15 p-2.5">
-        <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+        <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.5">
             <path d="M20 6L9 17l-5-5" />
           </svg>
@@ -189,16 +179,13 @@ function CalculatorPreview() {
 function MapPreview() {
   return (
     <div className="mt-4 relative rounded-xl overflow-hidden border border-white/[0.04] bg-harvest-forest-950/40 p-4">
-      {/* Simplified US map with county dots */}
       <svg viewBox="0 0 400 200" className="w-full h-auto opacity-60">
-        {/* Rough US outline */}
         <path
           d="M50 80 Q80 30 150 40 Q200 20 250 35 Q300 25 350 50 Q370 70 360 100 Q340 120 300 130 Q260 145 220 140 L200 160 Q180 155 150 145 Q100 150 70 130 Q40 120 50 80Z"
           fill="none"
           stroke="rgba(201,168,76,0.15)"
           strokeWidth="1"
         />
-        {/* Scattered county dots */}
         {[
           [120, 70], [140, 85], [160, 65], [180, 90], [200, 75],
           [220, 85], [240, 70], [260, 95], [280, 80], [300, 65],
@@ -216,7 +203,6 @@ function MapPreview() {
         ))}
       </svg>
 
-      {/* Legend */}
       <div className="flex items-center justify-center gap-4 mt-2 text-[9px] text-white/30">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-400/50" />
@@ -262,11 +248,12 @@ export function BentoShowcase() {
           </div>
         </RevealOnScroll>
 
-        {/* Bento grid */}
+        {/* Bento grid — spans on RevealOnScroll (direct grid children) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
+
           {/* ─── Morning Dashboard (2×2 hero card) ─── */}
-          <RevealOnScroll delay={0}>
-            <BentoCard span="md:col-span-2 md:row-span-2" className="p-6 md:p-8">
+          <RevealOnScroll delay={0} className="md:col-span-2 md:row-span-2">
+            <BentoCard className="p-6 md:p-8">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
                 <div className="w-8 h-8 rounded-lg bg-harvest-gold/10 flex items-center justify-center">
                   <SunriseIcon />
@@ -292,8 +279,8 @@ export function BentoShowcase() {
           </RevealOnScroll>
 
           {/* ─── ARC/PLC Calculator (2×1 wide) ─── */}
-          <RevealOnScroll delay={100}>
-            <BentoCard span="md:col-span-2" className="p-6">
+          <RevealOnScroll delay={100} className="md:col-span-2">
+            <BentoCard className="p-6">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
                 <div className="w-8 h-8 rounded-lg bg-harvest-gold/10 flex items-center justify-center">
                   <CalculatorIcon />
@@ -316,8 +303,8 @@ export function BentoShowcase() {
           </RevealOnScroll>
 
           {/* ─── County Election Map (2×1 wide) ─── */}
-          <RevealOnScroll delay={150}>
-            <BentoCard span="md:col-span-2" className="p-6">
+          <RevealOnScroll delay={150} className="md:col-span-2">
+            <BentoCard className="p-6">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
                 <div className="w-8 h-8 rounded-lg bg-harvest-gold/10 flex items-center justify-center">
                   <GlobeIcon />
@@ -340,7 +327,7 @@ export function BentoShowcase() {
           </RevealOnScroll>
 
           {/* ─── Metric cards (1×1 each) ─── */}
-          <RevealOnScroll delay={200}>
+          <RevealOnScroll delay={200} className="md:col-span-1">
             <BentoCard className="p-6 flex flex-col justify-between min-h-[140px]">
               <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/25">
                 Elevator Bids Tracked
@@ -352,14 +339,12 @@ export function BentoShowcase() {
                 >
                   2,000+
                 </div>
-                <div className="text-[12px] text-white/25 mt-1">
-                  Daily via Barchart
-                </div>
+                <div className="text-[12px] text-white/25 mt-1">Daily via Barchart</div>
               </div>
             </BentoCard>
           </RevealOnScroll>
 
-          <RevealOnScroll delay={250}>
+          <RevealOnScroll delay={250} className="md:col-span-1">
             <BentoCard className="p-6 flex flex-col justify-between min-h-[140px]">
               <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/25">
                 Commodities Covered
@@ -371,39 +356,33 @@ export function BentoShowcase() {
                 >
                   16
                 </div>
-                <div className="text-[12px] text-white/25 mt-1">
-                  All ARC/PLC crops
-                </div>
+                <div className="text-[12px] text-white/25 mt-1">All ARC/PLC crops</div>
               </div>
             </BentoCard>
           </RevealOnScroll>
 
-          {/* ─── Wide bottom CTA card ─── */}
-          <RevealOnScroll delay={300}>
-            <BentoCard span="md:col-span-2" className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/25">
-                    Free Forever
-                  </div>
-                  <div className="mt-2 text-white/70 font-semibold">
-                    No credit card. No registration wall. Just your county&apos;s data.
-                  </div>
-                </div>
-                <a
-                  href="/check"
-                  className="shrink-0 ml-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
-                    text-sm font-semibold text-harvest-forest-950
-                    bg-gradient-to-br from-harvest-gold to-harvest-gold-bright
-                    hover:shadow-[0_4px_20px_rgba(201,168,76,0.3)]
-                    hover:translate-y-[-1px] transition-all duration-200"
-                >
-                  Try the Calculator
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </a>
+          {/* ─── Wide bottom CTA card — stacked layout for all widths ─── */}
+          <RevealOnScroll delay={300} className="md:col-span-2">
+            <BentoCard className="p-6">
+              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/25">
+                Free Forever
               </div>
+              <div className="mt-3 text-white/70 font-semibold text-base">
+                No credit card. No registration wall. Just your county&apos;s data.
+              </div>
+              <a
+                href="/check"
+                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                  text-sm font-semibold text-harvest-forest-950
+                  bg-gradient-to-br from-harvest-gold to-harvest-gold-bright
+                  hover:shadow-[0_4px_20px_rgba(201,168,76,0.3)]
+                  hover:translate-y-[-1px] transition-all duration-200"
+              >
+                Try the Calculator
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </a>
             </BentoCard>
           </RevealOnScroll>
         </div>
