@@ -40,6 +40,7 @@ import { CountyCharts } from '@/components/county/CountyCharts';
 import { CountyBenchmarkCTA } from '@/components/county/CountyBenchmarkCTA';
 import { getBenchmarkContextForCounty } from '@/lib/cross-tool/benchmark-context';
 import { GrainBidCard } from '@/components/county/GrainBidCard';
+import { PaymentNarrative } from '@/components/county/PaymentNarrative';
 import {
   getCountyProfile,
   generateCountyNarrative,
@@ -402,6 +403,9 @@ async function PartialCountyPage({
             longitude={county.longitude}
           />
         </section>
+
+        {/* Live Price Context */}
+        <PaymentNarrative />
 
         {/* OBBBA Info */}
         <section className="mb-12">
@@ -1152,6 +1156,9 @@ export default async function CountyArcPlcPage({ params }: PageProps) {
               longitude={county.longitude}
             />
           </section>
+
+          {/* ── Live Price vs. Payment Context ── */}
+          <PaymentNarrative />
 
           {/* ── Phase 31 Build 2: Live 2026 Election Intelligence ── */}
           {benchmarkContext && (benchmarkContext.live_2026.total > 0 || benchmarkContext.historical.length > 0) && (

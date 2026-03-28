@@ -23,6 +23,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { GrainBidCard } from '@/components/grain/GrainBidCard';
+import { PaymentEstimateCard } from '@/components/morning/PaymentEstimateCard';
+import { useGeolocation } from '@/lib/hooks/useGeolocation';
 import {
   AreaChart,
   Area,
@@ -851,6 +853,7 @@ export default function MorningDashboard() {
   const [pricesLoading, setPricesLoading] = useState(true);
   const [weatherError, setWeatherError] = useState('');
   const [pricesError, setPricesError] = useState('');
+  const geo = useGeolocation();
 
   const marketStatus = useMemo(() => getMarketStatus(), []);
   const usdaReports = useMemo(() => getUpcomingReports(), []);
@@ -859,18 +862,8 @@ export default function MorningDashboard() {
   const fetchWeather = useCallback(async () => {
     try {
       // Try to get saved location from localStorage
-      let lat = DEFAULT_LAT;
-      let lng = DEFAULT_LNG;
-
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('hf_location');
-        if (saved) {
-          try {
-            const loc = JSON.parse(saved);
-            if (loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
-          } catch {}
-        }
-      }
+      const lat = geo.lat;
+      const lng = geo.lng;
 
       const res = await fetch(`/api/weather?lat=${lat}&lng=${lng}&crops=CORN,SOYBEANS,WHEAT`);
       if (!res.ok) throw new Error('Weather fetch failed');
@@ -883,7 +876,7 @@ export default function MorningDashboard() {
     } finally {
       setWeatherLoading(false);
     }
-  }, []);
+  }, [geo.lat, geo.lng]);
 
   // ── Fetch Prices ──────────────────────────────────────────────────
   const fetchPrices = useCallback(async () => {
@@ -934,6 +927,9 @@ export default function MorningDashboard() {
           </div>
           <p className="text-white/40 text-sm font-medium mb-5">
             {formatDateHeader()}
+            {!geo.isDefault && geo.locationName && (
+              <span className="text-white/25 ml-2">· {geo.locationName}</span>
+            )}
           </p>
 
           {/* Market status pill */}
@@ -956,6 +952,12 @@ export default function MorningDashboard() {
       <main className="mx-auto max-w-[680px] px-5 -mt-3 pb-20 space-y-4">
         {/* Quick Actions */}
         <QuickActions />
+
+        {/* Payment Estimate — THE hero metric */}
+        <PaymentEstimateCard
+          prices={prices}
+          loading={pricesLoading}
+        />
 
         {/* Weather Card */}
         {weatherLoading ? (
@@ -993,11 +995,11 @@ export default function MorningDashboard() {
 
         {/* Local Grain Bids */}
         <GrainBidCard
-          lat={DEFAULT_LAT}
-          lng={DEFAULT_LNG}
+          lat={geo.lat}
+          lng={geo.lng}
           compact={true}
-          countyName="Summit County"
-          stateAbbr="OH"
+          countyName={geo.isDefault ? 'Summit County' : geo.locationName.split(',')[0] || 'Your Area'}
+          stateAbbr={geo.isDefault ? 'OH' : (geo.locationName.split(',')[1]?.trim() || 'US')}
         />
 
         {/* USDA Calendar Card */}
