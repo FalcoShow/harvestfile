@@ -2,18 +2,18 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Phase 13 Build 1: Calculator → Dashboard Bridge
+// Build 14 Deploy 1: Premium Visual Overhaul
 //
-// 3-step premium wizard: Location → Farm Details → Results
-// - Custom dark-themed dropdowns (DarkSelect component)
-// - SVG crop icons (no emojis)
-// - Animated results with staggered reveal, visual bar chart, plain-English explainer
-// - Expandable calculation breakdown table
-// - Conversion CTAs: "Save Your Results" primary + Pro trial secondary
-// - Below-fold: educational content, FAQ accordion, data sources
-// - Grain texture, gold separators, scroll-reveal animations matching homepage
-// - Mobile-first, 48dp touch targets, WCAG AAA contrast
-// - AUTO-SAVES results to localStorage for dashboard bridge on signup
+// Changes from Phase 13:
+// - Hero headline: weight contrast + gold gradient (no italic serif)
+// - Segmented progress stepper with step circles
+// - Background gradient matched to homepage system
+// - Premium filled/duotone crop icons (botanical style)
+// - Auto-comma formatting on base acres input
+// - Enhanced glass card styling with premium shadows
+// - Improved animation timing + easing curves
+// - Better touch targets and hover states
+// - Upgraded loading state with contextual messaging
 // =============================================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -65,23 +65,121 @@ const CROPS = [
   { code: "COTTON", name: "Cotton" },
 ];
 
-// SVG crop icons — premium, consistent, no emoji rendering differences
+// Premium filled/duotone crop icons — botanical illustration style for dark UI
 function CropIcon({ crop, size = 28 }: { crop: string; size?: number }) {
-  const color = "currentColor";
   const s = size;
-  const props = { width: s, height: s, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: "1.5", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const props = { width: s, height: s, viewBox: "0 0 32 32", fill: "none", xmlns: "http://www.w3.org/2000/svg" };
 
   switch (crop) {
-    case "CORN": return (<svg {...props}><path d="M12 2v20" /><path d="M8 6c0 0 2 2 4 2s4-2 4-2" /><path d="M7 10c0 0 2.5 2 5 2s5-2 5-2" /><path d="M8 14c0 0 2 2 4 2s4-2 4-2" /><path d="M9 18c0 0 1.5 1 3 1s3-1 3-1" /></svg>);
-    case "SOYBEANS": return (<svg {...props}><circle cx="9" cy="10" r="3" /><circle cx="15" cy="10" r="3" /><path d="M12 7V2" /><path d="M12 13v9" /><path d="M9 13c1.5 1 4.5 1 6 0" /></svg>);
-    case "WHEAT": return (<svg {...props}><path d="M12 2v20" /><path d="M8 6l4-2 4 2" /><path d="M7 10l5-2 5 2" /><path d="M8 14l4-2 4 2" /><path d="M9 18l3-1 3 1" /></svg>);
-    case "SORGHUM": return (<svg {...props}><path d="M12 22V8" /><circle cx="12" cy="5" r="3" /><path d="M8 8c2 1 6 1 8 0" /><path d="M9 12c1.5 .5 4.5 .5 6 0" /></svg>);
-    case "BARLEY": return (<svg {...props}><path d="M12 2v20" /><path d="M7 8l5-1 5 1" /><path d="M7 12l5-1 5 1" /><path d="M8 16l4-1 4 1" /><path d="M6 4l6 2 6-2" /></svg>);
-    case "OATS": return (<svg {...props}><path d="M12 22V6" /><path d="M12 6c-2-3-5-4-5-4" /><path d="M12 6c2-3 5-4 5-4" /><path d="M9 14c0 0 1.5 1 3 1s3-1 3-1" /></svg>);
-    case "RICE": return (<svg {...props}><path d="M12 2v20" /><path d="M7 7c2.5 2 7.5 2 10 0" /><path d="M6 12c3 2 9 2 12 0" /><path d="M8 17c2 1 6 1 8 0" /></svg>);
-    case "PEANUTS": return (<svg {...props}><ellipse cx="9" cy="12" rx="4" ry="6" /><ellipse cx="15" cy="12" rx="4" ry="6" /><path d="M12 6V2" /><path d="M10 6c1 .5 3 .5 4 0" /></svg>);
-    case "COTTON": return (<svg {...props}><circle cx="12" cy="10" r="5" /><path d="M12 15v7" /><path d="M8 7c1-2 3-3 4-3s3 1 4 3" /><path d="M7 11c0 2 2 4 5 4s5-2 5-4" /></svg>);
-    default: return (<svg {...props}><circle cx="12" cy="12" r="8" /><path d="M12 8v8" /><path d="M8 12h8" /></svg>);
+    case "CORN": return (
+      <svg {...props}>
+        <path d="M16 4v24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M16 6c-1 0-4 1-4.5 6s-.5 8-.5 8h10s0-3-.5-8S17 6 16 6z" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M11.5 12h9M11.5 15h9M12 18h8" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.4" strokeLinecap="round" />
+        <path d="M12 8c-2-.5-4 0-5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M20 8c2-.5 4 0 5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    );
+    case "SOYBEANS": return (
+      <svg {...props}>
+        <path d="M16 6v20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <ellipse cx="12" cy="14" rx="4" ry="5.5" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.2" />
+        <ellipse cx="20" cy="14" rx="4" ry="5.5" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.2" />
+        <circle cx="12" cy="12.5" r="1.5" fill="currentColor" fillOpacity="0.3" />
+        <circle cx="12" cy="16" r="1.5" fill="currentColor" fillOpacity="0.3" />
+        <circle cx="20" cy="12.5" r="1.5" fill="currentColor" fillOpacity="0.3" />
+        <circle cx="20" cy="16" r="1.5" fill="currentColor" fillOpacity="0.3" />
+        <path d="M13 7c-1-2-3-3-5-2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+        <path d="M19 7c1-2 3-3 5-2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      </svg>
+    );
+    case "WHEAT": return (
+      <svg {...props}>
+        <path d="M16 8v20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M16 4l-3 4h6l-3-4z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
+        <path d="M13 8l-2.5 3.5h11L19 8" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1" />
+        <path d="M10.5 11.5l-2 3h15l-2-3" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1" />
+        <path d="M8.5 14.5l-1 2h17l-1-2" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="1" />
+        <path d="M12 20c-3-1-5-.5-6 1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.5" />
+        <path d="M20 20c3-1 5-.5 6 1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.5" />
+      </svg>
+    );
+    case "SORGHUM": return (
+      <svg {...props}>
+        <path d="M16 12v16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <ellipse cx="16" cy="9" rx="5" ry="6" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1.2" />
+        <circle cx="14" cy="7" r="1.2" fill="currentColor" fillOpacity="0.35" />
+        <circle cx="18" cy="7" r="1.2" fill="currentColor" fillOpacity="0.35" />
+        <circle cx="16" cy="5" r="1.2" fill="currentColor" fillOpacity="0.35" />
+        <circle cx="16" cy="9.5" r="1.2" fill="currentColor" fillOpacity="0.35" />
+        <circle cx="13" cy="10" r="1" fill="currentColor" fillOpacity="0.25" />
+        <circle cx="19" cy="10" r="1" fill="currentColor" fillOpacity="0.25" />
+        <path d="M12 15c-2.5-1-4.5 0-5.5 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+        <path d="M20 15c2.5-1 4.5 0 5.5 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      </svg>
+    );
+    case "BARLEY": return (
+      <svg {...props}>
+        <path d="M16 10v18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M16 3l-2.5 3 2.5 1 2.5-1L16 3z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
+        <path d="M13.5 6l-2 2.5 5 1.5 5-1.5-2-2.5" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1" />
+        <path d="M11.5 8.5l-1.5 2.5 6 1.5 6-1.5-1.5-2.5" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1" />
+        <path d="M16 3v-1M14 4l-1-1.5M18 4l1-1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.5" />
+        <path d="M12 16c-3-.5-5 .5-6 2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+        <path d="M20 16c3-.5 5 .5 6 2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      </svg>
+    );
+    case "OATS": return (
+      <svg {...props}>
+        <path d="M16 10v18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M16 8c-3-5-7-6-8-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M16 8c3-5 7-6 8-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <ellipse cx="9" cy="4.5" rx="2.5" ry="3" transform="rotate(-15 9 4.5)" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1" />
+        <ellipse cx="23" cy="4.5" rx="2.5" ry="3" transform="rotate(15 23 4.5)" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1" />
+        <path d="M16 12c-2.5-3-5.5-4-7-3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.5" />
+        <path d="M16 12c2.5-3 5.5-4 7-3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.5" />
+      </svg>
+    );
+    case "RICE": return (
+      <svg {...props}>
+        <path d="M16 6v22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M16 4c-2 2-6 4-7 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M16 4c2 2 6 4 7 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M16 8c-2 2-5 3.5-6 7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.6" />
+        <path d="M16 8c2 2 5 3.5 6 7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.6" />
+        <ellipse cx="10" cy="11" rx="1.5" ry="2.5" transform="rotate(-20 10 11)" fill="currentColor" fillOpacity="0.2" />
+        <ellipse cx="22" cy="11" rx="1.5" ry="2.5" transform="rotate(20 22 11)" fill="currentColor" fillOpacity="0.2" />
+        <ellipse cx="11" cy="14.5" rx="1.3" ry="2" transform="rotate(-15 11 14.5)" fill="currentColor" fillOpacity="0.15" />
+        <ellipse cx="21" cy="14.5" rx="1.3" ry="2" transform="rotate(15 21 14.5)" fill="currentColor" fillOpacity="0.15" />
+      </svg>
+    );
+    case "PEANUTS": return (
+      <svg {...props}>
+        <path d="M16 4v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M10 14c0-4 2-7 6-7s6 3 6 7c0 3-2 5.5-3 6.5-.8.8-1.5 1-3 1s-2.2-.2-3-1c-1-1-3-3.5-3-6.5z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M16 8v12" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.3" strokeDasharray="2 2" />
+        <path d="M10.5 14h11" stroke="currentColor" strokeWidth="0.8" strokeOpacity="0.3" />
+        <circle cx="13" cy="11.5" r="1.8" fill="currentColor" fillOpacity="0.2" />
+        <circle cx="19" cy="11.5" r="1.8" fill="currentColor" fillOpacity="0.2" />
+        <circle cx="13" cy="16" r="1.8" fill="currentColor" fillOpacity="0.2" />
+        <circle cx="19" cy="16" r="1.8" fill="currentColor" fillOpacity="0.2" />
+      </svg>
+    );
+    case "COTTON": return (
+      <svg {...props}>
+        <path d="M16 18v10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="16" cy="12" r="6" fill="currentColor" fillOpacity="0.12" stroke="currentColor" strokeWidth="1.2" />
+        <circle cx="14" cy="10" r="2.5" fill="currentColor" fillOpacity="0.2" />
+        <circle cx="18.5" cy="10" r="2.5" fill="currentColor" fillOpacity="0.2" />
+        <circle cx="16" cy="14" r="2.5" fill="currentColor" fillOpacity="0.2" />
+        <circle cx="13" cy="13.5" r="2" fill="currentColor" fillOpacity="0.15" />
+        <circle cx="19" cy="13.5" r="2" fill="currentColor" fillOpacity="0.15" />
+        <path d="M12.5 17.5c-1.5.5-2 2-1.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.4" />
+        <path d="M19.5 17.5c1.5.5 2 2 1.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.4" />
+        <path d="M16 6c0-1.5 1-3 2.5-3.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.4" />
+      </svg>
+    );
+    default: return (<svg {...props}><circle cx="16" cy="16" r="8" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.1" /><path d="M16 12v8M12 16h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>);
   }
 }
 
@@ -486,16 +584,17 @@ export default function CheckCalculator() {
     <div
       className="min-h-screen relative overflow-hidden"
       style={{
-        background: "linear-gradient(170deg, #0C1F17 0%, #0A2E1C 45%, #0F3525 100%)",
+        background: "linear-gradient(170deg, #0a0f0d 0%, #0C1F17 30%, #0F2A1E 60%, #0C1F17 100%)",
         fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
       }}
     >
       {/* Noise texture */}
       <div className="hf-noise" />
 
-      {/* Ambient glows */}
-      <div className="absolute top-[8%] right-[10%] w-[500px] h-[500px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 55%)", filter: "blur(80px)" }} />
-      <div className="absolute bottom-[10%] left-[5%] w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(5,150,105,0.05) 0%, transparent 55%)", filter: "blur(80px)" }} />
+      {/* Ambient glows — matching homepage warmth */}
+      <div className="absolute top-[5%] right-[8%] w-[600px] h-[600px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.05) 0%, transparent 50%)", filter: "blur(100px)" }} />
+      <div className="absolute top-[40%] left-[3%] w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(5,150,105,0.04) 0%, transparent 50%)", filter: "blur(80px)" }} />
+      <div className="absolute bottom-[15%] right-[15%] w-[350px] h-[350px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.03) 0%, transparent 50%)", filter: "blur(80px)" }} />
 
       {/* Main content */}
       <div className="relative z-10 mx-auto max-w-[580px] px-5 sm:px-6 pt-28 sm:pt-32 pb-20">
@@ -503,49 +602,90 @@ export default function CheckCalculator() {
         {/* ── Header (steps 1-2 only) ──────────────────────────────────── */}
         {step < 3 && (
           <div
-            className="text-center mb-8 sm:mb-10 transition-all duration-600"
+            className="text-center mb-8 sm:mb-10"
             style={{
               opacity: mounted ? 1 : 0,
-              transform: mounted ? "translateY(0)" : "translateY(16px)",
-              transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+              transform: mounted ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           >
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-6" style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)" }}>
+            <div
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-7"
+              style={{
+                background: "rgba(201,168,76,0.06)",
+                border: "1px solid rgba(201,168,76,0.12)",
+                backdropFilter: "blur(12px)",
+              }}
+            >
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" style={{ animation: "hf-pulse 2s ease-in-out infinite" }} />
-              <span className="text-xs font-semibold text-[#C9A84C]">FREE — No Signup Required</span>
+              <span className="text-[11px] font-bold text-[#C9A84C]/80 uppercase tracking-wider">Free — No Signup Required</span>
             </div>
 
-            {/* Headline */}
-            <h1 className="text-[clamp(26px,4.5vw,40px)] font-extrabold text-white leading-[1.1] tracking-[-0.035em] mb-3">
-              See which program<br />
-              pays you{" "}
-              <span className="font-serif italic font-normal text-[#C9A84C]">more</span>
+            {/* Headline — weight contrast + gold gradient (matching homepage pattern) */}
+            <h1 className="text-[clamp(28px,5vw,44px)] leading-[1.1] tracking-[-0.035em] mb-4">
+              <span className="font-medium text-white/70">See which program</span>
+              <br />
+              <span className="font-extrabold text-white">
+                pays you{" "}
+                <span
+                  className="bg-clip-text text-transparent"
+                  style={{ backgroundImage: "linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)" }}
+                >
+                  more
+                </span>
+              </span>
             </h1>
-            <p className="text-[15px] text-white/40 leading-relaxed">
+            <p className="text-[14px] sm:text-[15px] text-white/35 leading-relaxed max-w-[400px] mx-auto">
               Compare ARC-CO vs PLC for your county. Real USDA data. 60 seconds.
             </p>
           </div>
         )}
 
-        {/* ── Progress bar (steps 1-2 only) ────────────────────────────── */}
+        {/* ── Segmented Progress Stepper (steps 1-2 only) ────────────── */}
         {step < 3 && (
-          <div className="mb-6 sm:mb-8">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-white/25 uppercase tracking-widest">
-                Step {step} of 3
-              </span>
-              <span className="text-[11px] font-bold text-[#C9A84C]">
-                {stepLabels[step - 1]}
-              </span>
+          <div className="mb-7 sm:mb-9">
+            {/* Step labels + progress */}
+            <div className="flex items-center justify-between mb-3">
+              {stepLabels.map((label, i) => {
+                const stepNum = i + 1;
+                const isActive = step === stepNum;
+                const isComplete = step > stepNum;
+                return (
+                  <div key={label} className="flex items-center gap-2">
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
+                      style={{
+                        background: isComplete ? "rgba(201,168,76,0.2)" : isActive ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.04)",
+                        border: isComplete || isActive ? "1.5px solid rgba(201,168,76,0.4)" : "1.5px solid rgba(255,255,255,0.08)",
+                        color: isComplete || isActive ? "#C9A84C" : "rgba(255,255,255,0.25)",
+                      }}
+                    >
+                      {isComplete ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      ) : stepNum}
+                    </div>
+                    <span
+                      className="text-[11px] font-semibold tracking-wide hidden sm:inline transition-colors duration-300"
+                      style={{ color: isComplete || isActive ? "rgba(201,168,76,0.7)" : "rgba(255,255,255,0.2)" }}
+                    >
+                      {label}
+                    </span>
+                    {i < stepLabels.length - 1 && (
+                      <div className="w-8 sm:w-12 h-px mx-1 sm:mx-2" style={{ background: isComplete ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.06)" }} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+            {/* Continuous progress bar */}
+            <div className="h-[3px] rounded-full bg-white/[0.04] overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="h-full rounded-full transition-all duration-700"
                 style={{
                   width: `${progressPct}%`,
-                  background: "linear-gradient(90deg, #9E7E30, #C9A84C)",
-                  transitionTimingFunction: "cubic-bezier(0.25, 0.1, 0.25, 1)",
+                  background: "linear-gradient(90deg, #9E7E30, #C9A84C, #E2C366)",
+                  transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
               />
             </div>
@@ -554,23 +694,26 @@ export default function CheckCalculator() {
 
         {/* ── Glass Card ───────────────────────────────────────────────── */}
         <div
-          className="rounded-[24px] transition-all duration-300"
+          className="rounded-[24px] transition-all duration-500"
           style={{
-            background: step < 3 ? "rgba(255,255,255,0.03)" : "transparent",
+            background: step < 3 ? "rgba(255,255,255,0.025)" : "transparent",
             backdropFilter: step < 3 ? "blur(40px)" : "none",
             WebkitBackdropFilter: step < 3 ? "blur(40px)" : "none",
-            padding: step < 3 ? "28px 24px 32px" : "0",
+            padding: step < 3 ? "32px 28px 36px" : "0",
             border: step < 3 ? "1px solid rgba(255,255,255,0.06)" : "none",
-            boxShadow: step < 3 ? "inset 0 1px 0 rgba(255,255,255,0.04), 0 24px 80px rgba(0,0,0,0.25)" : "none",
+            boxShadow: step < 3
+              ? "inset 0 1px 0 rgba(255,255,255,0.04), 0 24px 80px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.03)"
+              : "none",
           }}
         >
           <div
-            className="transition-all duration-200"
+            className="transition-all duration-250"
             style={{
               opacity: isAnimating ? 0 : 1,
               transform: isAnimating
-                ? animDir === "forward" ? "translateX(-20px)" : "translateX(20px)"
+                ? animDir === "forward" ? "translateX(-16px)" : "translateX(16px)"
                 : "translateX(0)",
+              transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           >
 
@@ -579,10 +722,10 @@ export default function CheckCalculator() {
                  ════════════════════════════════════════════════════════ */}
             {step === 1 && (
               <div>
-                <h2 className="text-[20px] sm:text-[22px] font-extrabold text-white tracking-[-0.02em] mb-1.5">
+                <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-1.5">
                   Where is your farm?
                 </h2>
-                <p className="text-[13px] text-white/30 mb-6">
+                <p className="text-[13px] text-white/30 mb-7">
                   We&apos;ll pull real USDA data for your county.
                 </p>
 
@@ -597,7 +740,7 @@ export default function CheckCalculator() {
 
                 {/* County select */}
                 {stateAbbr && (
-                  <div className="mt-5" style={{ animation: "qc-enter 0.35s ease" }}>
+                  <div className="mt-5" style={{ animation: "qc-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1)" }}>
                     <DarkSelect
                       label="County"
                       options={counties.map(c => ({ value: c.county_fips, label: c.display_name }))}
@@ -618,11 +761,12 @@ export default function CheckCalculator() {
                 {countyFips && (
                   <button
                     onClick={() => goTo(2)}
-                    className="w-full mt-6 p-4 rounded-[14px] text-[15px] font-bold border-none cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:-translate-y-0.5"
+                    className="w-full mt-7 p-4 rounded-[14px] text-[15px] font-bold border-none cursor-pointer flex items-center justify-center gap-2 transition-all duration-300 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75"
                     style={{
-                      background: "linear-gradient(135deg, #C9A84C, #9E7E30)",
+                      background: "linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)",
                       color: "#0C1F17",
-                      boxShadow: "0 4px 24px rgba(201,168,76,0.2)",
+                      boxShadow: "0 4px 24px rgba(201,168,76,0.25), 0 0 0 0.5px rgba(201,168,76,0.3)",
+                      animation: "qc-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
                     }}
                   >
                     Continue <IconArrow />
@@ -636,86 +780,99 @@ export default function CheckCalculator() {
                  ════════════════════════════════════════════════════════ */}
             {step === 2 && (
               <div>
-                <h2 className="text-[20px] sm:text-[22px] font-extrabold text-white tracking-[-0.02em] mb-1.5">
+                <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-1.5">
                   What are you growing?
                 </h2>
-                <p className="text-[13px] text-white/30 mb-6">
+                <p className="text-[13px] text-white/30 mb-7">
                   {countyName}, {stateAbbr} — Pick your primary crop and enter base acres.
                 </p>
 
                 {/* Crop grid */}
-                <label className="block text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Crop</label>
-                <div className="grid grid-cols-3 gap-2.5 mb-6">
-                  {CROPS.map((c) => (
-                    <button
-                      key={c.code}
-                      onClick={() => setCropCode(c.code)}
-                      className="p-3.5 sm:p-4 rounded-[14px] text-center cursor-pointer transition-all duration-200 border-2"
-                      style={{
-                        borderColor: cropCode === c.code ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.06)",
-                        background: cropCode === c.code ? "rgba(201,168,76,0.06)" : "rgba(255,255,255,0.02)",
-                      }}
-                    >
-                      <div className="mb-1.5 flex justify-center" style={{ color: cropCode === c.code ? "#C9A84C" : "rgba(255,255,255,0.35)" }}>
-                        <CropIcon crop={c.code} size={30} />
-                      </div>
-                      <div className="text-[12px] sm:text-[13px] font-bold" style={{ color: cropCode === c.code ? "#C9A84C" : "rgba(255,255,255,0.5)" }}>
-                        {c.name}
-                      </div>
-                    </button>
-                  ))}
+                <label className="block text-[11px] font-bold text-white/35 uppercase tracking-wider mb-3">Crop</label>
+                <div className="grid grid-cols-3 gap-2.5 mb-7">
+                  {CROPS.map((c) => {
+                    const isSelected = cropCode === c.code;
+                    return (
+                      <button
+                        key={c.code}
+                        onClick={() => setCropCode(c.code)}
+                        className="p-3.5 sm:p-4 rounded-[16px] text-center cursor-pointer transition-all duration-300 border-2 hover:-translate-y-0.5 active:scale-[0.97] active:duration-75"
+                        style={{
+                          borderColor: isSelected ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.06)",
+                          background: isSelected ? "rgba(201,168,76,0.08)" : "rgba(255,255,255,0.02)",
+                          boxShadow: isSelected ? "0 4px 20px rgba(201,168,76,0.1)" : "none",
+                        }}
+                      >
+                        <div className="mb-1.5 flex justify-center transition-colors duration-300" style={{ color: isSelected ? "#C9A84C" : "rgba(255,255,255,0.3)" }}>
+                          <CropIcon crop={c.code} size={32} />
+                        </div>
+                        <div className="text-[12px] sm:text-[13px] font-bold transition-colors duration-300" style={{ color: isSelected ? "#C9A84C" : "rgba(255,255,255,0.45)" }}>
+                          {c.name}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* Base acres */}
-                <label className="block text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">Base Acres</label>
+                {/* Base acres — with auto-comma formatting */}
+                <label className="block text-[11px] font-bold text-white/35 uppercase tracking-wider mb-2">Base Acres</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  value={acres}
-                  onChange={(e) => setAcres(e.target.value)}
+                  value={acres ? parseInt(acres.replace(/,/g, "")).toLocaleString() : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, "");
+                    setAcres(raw);
+                  }}
                   placeholder="e.g. 500"
                   autoFocus={!!cropCode}
-                  className="hf-calc-input w-full p-4 rounded-[14px] text-center text-2xl font-bold text-white bg-white/[0.04] border border-white/[0.08] outline-none transition-colors focus:border-[#C9A84C]/40 focus:ring-1 focus:ring-[#C9A84C]/20"
+                  className="hf-calc-input w-full p-4 rounded-[16px] text-center text-[28px] sm:text-[32px] font-bold text-white bg-white/[0.03] border border-white/[0.08] outline-none transition-all duration-300 focus:border-[#C9A84C]/40 focus:ring-1 focus:ring-[#C9A84C]/20 focus:bg-white/[0.04]"
                   style={{ letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
                 />
 
                 {/* Quick presets */}
                 <div className="flex gap-2 justify-center mt-3">
-                  {[100, 250, 500, 1000].map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setAcres(String(v))}
-                      className="px-3.5 py-2 rounded-xl text-[13px] font-bold cursor-pointer transition-all duration-200"
-                      style={{
-                        background: acres === String(v) ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.04)",
-                        border: acres === String(v) ? "1px solid rgba(201,168,76,0.3)" : "1px solid rgba(255,255,255,0.06)",
-                        color: acres === String(v) ? "#C9A84C" : "rgba(255,255,255,0.35)",
-                      }}
-                    >
-                      {v} ac
-                    </button>
-                  ))}
+                  {[100, 250, 500, 1000].map((v) => {
+                    const rawAcres = acres.replace(/,/g, "");
+                    const isActive = rawAcres === String(v);
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => setAcres(String(v))}
+                        className="px-3.5 py-2 rounded-xl text-[13px] font-bold cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
+                        style={{
+                          background: isActive ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.03)",
+                          border: isActive ? "1px solid rgba(201,168,76,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                          color: isActive ? "#C9A84C" : "rgba(255,255,255,0.3)",
+                        }}
+                      >
+                        {v.toLocaleString()} ac
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex gap-3 mt-6">
+                <div className="flex gap-3 mt-7">
                   <button
                     onClick={() => goTo(1)}
-                    className="px-5 py-3.5 rounded-[14px] text-[14px] font-semibold border border-white/[0.08] bg-transparent text-white/40 cursor-pointer hover:text-white/60 hover:border-white/15 transition-colors"
+                    className="px-5 py-3.5 rounded-[14px] text-[14px] font-semibold border border-white/[0.08] bg-transparent text-white/35 cursor-pointer hover:text-white/55 hover:border-white/15 transition-all duration-200"
                   >
                     ← Back
                   </button>
                   <button
                     id="hf-calc-btn"
-                    disabled={!cropCode || !acres || parseInt(acres) <= 0}
+                    disabled={!cropCode || !acres || parseInt(acres.replace(/,/g, "")) <= 0}
                     onClick={calculate}
-                    className="flex-1 p-3.5 rounded-[14px] text-[15px] font-bold border-none cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                    className="flex-1 p-3.5 rounded-[14px] text-[15px] font-bold border-none cursor-pointer flex items-center justify-center gap-2 transition-all duration-300 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     style={{
-                      background: cropCode && acres && parseInt(acres) > 0
-                        ? "linear-gradient(135deg, #C9A84C, #9E7E30)"
+                      background: cropCode && acres && parseInt(acres.replace(/,/g, "")) > 0
+                        ? "linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)"
                         : "rgba(255,255,255,0.04)",
-                      color: cropCode && acres && parseInt(acres) > 0 ? "#0C1F17" : "rgba(255,255,255,0.15)",
-                      boxShadow: cropCode && acres && parseInt(acres) > 0 ? "0 4px 24px rgba(201,168,76,0.2)" : "none",
+                      color: cropCode && acres && parseInt(acres.replace(/,/g, "")) > 0 ? "#0C1F17" : "rgba(255,255,255,0.15)",
+                      boxShadow: cropCode && acres && parseInt(acres.replace(/,/g, "")) > 0
+                        ? "0 4px 24px rgba(201,168,76,0.25), 0 0 0 0.5px rgba(201,168,76,0.3)"
+                        : "none",
                     }}
                   >
                     Calculate My Payment <IconArrow />
@@ -729,11 +886,15 @@ export default function CheckCalculator() {
                  ════════════════════════════════════════════════════════ */}
             {step === 3 && (results || calculating) && (
               <div>
-                {/* Loading overlay */}
+                {/* Loading overlay — contextual, trust-building */}
                 {calculating && (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="w-10 h-10 border-2 border-[#C9A84C]/30 border-t-[#C9A84C] rounded-full animate-spin mb-4" />
-                    <span className="text-[14px] text-white/40 font-medium">Crunching USDA data...</span>
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <div className="relative mb-5">
+                      <div className="w-12 h-12 border-2 border-[#C9A84C]/20 border-t-[#C9A84C] rounded-full animate-spin" />
+                      <div className="absolute inset-0 w-12 h-12 border-2 border-transparent border-b-emerald-500/30 rounded-full animate-spin" style={{ animationDirection: "reverse", animationDuration: "1.5s" }} />
+                    </div>
+                    <span className="text-[14px] text-white/40 font-medium mb-1">Analyzing your county data...</span>
+                    <span className="text-[11px] text-white/20">Comparing ARC-CO vs PLC for {countyName || "your county"}</span>
                   </div>
                 )}
 
@@ -1077,11 +1238,15 @@ export default function CheckCalculator() {
 
         {/* ── Social proof (steps 1-2) ─────────────────────────────────── */}
         {step < 3 && (
-          <div className="mt-8 flex justify-center gap-5 sm:gap-6 flex-wrap">
-            {["3,100+ farms analyzed", "All 50 states", "Real USDA data"].map((t) => (
-              <span key={t} className="flex items-center gap-1.5 text-[11px] text-white/20">
-                <span className="text-emerald-500"><IconCheck /></span>
-                {t}
+          <div className="mt-9 flex justify-center gap-6 sm:gap-8 flex-wrap" style={{ opacity: mounted ? 1 : 0, transition: "opacity 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s" }}>
+            {[
+              { icon: "chart", text: "3,100+ farms analyzed" },
+              { icon: "map", text: "All 50 states" },
+              { icon: "data", text: "Real USDA data" },
+            ].map((t) => (
+              <span key={t.text} className="flex items-center gap-1.5 text-[11px] text-white/20 font-medium">
+                <span className="text-emerald-500/60"><IconCheck /></span>
+                {t.text}
               </span>
             ))}
           </div>
@@ -1104,19 +1269,19 @@ export default function CheckCalculator() {
            BELOW-THE-FOLD: Educational Content + FAQ + Trust
            Always visible — provides SEO value and fills the page
            ═══════════════════════════════════════════════════════════════ */}
-      <div className="relative z-10" style={{ background: "linear-gradient(180deg, #0A2E1C 0%, #0C1F17 100%)" }}>
+      <div className="relative z-10" style={{ background: "linear-gradient(180deg, #0F2A1E 0%, #0C1F17 30%, #0a0f0d 100%)" }}>
         {/* Grain texture overlay */}
-        <div className="hf-grain" style={{ opacity: 0.04 }} />
+        <div className="hf-grain" style={{ opacity: 0.03 }} />
 
-        {/* Ambient gold glow at transition — compact */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[150px] pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(201,168,76,0.06) 0%, transparent 70%)" }} />
+        {/* Ambient gold glow at transition — subtle */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(201,168,76,0.04) 0%, transparent 70%)" }} />
 
         {/* Gold separator line */}
-        <div className="mx-auto max-w-[500px] px-8">
-          <div className="h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.25) 50%, transparent 100%)" }} />
+        <div className="mx-auto max-w-[400px] px-8">
+          <div className="h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.2) 50%, transparent 100%)" }} />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-[680px] px-5 sm:px-6 pt-10 sm:pt-14 pb-16 sm:pb-24">
+        <div className="relative z-10 mx-auto max-w-[680px] px-5 sm:px-6 pt-12 sm:pt-16 pb-16 sm:pb-24">
 
           {/* ── How It Works ─────────────────────────────────────── */}
           <ScrollReveal>
