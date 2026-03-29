@@ -2,7 +2,7 @@
 // app/(marketing)/grain/page.tsx
 // HarvestFile — Phase 28 Build 1: Grain Marketing Command Center
 //
-// FREE TOOL #15 — The industry's FIRST "Marketing Score": a single 0–100
+// Grain Marketing Command Center — The industry's FIRST "Marketing Score": a single 0–100
 // number that tells a farmer whether conditions favor selling stored grain.
 //
 // No tool on the planet gives a farmer a composite score synthesizing:
@@ -528,10 +528,6 @@ export default function GrainMarketingPage() {
         }} />
         <div className="relative z-10 mx-auto max-w-[1200px] px-6">
           <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20" /></svg>
-              FREE TOOL #15
-            </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
               LIVE FUTURES
             </span>

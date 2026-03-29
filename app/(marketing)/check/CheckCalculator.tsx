@@ -962,7 +962,7 @@ export default function CheckCalculator() {
                   Start 14-Day Pro Trial · Multi-year projections + Scenario modeling
                 </Link>
                 <p className="text-[11px] text-white/15 text-center mb-5">
-                  $49/month after trial · Cancel anytime
+                  Plans from $29/month · Cancel anytime
                 </p>
 
                 {/* ── TERTIARY: See Plans ───────────────────────────────── */}
@@ -1194,7 +1194,7 @@ export default function CheckCalculator() {
               {[
                 {
                   q: "Is this calculator really free?",
-                  a: "Yes. The ARC/PLC comparison calculator is 100% free, no registration required. We also offer a paid Pro dashboard ($49/mo) with multi-year projections, scenario modeling, and portfolio management for ag professionals.",
+                  a: "Yes. The ARC/PLC comparison calculator is 100% free, no registration required. We also offer a paid Pro dashboard ($29/mo) with multi-year projections, scenario modeling, and portfolio management for ag professionals.",
                 },
                 {
                   q: "Where does the data come from?",
