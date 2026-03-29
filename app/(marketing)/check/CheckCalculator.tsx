@@ -2,18 +2,17 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Build 14 Deploy 1: Premium Visual Overhaul
+// Build 14 Deploy 2: Background + Below-Fold Redesign
 //
-// Changes from Phase 13:
-// - Hero headline: weight contrast + gold gradient (no italic serif)
-// - Segmented progress stepper with step circles
-// - Background gradient matched to homepage system
-// - Premium filled/duotone crop icons (botanical style)
-// - Auto-comma formatting on base acres input
-// - Enhanced glass card styling with premium shadows
-// - Improved animation timing + easing curves
-// - Better touch targets and hover states
-// - Upgraded loading state with contextual messaging
+// Deploy 2 changes:
+// - Removed all noise/grain textures for clean, smooth background
+// - Background gradient matched to homepage (no near-black at bottom)
+// - Eliminated dead space between calculator and below-fold content
+// - Below-fold completely redesigned: bento cards, icon headers, wider layout
+// - ARC vs PLC comparison cards with icon badges (matching homepage bento)
+// - OBBBA changes in single wide card with 2-column grid
+// - FAQ with improved hover states and spacing
+// - Consistent #0C1F17 background throughout (no dark-to-black fade)
 // =============================================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -584,20 +583,16 @@ export default function CheckCalculator() {
     <div
       className="min-h-screen relative overflow-hidden"
       style={{
-        background: "linear-gradient(170deg, #0a0f0d 0%, #0C1F17 30%, #0F2A1E 60%, #0C1F17 100%)",
+        background: "linear-gradient(180deg, #0C1F17 0%, #0F2A1E 40%, #0C1F17 80%, #0C1F17 100%)",
         fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
       }}
     >
-      {/* Noise texture */}
-      <div className="hf-noise" />
-
-      {/* Ambient glows — matching homepage warmth */}
-      <div className="absolute top-[5%] right-[8%] w-[600px] h-[600px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.05) 0%, transparent 50%)", filter: "blur(100px)" }} />
-      <div className="absolute top-[40%] left-[3%] w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(5,150,105,0.04) 0%, transparent 50%)", filter: "blur(80px)" }} />
-      <div className="absolute bottom-[15%] right-[15%] w-[350px] h-[350px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.03) 0%, transparent 50%)", filter: "blur(80px)" }} />
+      {/* Ambient glows — matching homepage warmth, no grain */}
+      <div className="absolute top-[5%] right-[8%] w-[600px] h-[600px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 50%)", filter: "blur(100px)" }} />
+      <div className="absolute top-[40%] left-[3%] w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(5,150,105,0.03) 0%, transparent 50%)", filter: "blur(80px)" }} />
 
       {/* Main content */}
-      <div className="relative z-10 mx-auto max-w-[580px] px-5 sm:px-6 pt-28 sm:pt-32 pb-20">
+      <div className="relative z-10 mx-auto max-w-[580px] px-5 sm:px-6 pt-28 sm:pt-32 pb-10">
 
         {/* ── Header (steps 1-2 only) ──────────────────────────────────── */}
         {step < 3 && (
@@ -1267,151 +1262,185 @@ export default function CheckCalculator() {
 
       {/* ═══════════════════════════════════════════════════════════════
            BELOW-THE-FOLD: Educational Content + FAQ + Trust
-           Always visible — provides SEO value and fills the page
+           Redesigned to match homepage bento quality
            ═══════════════════════════════════════════════════════════════ */}
-      <div className="relative z-10" style={{ background: "linear-gradient(180deg, #0F2A1E 0%, #0C1F17 30%, #0a0f0d 100%)" }}>
-        {/* Grain texture overlay */}
-        <div className="hf-grain" style={{ opacity: 0.03 }} />
+      <div className="relative z-10" style={{ background: "#0C1F17" }}>
 
-        {/* Ambient gold glow at transition — subtle */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(201,168,76,0.04) 0%, transparent 70%)" }} />
-
-        {/* Gold separator line */}
-        <div className="mx-auto max-w-[400px] px-8">
-          <div className="h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.2) 50%, transparent 100%)" }} />
+        {/* Thin gold separator — minimal, elegant */}
+        <div className="mx-auto max-w-[300px]">
+          <div className="h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.15) 50%, transparent 100%)" }} />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-[680px] px-5 sm:px-6 pt-12 sm:pt-16 pb-16 sm:pb-24">
+        <div className="relative z-10 mx-auto max-w-[780px] px-5 sm:px-6 pt-14 sm:pt-20 pb-16 sm:pb-24">
 
-          {/* ── How It Works ─────────────────────────────────────── */}
+          {/* ── Section Header (matching homepage style) ───────────── */}
           <ScrollReveal>
             <div className="text-center mb-10 sm:mb-14">
-              <h2 className="text-[22px] sm:text-[28px] font-extrabold text-white tracking-[-0.02em] mb-3">
-                How does ARC-CO vs PLC work?
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full mb-5" style={{ background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.1)" }}>
+                <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]/50" />
+                <span className="text-[10px] font-bold text-[#C9A84C]/60 uppercase tracking-wider">How It Works</span>
+              </div>
+              <h2 className="text-[24px] sm:text-[32px] font-extrabold text-white tracking-[-0.03em] mb-3">
+                <span className="font-medium text-white/60">Two programs.</span>
+                <br />
+                <span className="text-white">One right answer for your farm.</span>
               </h2>
-              <p className="text-[14px] sm:text-[15px] text-white/35 leading-relaxed max-w-[520px] mx-auto">
-                Every year, farmers with base acres must choose between two USDA safety-net programs. Picking the right one can mean thousands of dollars in difference.
+              <p className="text-[14px] sm:text-[15px] text-white/30 leading-relaxed max-w-[480px] mx-auto">
+                Every year, farmers with base acres choose between ARC-CO and PLC. The right choice can mean thousands of dollars in difference.
               </p>
             </div>
           </ScrollReveal>
 
-          <div className="grid sm:grid-cols-2 gap-5 mb-12 sm:mb-16">
+          {/* ── ARC vs PLC Comparison — Bento Cards (matching homepage) ── */}
+          <div className="grid sm:grid-cols-2 gap-4 mb-14 sm:mb-20">
             {[
               {
-                title: "ARC-CO (County Revenue)",
-                desc: "Pays when your county\u2019s actual crop revenue falls below 90% of its benchmark revenue. Covers both price drops and yield losses. Capped at 12% of benchmark.",
+                label: "ARC-CO",
+                title: "County Revenue Protection",
+                desc: "Pays when your county\u2019s actual crop revenue falls below 90% of its benchmark. Covers both price drops and yield losses. Capped at 12% of benchmark revenue.",
                 accent: "#C9A84C",
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3v18h18" /><path d="M7 16l4-4 4 4 5-8" />
+                  </svg>
+                ),
               },
               {
-                title: "PLC (Price Loss Coverage)",
-                desc: "Pays when the national average price drops below the statutory reference price. Payments are based on your farm\u2019s PLC yield, not county yields. No payment cap per acre.",
-                accent: "#59A985",
+                label: "PLC",
+                title: "Price Loss Coverage",
+                desc: "Pays when the national average price drops below the statutory reference price. Based on your farm\u2019s PLC yield, not county yields. No per-acre payment cap.",
+                accent: "#34D399",
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                ),
               },
             ].map((card, i) => (
-              <ScrollReveal key={card.title} delay={i * 100}>
-                <div className="p-5 sm:p-6 rounded-[18px] border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.03] transition-all duration-300">
-                  <div className="w-2 h-2 rounded-full mb-3" style={{ background: card.accent }} />
-                  <h3 className="text-[15px] font-bold text-white mb-2">{card.title}</h3>
+              <ScrollReveal key={card.label} delay={i * 100}>
+                <div
+                  className="p-6 sm:p-7 rounded-[20px] border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.03] transition-all duration-300 h-full"
+                >
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: `${card.accent}10`, border: `1px solid ${card.accent}20` }}>
+                      {card.icon}
+                    </div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: card.accent }}>{card.label}</span>
+                  </div>
+                  <h3 className="text-[16px] sm:text-[17px] font-bold text-white mb-2">{card.title}</h3>
                   <p className="text-[13px] text-white/30 leading-relaxed">{card.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
           </div>
 
-          {/* ── What Changed in OBBBA ────────────────────────────── */}
+          {/* ── OBBBA Changes — Bento Card (single wide card) ────────── */}
           <ScrollReveal>
-          <div className="mb-12 sm:mb-16">
-            <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-4">
-              What changed under OBBBA (2025 Farm Bill)?
-            </h2>
-            <div className="space-y-3">
-              {[
-                "ARC-CO guarantee increased from 86% to 90% of benchmark revenue",
-                "ARC payment cap raised from 10% to 12% of benchmark revenue",
-                "Statutory reference prices increased — corn from $3.70 to $4.10/bu, soybeans from $8.40 to $10.00/bu",
-                "Effective reference price escalator improved from 85% to 88% of Olympic average MYA",
-                "Payment limits increased from $125,000 to $155,000 per person",
-                "30 million new base acres eligible for the first time",
-                "2025 crop year uses automatic higher-of ARC or PLC payments",
-                "Programs extended through 2031 (8 crop years)",
-              ].map((item) => (
-                <div key={item} className="flex items-start gap-3 text-[13px] sm:text-[14px] text-white/35 leading-relaxed">
-                  <span className="text-[#C9A84C] mt-0.5 shrink-0"><IconCheck /></span>
-                  {item}
+            <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8 mb-14 sm:mb-20">
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
                 </div>
-              ))}
-            </div>
-          </div>
-          </ScrollReveal>
-
-          {/* ── Gold separator ────────────────────────────────────── */}
-          <div className="mb-12 sm:mb-16 mx-auto max-w-[300px]">
-            <div className="h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.15), transparent)" }} />
-          </div>
-
-          {/* ── FAQ ──────────────────────────────────────────────── */}
-          <ScrollReveal>
-          <div className="mb-12 sm:mb-16">
-            <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white tracking-[-0.02em] mb-6">
-              Frequently asked questions
-            </h2>
-            <div className="space-y-4">
-              {[
-                {
-                  q: "Is this calculator really free?",
-                  a: "Yes. The ARC/PLC comparison calculator is 100% free, no registration required. We also offer a paid Pro dashboard ($29/mo) with multi-year projections, scenario modeling, and portfolio management for ag professionals.",
-                },
-                {
-                  q: "Where does the data come from?",
-                  a: "All county yield data comes from the USDA National Agricultural Statistics Service (NASS) Quick Stats API. Program rules follow OBBBA (Pub. L. 119-21) and FSA published parameters. We are not affiliated with USDA or FSA.",
-                },
-                {
-                  q: "How accurate are these estimates?",
-                  a: "Our calculations use the same formulas as FSA, but actual payments depend on final Marketing Year Average prices, official county yields, and your farm-specific PLC yield. Use these estimates for planning — always confirm with your local FSA office before making enrollment decisions.",
-                },
-                {
-                  q: "When is the 2026 ARC/PLC election deadline?",
-                  a: "FSA has not yet announced the 2026 enrollment period. Current estimates from extension economists suggest enrollment may open in summer or fall 2026. The 2025 crop year uses automatic higher-of payments (no election needed).",
-                },
-                {
-                  q: "Do you store my farm data?",
-                  a: "The free calculator processes everything in your browser — no farm data is stored on our servers unless you create an account. We never sell your data to third parties. See our privacy policy for full details.",
-                },
-              ].map((faq) => (
-                <details key={faq.q} className="group rounded-[14px] border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-                  <summary className="flex items-center justify-between p-4 sm:p-5 cursor-pointer text-[14px] sm:text-[15px] font-semibold text-white/70 hover:text-white transition-colors list-none [&::-webkit-details-marker]:hidden">
-                    {faq.q}
-                    <svg className="w-4 h-4 text-white/20 group-open:rotate-180 transition-transform shrink-0 ml-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </summary>
-                  <div className="px-4 sm:px-5 pb-4 sm:pb-5 text-[13px] text-white/30 leading-relaxed -mt-1">
-                    {faq.a}
+                <span className="text-[11px] font-bold text-[#C9A84C]/60 uppercase tracking-wider">2025 Farm Bill</span>
+              </div>
+              <h3 className="text-[18px] sm:text-[20px] font-extrabold text-white tracking-[-0.02em] mb-5">
+                What changed under OBBBA?
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
+                {[
+                  "ARC guarantee raised to 90% of benchmark",
+                  "Payment cap raised to 12% of benchmark",
+                  "Corn reference price: $3.70 → $4.10/bu",
+                  "Soybeans reference price: $8.40 → $10.00/bu",
+                  "ERP escalator improved to 88% of MYA",
+                  "Payment limit raised to $155,000/person",
+                  "30M new base acres now eligible",
+                  "Programs extended through 2031",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-2.5 text-[13px] text-white/35 leading-relaxed">
+                    <span className="text-[#C9A84C] mt-0.5 shrink-0"><IconCheck /></span>
+                    {item}
                   </div>
-                </details>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
           </ScrollReveal>
 
-          {/* ── Data Sources ─────────────────────────────────────── */}
+          {/* ── FAQ — Clean Card Style ────────────────────────────── */}
           <ScrollReveal>
-          <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 hover:border-white/[0.1] transition-all duration-300">
-            <h3 className="text-[13px] font-bold text-white/50 uppercase tracking-wider mb-4">Data Sources</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { abbr: "NASS", name: "County yields via Quick Stats API" },
-                { abbr: "FSA", name: "ARC/PLC program rules" },
-                { abbr: "OBBBA", name: "2025 farm bill parameters" },
-                { abbr: "ERS", name: "Price forecasts & baselines" },
-              ].map((src) => (
-                <div key={src.abbr} className="text-center">
-                  <div className="text-[15px] font-extrabold text-[#C9A84C]/60 mb-1">{src.abbr}</div>
-                  <div className="text-[11px] text-white/20 leading-snug">{src.name}</div>
+            <div className="mb-14 sm:mb-20">
+              <div className="flex items-center gap-2.5 mb-6">
+                <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
                 </div>
-              ))}
+                <h2 className="text-[18px] sm:text-[20px] font-extrabold text-white tracking-[-0.02em]">
+                  Frequently asked questions
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {[
+                  {
+                    q: "Is this calculator really free?",
+                    a: "Yes. The ARC/PLC comparison calculator is 100% free, no registration required. We also offer a paid Pro dashboard ($29/mo) with multi-year projections, scenario modeling, and portfolio management for ag professionals.",
+                  },
+                  {
+                    q: "Where does the data come from?",
+                    a: "All county yield data comes from the USDA National Agricultural Statistics Service (NASS) Quick Stats API. Program rules follow OBBBA (Pub. L. 119-21) and FSA published parameters. We are not affiliated with USDA or FSA.",
+                  },
+                  {
+                    q: "How accurate are these estimates?",
+                    a: "Our calculations use the same formulas as FSA, but actual payments depend on final Marketing Year Average prices, official county yields, and your farm-specific PLC yield. Use these estimates for planning — always confirm with your local FSA office before making enrollment decisions.",
+                  },
+                  {
+                    q: "When is the 2026 ARC/PLC election deadline?",
+                    a: "FSA has not yet announced the 2026 enrollment period. Current estimates from extension economists suggest enrollment may open in summer or fall 2026. The 2025 crop year uses automatic higher-of payments (no election needed).",
+                  },
+                  {
+                    q: "Do you store my farm data?",
+                    a: "The free calculator processes everything in your browser — no farm data is stored on our servers unless you create an account. We never sell your data to third parties. See our privacy policy for full details.",
+                  },
+                ].map((faq) => (
+                  <details key={faq.q} className="group rounded-[16px] border border-white/[0.06] bg-white/[0.02] overflow-hidden hover:border-white/[0.1] transition-all duration-200">
+                    <summary className="flex items-center justify-between p-4 sm:p-5 cursor-pointer text-[14px] sm:text-[15px] font-semibold text-white/60 hover:text-white/80 transition-colors list-none [&::-webkit-details-marker]:hidden">
+                      {faq.q}
+                      <svg className="w-4 h-4 text-white/20 group-open:rotate-180 transition-transform shrink-0 ml-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </summary>
+                    <div className="px-4 sm:px-5 pb-4 sm:pb-5 text-[13px] text-white/30 leading-relaxed -mt-1">
+                      {faq.a}
+                    </div>
+                  </details>
+                ))}
+              </div>
             </div>
-          </div>
+          </ScrollReveal>
+
+          {/* ── Data Sources — Horizontal Trust Bar ────────────────── */}
+          <ScrollReveal>
+            <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6">
+              <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-4">Built on official data sources</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { abbr: "NASS", name: "County yields via Quick Stats API" },
+                  { abbr: "FSA", name: "ARC/PLC program rules" },
+                  { abbr: "OBBBA", name: "2025 farm bill parameters" },
+                  { abbr: "ERS", name: "Price forecasts & baselines" },
+                ].map((src) => (
+                  <div key={src.abbr} className="text-center">
+                    <div className="text-[15px] font-extrabold text-[#C9A84C]/50 mb-1">{src.abbr}</div>
+                    <div className="text-[11px] text-white/20 leading-snug">{src.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </ScrollReveal>
 
         </div>
