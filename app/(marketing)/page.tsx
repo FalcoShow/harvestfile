@@ -1,20 +1,28 @@
 // =============================================================================
 // HarvestFile — Homepage
-// Build 12 Deploy 2: Cream + Dark HowItWorks restructure
+// Build 13 Deploy 1 (Deploy 2A): Structural Surgery
 //
 // ASYNC Server Component — reads Vercel IP geolocation headers, resolves the
 // visitor's county (~200ms), and passes personalized data to the hero.
 //
-// Section order (Build 12):
-//   CHAPTER 1 (Dark):  Hero → Market Ticker → Election Map → Trust Bar → Bento
-//   CHAPTER 2 (Cream): Tabbed Showcase  [noise texture + ambient glow]
-//   CHAPTER 3 (Dark):  How It Works → Data Confidence → Final CTA
+// WHAT CHANGED (Deploy 2A):
+//   - REMOVED TabbedShowcase (redundant — showed same 3 products as BentoShowcase)
+//   - REMOVED cream chapter entirely — unified dark experience, no theme-switching
+//   - REMOVED DarkToLightTransition and LightToDarkTransition (no cream section)
+//   - MOVED TrustBar to position 2 (right after hero, before MarketTicker)
+//     → Trust signals now appear within first scroll (peak attention window)
+//   - Reordered to 7 purposeful sections:
+//     Hero → TrustBar → MarketTicker → ElectionMapTeaser →
+//     BentoShowcase → HowItWorks → DataConfidence → FinalCTA
 //
-// What changed from Build 12 Deploy 1:
-//   - HowItWorks moved from cream chapter to dark chapter (component is now
-//     dark-themed with gold step circles and glass cards)
-//   - Cream section is now just TabbedShowcase — shorter, doesn't overstay
-//   - Gold separator between HowItWorks and DataConfidence
+// WHY:
+//   - BentoShowcase + TabbedShowcase were redundant (both showed Morning Dashboard,
+//     ARC/PLC Calculator, and County Election Map)
+//   - TrustBar at position 4 meant most visitors never saw it during peak attention
+//   - The dark→cream→dark theme switching created arrhythmic visual flow
+//   - Removing one section + two transitions cuts ~40% of page length
+//
+// Architecture: Single dark chapter, gold separators between sections
 // =============================================================================
 
 import { headers } from 'next/headers';
@@ -23,7 +31,6 @@ import { MarketTicker } from '@/components/homepage/MarketTicker';
 import { ElectionMapTeaser } from '@/components/homepage/ElectionMapTeaser';
 import { TrustBar } from '@/components/homepage/TrustBar';
 import { BentoShowcase } from '@/components/homepage/BentoShowcase';
-import { TabbedShowcase } from '@/components/homepage/TabbedShowcase';
 import { HowItWorks } from '@/components/homepage/HowItWorksNew';
 import { DataConfidence } from '@/components/homepage/DataConfidence';
 import { FinalCTA } from '@/components/homepage/FinalCTANew';
@@ -66,7 +73,7 @@ async function resolveVisitorCounty(
   }
 }
 
-// ─── Section Transitions ────────────────────────────────────────────────────
+// ─── Section Separator ──────────────────────────────────────────────────────
 
 function DarkGoldSeparator() {
   return (
@@ -76,70 +83,6 @@ function DarkGoldSeparator() {
         style={{
           background:
             'linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.2) 20%, rgba(201,168,76,0.35) 50%, rgba(201,168,76,0.2) 80%, transparent 100%)',
-        }}
-      />
-    </div>
-  );
-}
-
-function DarkToLightTransition() {
-  return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ height: '120px', background: '#F5F0E6' }}
-      aria-hidden="true"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `linear-gradient(to bottom,
-          rgba(12,31,23,1) 0%, rgba(12,31,23,0.987) 8.1%, rgba(12,31,23,0.951) 15.5%,
-          rgba(12,31,23,0.896) 22.5%, rgba(12,31,23,0.825) 29%, rgba(12,31,23,0.741) 35.3%,
-          rgba(12,31,23,0.648) 41.2%, rgba(12,31,23,0.55) 47.1%, rgba(12,31,23,0.45) 52.9%,
-          rgba(12,31,23,0.352) 58.8%, rgba(12,31,23,0.259) 64.7%, rgba(12,31,23,0.175) 71%,
-          rgba(12,31,23,0.104) 77.5%, rgba(12,31,23,0.049) 84.5%, rgba(12,31,23,0.013) 91.9%,
-          rgba(12,31,23,0) 100%)`,
-        }}
-      />
-      <div
-        className="absolute left-0 right-0 z-10"
-        style={{
-          top: '55%',
-          height: '1px',
-          background:
-            'linear-gradient(90deg, transparent 8%, rgba(201,168,76,0.25) 25%, rgba(201,168,76,0.45) 50%, rgba(201,168,76,0.25) 75%, transparent 92%)',
-        }}
-      />
-    </div>
-  );
-}
-
-function LightToDarkTransition() {
-  return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ height: '120px', background: '#0C1F17' }}
-      aria-hidden="true"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `linear-gradient(to bottom,
-          rgba(245,240,230,1) 0%, rgba(245,240,230,0.987) 8.1%, rgba(245,240,230,0.951) 15.5%,
-          rgba(245,240,230,0.896) 22.5%, rgba(245,240,230,0.825) 29%, rgba(245,240,230,0.741) 35.3%,
-          rgba(245,240,230,0.648) 41.2%, rgba(245,240,230,0.55) 47.1%, rgba(245,240,230,0.45) 52.9%,
-          rgba(245,240,230,0.352) 58.8%, rgba(245,240,230,0.259) 64.7%, rgba(245,240,230,0.175) 71%,
-          rgba(245,240,230,0.104) 77.5%, rgba(245,240,230,0.049) 84.5%, rgba(245,240,230,0.013) 91.9%,
-          rgba(245,240,230,0) 100%)`,
-        }}
-      />
-      <div
-        className="absolute left-0 right-0 z-10"
-        style={{
-          top: '45%',
-          height: '1px',
-          background:
-            'linear-gradient(90deg, transparent 8%, rgba(201,168,76,0.25) 25%, rgba(201,168,76,0.45) 50%, rgba(201,168,76,0.25) 75%, transparent 92%)',
         }}
       />
     </div>
@@ -184,57 +127,79 @@ export default async function Home() {
   }
 
   return (
-    <>
-      {/* ═══════════════════════════════════════════════════════════════════════
-          CHAPTER 1 — DARK: Hero → Ticker → Map → Trust → Bento Showcase
-          ═══════════════════════════════════════════════════════════════════════ */}
-      <div data-nav-theme="dark" className="bg-harvest-forest-950">
-        <HeroSection
-          countyFips={county?.countyFips}
-          countyName={county?.displayName}
-          stateAbbr={county?.stateAbbr}
-          stateName={county?.stateName}
-          lat={lat}
-          lng={lng}
-          detected={detected}
-        />
-        <DarkGoldSeparator />
-        <MarketTicker />
-        <DarkGoldSeparator />
-        <ElectionMapTeaser />
-        <DarkGoldSeparator />
-        <TrustBar />
-        <DarkGoldSeparator />
-        <BentoShowcase />
-      </div>
+    <div data-nav-theme="dark" className="bg-harvest-forest-950">
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 1 — HERO
+          Geo-personalized headline + live data cards + email capture
+          ═══════════════════════════════════════════════════════════════════ */}
+      <HeroSection
+        countyFips={county?.countyFips}
+        countyName={county?.displayName}
+        stateAbbr={county?.stateAbbr}
+        stateName={county?.stateName}
+        lat={lat}
+        lng={lng}
+        detected={detected}
+      />
 
-      <DarkToLightTransition />
+      <DarkGoldSeparator />
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          CHAPTER 2 — CREAM: Tabbed Product Showcase
-          hf-section-cream auto-applies noise texture + warm radial glow.
-          Content uses relative z-10 to sit above the pseudo-elements.
-          ═══════════════════════════════════════════════════════════════════════ */}
-      <div data-nav-theme="light" className="hf-section-cream">
-        <div className="relative z-10">
-          <TabbedShowcase />
-        </div>
-      </div>
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 2 — TRUST BAR (moved up from position 4)
+          USDA/NOAA/RMA badges + activity counters
+          Now within first scroll — peak attention window
+          ═══════════════════════════════════════════════════════════════════ */}
+      <TrustBar />
 
-      <LightToDarkTransition />
+      <DarkGoldSeparator />
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          CHAPTER 3 — DARK: How It Works → Data Confidence → Final CTA
-          HowItWorks sets its own bg-harvest-forest-950 with gold accents.
-          It flows seamlessly into DataConfidence (same dark bg).
-          ═══════════════════════════════════════════════════════════════════════ */}
-      <div data-nav-theme="dark" className="bg-harvest-forest-950">
-        <HowItWorks />
-        <DarkGoldSeparator />
-        <DataConfidence />
-        <DarkGoldSeparator />
-        <FinalCTA />
-      </div>
-    </>
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 3 — MARKET TICKER
+          Live corn/soybeans/wheat CME prices with PLC payment status
+          ═══════════════════════════════════════════════════════════════════ */}
+      <MarketTicker />
+
+      <DarkGoldSeparator />
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 4 — ELECTION MAP
+          Interactive choropleth of ARC/PLC elections across 3,100+ counties
+          The "wow moment" — nothing like this exists in the market
+          ═══════════════════════════════════════════════════════════════════ */}
+      <ElectionMapTeaser />
+
+      <DarkGoldSeparator />
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 5 — PRODUCT SHOWCASE (Bento Grid)
+          Three surfaces: Morning Dashboard, ARC/PLC Calculator, Election Map
+          Plus stat cards (elevator bids tracked, commodities covered)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <BentoShowcase />
+
+      <DarkGoldSeparator />
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 6 — HOW IT WORKS
+          Three steps: Enter county → See data → Make decisions
+          ═══════════════════════════════════════════════════════════════════ */}
+      <HowItWorks />
+
+      <DarkGoldSeparator />
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 7 — DATA CONFIDENCE
+          Stats + data sources + independence commitment
+          ═══════════════════════════════════════════════════════════════════ */}
+      <DataConfidence />
+
+      <DarkGoldSeparator />
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 8 — FINAL CTA
+          "Know your numbers before election day" + email capture
+          ═══════════════════════════════════════════════════════════════════ */}
+      <FinalCTA />
+    </div>
   );
 }
