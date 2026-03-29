@@ -1,19 +1,22 @@
 // =============================================================================
 // HarvestFile — HowItWorks (Server Component)
-// Build 12: Premium Visual Overhaul
+// Build 13 Deploy 2C+2D: Typography Consistency
 //
-// Changes from Build 11 Deploy 2:
-//   - MOVED to dark green background for visual contrast against cream above
-//   - This section now sits BETWEEN cream TabbedShowcase and the
-//     LightToDarkTransition, creating a dark "island" that breaks up the cream
-//   - Gold step number circles connected by a gradient line
-//   - Cards use glass treatment on dark background
-//   - Typography uses hf-heading-section scale
-//   - Ambient gold glow behind the section focal point
-//   - REMOVED inline background — uses its own dark bg since it needs contrast
+// CHANGES FROM BUILD 12:
+//   - REMOVED Instrument Serif italic from "Thirty seconds." accent text
+//   - Now uses Bricolage Grotesque ExtraBold + gold gradient (matching hero)
+//   - All other styling preserved from Build 12
 // =============================================================================
 
 import { RevealOnScroll } from '@/components/homepage/shared/RevealOnScroll';
+
+// Gold gradient text style — matches HeroSection pattern exactly
+const goldGradientStyle = {
+  backgroundImage: 'linear-gradient(135deg, #C9A84C, #E2C366, #D4B55A)',
+  WebkitBackgroundClip: 'text',
+  backgroundClip: 'text',
+  color: 'transparent',
+} as const;
 
 const steps = [
   {
@@ -74,10 +77,7 @@ export function HowItWorks() {
           <div className="text-center mb-14">
             <h2 className="hf-heading-section text-white/90">
               Three steps.{' '}
-              <span
-                className="font-serif italic text-harvest-gold"
-                style={{ fontFamily: 'var(--font-instrument)' }}
-              >
+              <span className="font-extrabold" style={goldGradientStyle}>
                 Thirty seconds.
               </span>
             </h2>

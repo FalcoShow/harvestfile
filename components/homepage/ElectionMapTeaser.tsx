@@ -1,14 +1,12 @@
 // =============================================================================
 // HarvestFile — ElectionMapTeaser (Client Component)
-// Phase 9 Build 4.5: Mobile Polish
+// Build 13 Deploy 2C+2D: Typography Consistency
 //
-// FIXES:
-//   - Mobile padding increased (px-4 → px-5, tighter inner spacing)
-//   - Stats row: flex-wrap with centered alignment on mobile
-//   - Map container: explicit overflow-hidden to prevent bleed
-//   - KPI stats under map: grid layout instead of flex (better mobile)
-//   - "Explore Full Map" button: full-width on mobile
-//   - Reduced section bottom padding on mobile
+// CHANGES FROM PHASE 9 BUILD 4.5:
+//   - REMOVED Instrument Serif italic from "is choosing" accent text
+//   - Now uses Bricolage Grotesque ExtraBold + gold gradient (matching hero)
+//   - All mobile polish fixes from Build 4.5 preserved
+//   - All other styling preserved
 // =============================================================================
 
 'use client';
@@ -17,6 +15,14 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { RevealOnScroll } from './shared/RevealOnScroll';
 import { AnimatedCounter } from './shared/AnimatedCounter';
+
+// Gold gradient text style — matches HeroSection pattern exactly
+const goldGradientStyle = {
+  backgroundImage: 'linear-gradient(135deg, #C9A84C, #E2C366, #D4B55A)',
+  WebkitBackgroundClip: 'text',
+  backgroundClip: 'text',
+  color: 'transparent',
+} as const;
 
 const ElectionMap = dynamic(
   () => import('@/components/marketing/ElectionMap'),
@@ -62,7 +68,7 @@ export function ElectionMapTeaser() {
 
             <h2 className="text-[clamp(24px,4vw,46px)] font-extrabold text-white tracking-[-0.03em] leading-[1.1] mb-4">
               See what every county{' '}
-              <span className="font-serif italic font-normal text-harvest-gold">
+              <span className="font-extrabold" style={goldGradientStyle}>
                 is choosing
               </span>
             </h2>

@@ -1,15 +1,24 @@
 // =============================================================================
 // HarvestFile — DataConfidence (Server Component)
-// Build 12 Deploy 3: Premium visual overhaul
+// Build 13 Deploy 2C+2D: Typography Consistency
 //
-// Changes: Stats use hf-card-dark with gold border accent on hover.
-// Data source cards use hf-card-dark. Typography uses scale classes.
-// Gold ambient glow behind stats row. Independence section gets gold rule.
+// CHANGES FROM BUILD 12:
+//   - REMOVED Instrument Serif italic from "already trust." accent text
+//   - Now uses Bricolage Grotesque ExtraBold + gold gradient (matching hero)
+//   - All other styling preserved from Build 12 Deploy 3
 // =============================================================================
 
 import { AnimatedCounter } from '@/components/homepage/shared/AnimatedCounter';
 import { SectionBadge } from '@/components/homepage/shared/SectionBadge';
 import { RevealOnScroll } from '@/components/homepage/shared/RevealOnScroll';
+
+// Gold gradient text style — matches HeroSection pattern exactly
+const goldGradientStyle = {
+  backgroundImage: 'linear-gradient(135deg, #C9A84C, #E2C366, #D4B55A)',
+  WebkitBackgroundClip: 'text',
+  backgroundClip: 'text',
+  color: 'transparent',
+} as const;
 
 const stats = [
   { value: 3143, suffix: '', label: 'U.S. counties mapped', sublabel: 'Every state covered' },
@@ -78,12 +87,12 @@ export function DataConfidence() {
             <SectionBadge variant="emerald">Transparent · Verified · Independent</SectionBadge>
             <h2 className="mt-5 hf-heading-section text-white/90">
               Built on data you{' '}
-              <span className="font-serif italic text-harvest-gold" style={{ fontFamily: 'var(--font-instrument)' }}>
+              <span className="font-extrabold" style={goldGradientStyle}>
                 already trust.
               </span>
             </h2>
             <p className="mt-4 text-white/35 max-w-lg mx-auto hf-body-lg leading-relaxed">
-              The same datasets and formulas used by USDA&apos;s Farm Service Agency — 
+              The same datasets and formulas used by USDA&apos;s Farm Service Agency —
               delivered in a modern interface you can actually use.
             </p>
           </div>
@@ -156,8 +165,8 @@ export function DataConfidence() {
                   </span>
                 </div>
                 <p className="text-sm text-white/30 leading-relaxed">
-                  HarvestFile is not owned by, affiliated with, or funded by any seed company, 
-                  chemical manufacturer, equipment dealer, or grain buyer. Your data stays yours. 
+                  HarvestFile is not owned by, affiliated with, or funded by any seed company,
+                  chemical manufacturer, equipment dealer, or grain buyer. Your data stays yours.
                   We never sell farmer data. Period.
                 </p>
               </div>

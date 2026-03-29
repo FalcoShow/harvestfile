@@ -1,13 +1,22 @@
 // =============================================================================
 // HarvestFile — FinalCTA (Server Component)
-// Build 12 Deploy 3: Premium visual overhaul
+// Build 13 Deploy 2C+2D: Typography Consistency
 //
-// Changes: Typography uses hf-heading-hero scale. CTA button uses hf-shadow-gold-lg.
-// Aurora glow effect intensified slightly. Trust micro-copy spacing refined.
-// Gold rule separator above the section for visual anchoring.
+// CHANGES FROM BUILD 12:
+//   - Upgraded "before election day." from flat text-harvest-gold to
+//     Bricolage Grotesque ExtraBold + gold gradient (matching hero pattern)
+//   - All other styling preserved from Build 12 Deploy 3
 // =============================================================================
 
 import { RevealOnScroll } from '@/components/homepage/shared/RevealOnScroll';
+
+// Gold gradient text style — matches HeroSection pattern exactly
+const goldGradientStyle = {
+  backgroundImage: 'linear-gradient(135deg, #C9A84C, #E2C366, #D4B55A)',
+  WebkitBackgroundClip: 'text',
+  backgroundClip: 'text',
+  color: 'transparent',
+} as const;
 
 export function FinalCTA() {
   return (
@@ -40,7 +49,9 @@ export function FinalCTA() {
           <h2 className="hf-heading-hero text-white/90">
             Know your numbers
             <br />
-            <span className="text-harvest-gold">before election day.</span>
+            <span className="font-extrabold" style={goldGradientStyle}>
+              before election day.
+            </span>
           </h2>
 
           {/* Subtext */}

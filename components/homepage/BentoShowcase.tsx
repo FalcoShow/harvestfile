@@ -1,11 +1,16 @@
 // =============================================================================
 // HarvestFile — BentoShowcase (Server Component + Client wrappers)
-// Build 12 Deploy 3: Fixed Morning Dashboard dead space
+// Build 13 Deploy 2C: Bento Consolidation + Typography Consistency
 //
-// FIX: Morning Dashboard card uses h-full flex flex-col with DashboardPreview
-// set to flex-1 so it stretches to fill the full 2x2 grid cell height.
-// The RevealOnScroll wrapper also gets h-full to propagate grid height.
-// The bar chart inside DashboardPreview uses flex-1 to absorb extra space.
+// CHANGES FROM BUILD 12:
+//   - Section header rewritten: "Your county's data. Updated before sunrise."
+//     replaces generic "Everything you need. Nothing you don't."
+//   - ALL gold accent text uses Bricolage Grotesque ExtraBold + gold gradient
+//     (matching hero pattern) — ZERO Instrument Serif italic anywhere
+//   - Badge text updated: "Three Free Tools · Updated Daily"
+//   - Tighter grid gap (gap-3 → gap-2.5) for more cohesive bento feel
+//   - Bottom CTA card simplified — "No signup required" instead of "Free Forever"
+//   - DashboardPreview bar chart flex-1 fix preserved from Build 12 Deploy 3
 // =============================================================================
 
 import { SectionBadge } from '@/components/homepage/shared/SectionBadge';
@@ -57,6 +62,14 @@ function CheckIcon() {
   );
 }
 
+// --- Gold gradient text style (matches HeroSection pattern) ---
+const goldGradientStyle = {
+  backgroundImage: 'linear-gradient(135deg, #C9A84C, #E2C366, #D4B55A)',
+  WebkitBackgroundClip: 'text',
+  backgroundClip: 'text',
+  color: 'transparent',
+} as const;
+
 // --- Bento Card ---
 
 function BentoCard({
@@ -84,12 +97,14 @@ function BentoCard({
         ${className}
       `}
     >
+      {/* Top edge highlight */}
       <div
         className="absolute top-0 left-[10%] right-[10%] h-[1px] pointer-events-none"
         style={{
           background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 70%, transparent)',
         }}
       />
+      {/* Hover glow */}
       <div
         className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none"
         style={{
@@ -106,6 +121,7 @@ function BentoCard({
 function DashboardPreview() {
   return (
     <div className="mt-4 rounded-xl overflow-hidden border border-white/[0.04] bg-harvest-forest-950/60 flex-1 flex flex-col min-h-0">
+      {/* Window chrome */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/[0.04]">
         <div className="w-2 h-2 rounded-full bg-white/10" />
         <div className="w-2 h-2 rounded-full bg-white/10" />
@@ -114,6 +130,7 @@ function DashboardPreview() {
       </div>
 
       <div className="p-3 flex-1 flex flex-col gap-2.5">
+        {/* Price cards */}
         <div className="grid grid-cols-3 gap-1.5">
           {[
             { crop: 'Corn', price: '$4.62', change: '+$0.03', up: true },
@@ -128,6 +145,7 @@ function DashboardPreview() {
           ))}
         </div>
 
+        {/* Weather row */}
         <div className="flex items-center gap-2.5 rounded-lg bg-white/[0.03] p-2 border border-white/[0.04]">
           <div className="w-6 h-6 rounded-full bg-harvest-gold/10 flex items-center justify-center text-harvest-gold/60 shrink-0">
             <SunriseIcon />
@@ -148,6 +166,7 @@ function DashboardPreview() {
           </div>
         </div>
 
+        {/* ARC estimate */}
         <div className="flex items-center justify-between rounded-lg bg-emerald-500/[0.04] border border-emerald-500/10 p-2">
           <span className="text-[10px] text-emerald-400/80 font-medium">ARC-CO est.</span>
           <span className="text-sm font-bold text-emerald-400">$47.22/ac</span>
@@ -212,23 +231,30 @@ function MapPreview() {
 export function BentoShowcase() {
   return (
     <section className="relative py-20 md:py-24" aria-label="Product showcase">
+      {/* Ambient glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] pointer-events-none" style={{ background: 'radial-gradient(ellipse, rgba(201,168,76,0.04) 0%, transparent 70%)' }} aria-hidden="true" />
 
       <div className="relative max-w-7xl mx-auto px-6">
+        {/* ─── Section Header ─────────────────────────────────────────── */}
         <RevealOnScroll>
           <div className="text-center mb-12 md:mb-16">
-            <SectionBadge variant="gold">Three Surfaces · One Platform</SectionBadge>
+            <SectionBadge variant="gold">Three Free Tools · Updated Daily</SectionBadge>
             <h2 className="mt-5 hf-heading-section text-white/90">
-              Everything you need.<br />
-              <span className="text-harvest-gold">Nothing you don&apos;t.</span>
+              Your county&apos;s data.{' '}
+              <br className="hidden sm:block" />
+              <span className="font-extrabold" style={goldGradientStyle}>
+                Updated before sunrise.
+              </span>
             </h2>
             <p className="mt-4 text-white/40 max-w-lg mx-auto hf-body-lg leading-relaxed">
-              Live grain bids, ARC/PLC election optimization, and county-level intelligence — personalized to your operation. Free forever.
+              Live grain bids, ARC/PLC payment estimates, and county-level election data — personalized to your operation. Free forever.
             </p>
           </div>
         </RevealOnScroll>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        {/* ─── Bento Grid ─────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+          {/* Morning Dashboard — 2×2 hero card */}
           <RevealOnScroll delay={0} className="md:col-span-2 md:row-span-2">
             <BentoCard className="p-5 md:p-6 flex flex-col" variant="accent">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
@@ -241,6 +267,7 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
+          {/* ARC/PLC Calculator — 2×1 */}
           <RevealOnScroll delay={100} className="md:col-span-2">
             <BentoCard className="p-5 md:p-6">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
@@ -253,6 +280,7 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
+          {/* County Election Map — 2×1 */}
           <RevealOnScroll delay={150} className="md:col-span-2">
             <BentoCard className="p-5 md:p-6" variant="deep">
               <div className="flex items-center gap-2.5 text-harvest-gold/70">
@@ -265,6 +293,7 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
+          {/* Stat card 1 */}
           <RevealOnScroll delay={200} className="md:col-span-1">
             <BentoCard className="p-5 flex flex-col justify-between min-h-[140px]">
               <div className="hf-eyebrow text-white/25">Elevator Bids Tracked</div>
@@ -275,6 +304,7 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
+          {/* Stat card 2 */}
           <RevealOnScroll delay={250} className="md:col-span-1">
             <BentoCard className="p-5 flex flex-col justify-between min-h-[140px]">
               <div className="hf-eyebrow text-white/25">Commodities Covered</div>
@@ -285,12 +315,13 @@ export function BentoShowcase() {
             </BentoCard>
           </RevealOnScroll>
 
+          {/* Bottom CTA — full width */}
           <RevealOnScroll delay={300} className="md:col-span-2">
             <BentoCard className="p-5 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <div className="hf-eyebrow text-harvest-gold/50">Free Forever</div>
-                  <div className="mt-2 text-white/80 font-semibold text-base">No credit card. No registration wall. Just your county&apos;s data.</div>
+                  <div className="hf-eyebrow text-harvest-gold/50">No Signup Required</div>
+                  <div className="mt-2 text-white/80 font-semibold text-base">Your county&apos;s data is ready now. No credit card. No registration wall.</div>
                 </div>
                 <a href="/check" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl shrink-0 text-sm font-semibold text-harvest-forest-950 bg-gradient-to-br from-harvest-gold to-harvest-gold-bright hf-shadow-gold hover:translate-y-[-1px] transition-all duration-200">
                   Try the Calculator <ArrowRightIcon />
