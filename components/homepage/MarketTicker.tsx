@@ -70,42 +70,86 @@ interface TickerData {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SVG Crop Icons — replaces plain C/S/W letter badges
+// SVG Crop Icons — based on approved reference images
+// Corn: cross-hatch kernel pattern with large husks (Adobe Stock style)
+// Soybeans: open pod with round beans + closed pod + leaf (Getty style)
+// Wheat: two stalks with leaf-shaped alternating kernels (vector style)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function CornIcon({ color }: { color: string }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2c-1 4-4 6-4 12 0 3 2 6 4 8 2-2 4-5 4-8 0-6-3-8-4-12z" />
-      <path d="M8 10c-1.5.5-3 2-3 4" />
-      <path d="M16 10c1.5.5 3 2 3 4" />
-      <path d="M12 6v16" opacity="0.4" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Ear body */}
+      <path d="M9 5.5C9 3.5 10.5 2 12 2s3 1.5 3 3.5v8c0 2-1.5 3.5-3 3.5s-3-1.5-3-3.5z" />
+      {/* Cross-hatch kernel pattern */}
+      <line x1="9.3" y1="5" x2="14.7" y2="10" opacity="0.4" />
+      <line x1="9.1" y1="7.5" x2="14.9" y2="12.5" opacity="0.4" />
+      <line x1="9.3" y1="10" x2="14.5" y2="14.5" opacity="0.4" />
+      <line x1="14.7" y1="5" x2="9.3" y2="10" opacity="0.4" />
+      <line x1="14.9" y1="7.5" x2="9.1" y2="12.5" opacity="0.4" />
+      <line x1="14.5" y1="10" x2="9.3" y2="14.5" opacity="0.4" />
+      {/* Left husk */}
+      <path d="M9 6C7 5 4.5 6 3.5 9c-0.7 2.5 0 5 2 6.5" strokeWidth="1.3" />
+      <path d="M9 6C8 7 7 9 7.5 12" strokeWidth="1.1" opacity="0.5" />
+      {/* Right husk */}
+      <path d="M15 6c2-1 4.5 0 5.5 3 0.7 2.5 0 5-2 6.5" strokeWidth="1.3" />
+      <path d="M15 6c1 1 2 3 1.5 6" strokeWidth="1.1" opacity="0.5" />
+      {/* Stem */}
+      <path d="M12 17v5" strokeWidth="1.3" />
     </svg>
   );
 }
 
 function SoybeanIcon({ color }: { color: string }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <ellipse cx="9" cy="10" rx="4" ry="6" />
-      <ellipse cx="15" cy="10" rx="4" ry="6" />
-      <path d="M12 4c0 0-1 3-1 6s1 6 1 6" opacity="0.4" />
-      <path d="M7 18c2 2 8 2 10 0" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Open pod with beans visible */}
+      <path d="M4 6c0.5-2 3-3 5.5-2.5s4 2.5 3.5 4.5c-0.3 1-1 1.8-2 2-1.5 0.3-3.5-0.5-5-1.5S3.5 6.5 4 6z" strokeWidth="1.3" />
+      {/* Round beans inside */}
+      <circle cx="6.5" cy="6.5" r="1.4" strokeWidth="1.1" />
+      <circle cx="9.5" cy="6" r="1.4" strokeWidth="1.1" />
+      <circle cx="11.5" cy="7.5" r="1.2" strokeWidth="1.1" />
+      {/* Closed pod below */}
+      <path d="M10 13c2-0.5 4 0 5 1.5s1 3.5-0.5 4.5-4 0.5-5-1S8 14 10 13z" strokeWidth="1.3" />
+      {/* Bean bumps in closed pod */}
+      <circle cx="12.5" cy="15.5" r="0.8" opacity="0.35" />
+      <circle cx="14" cy="16.8" r="0.7" opacity="0.35" />
+      {/* Leaf at top right */}
+      <path d="M14 4c1.5-1.5 4-1.5 5 0" strokeWidth="1.2" />
+      <path d="M19 4c-0.5 1.5-2 2.5-3.5 2" strokeWidth="1.2" />
+      {/* Connecting stem */}
+      <path d="M12 10c1 1 1 2 0 3" strokeWidth="1.1" opacity="0.6" />
     </svg>
   );
 }
 
 function WheatIcon({ color }: { color: string }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22V8" />
-      <path d="M9 5c0 0 3 1 3 3" />
-      <path d="M15 5c0 0-3 1-3 3" />
-      <path d="M8 8c0 0 4 1 4 3" />
-      <path d="M16 8c0 0-4 1-4 3" />
-      <path d="M9 12c0 0 3 1 3 2" />
-      <path d="M15 12c0 0-3 1-3 2" />
-      <path d="M12 2l-1 3h2l-1-3z" fill={color} stroke="none" opacity="0.6" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Left stalk */}
+      <path d="M9 22C9 22 8.5 16 9 12" strokeWidth="1.3" />
+      {/* Left grain head: leaf-shaped alternating kernels */}
+      <path d="M9 11C7.5 10.5 7 9 7.5 7.5" />
+      <path d="M9 11c1.5-0.5 2-2 1.5-3.5" />
+      <path d="M9 8.5C7.5 8 7 6.5 7.5 5" />
+      <path d="M9 8.5c1.5-0.5 2-2 1.5-3.5" />
+      <path d="M9 6C8 5.5 7.5 4.5 8 3.5" />
+      <path d="M9 6c1-0.5 1.5-1.5 1-2.5" />
+      <path d="M9 4l-0.3-1.5" />
+      <path d="M9 4l0.3-1.5" />
+      {/* Right stalk */}
+      <path d="M15 22c0 0-0.5-6 0-10" strokeWidth="1.3" />
+      {/* Right grain head */}
+      <path d="M15 11c-1.5-0.5-2-2-1.5-3.5" />
+      <path d="M15 11c1.5-0.5 2-2 1.5-3.5" />
+      <path d="M15 8.5c-1.5-0.5-2-2-1.5-3.5" />
+      <path d="M15 8.5c1.5-0.5 2-2 1.5-3.5" />
+      <path d="M15 6c-1-0.5-1.5-1.5-1-2.5" />
+      <path d="M15 6c1-0.5 1.5-1.5 1-2.5" />
+      <path d="M15 4l-0.3-1.5" />
+      <path d="M15 4l0.3-1.5" />
+      {/* Ground curve */}
+      <path d="M5 22c2-2 5-3 7-3s5 1 7 3" strokeWidth="1.1" opacity="0.4" />
     </svg>
   );
 }
