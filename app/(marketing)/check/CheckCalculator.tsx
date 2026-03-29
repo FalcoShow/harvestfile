@@ -2,7 +2,7 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Build 14 Deploy 2: Background + Below-Fold Redesign
+// Build 14 Deploy 3: Background depth + below-fold contrast fix
 //
 // Deploy 2 changes:
 // - Removed all noise/grain textures for clean, smooth background
@@ -583,13 +583,14 @@ export default function CheckCalculator() {
     <div
       className="min-h-screen relative overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #0C1F17 0%, #0F2A1E 40%, #0C1F17 80%, #0C1F17 100%)",
+        background: "#0C1F17",
         fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
       }}
     >
-      {/* Ambient glows — matching homepage warmth, no grain */}
-      <div className="absolute top-[5%] right-[8%] w-[600px] h-[600px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 50%)", filter: "blur(100px)" }} />
-      <div className="absolute top-[40%] left-[3%] w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(5,150,105,0.03) 0%, transparent 50%)", filter: "blur(80px)" }} />
+      {/* Ambient aura glows — matching homepage depth (hero green + gold warmth) */}
+      <div className="absolute top-[0%] left-1/2 -translate-x-1/2 w-[900px] h-[700px] pointer-events-none" style={{ background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(15,42,30,0.8) 0%, transparent 70%)", filter: "blur(40px)" }} />
+      <div className="absolute top-[3%] right-[5%] w-[500px] h-[500px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 50%)", filter: "blur(100px)" }} />
+      <div className="absolute top-[25%] left-[0%] w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(5,150,105,0.03) 0%, transparent 50%)", filter: "blur(80px)" }} />
 
       {/* Main content */}
       <div className="relative z-10 mx-auto max-w-[580px] px-5 sm:px-6 pt-28 sm:pt-32 pb-10">
@@ -1266,33 +1267,38 @@ export default function CheckCalculator() {
            ═══════════════════════════════════════════════════════════════ */}
       <div className="relative z-10" style={{ background: "#0C1F17" }}>
 
+        {/* Ambient aura glows for depth — matching homepage "Know your numbers" section */}
+        <div className="absolute top-[5%] left-1/2 -translate-x-1/2 w-[900px] h-[600px] pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 30%, rgba(201,168,76,0.04) 0%, transparent 60%)", filter: "blur(60px)" }} />
+        <div className="absolute top-[30%] left-[5%] w-[500px] h-[500px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(15,42,30,0.6) 0%, transparent 50%)", filter: "blur(60px)" }} />
+        <div className="absolute bottom-[20%] right-[5%] w-[400px] h-[400px] pointer-events-none" style={{ background: "radial-gradient(circle, rgba(5,150,105,0.03) 0%, transparent 50%)", filter: "blur(80px)" }} />
+
         {/* Thin gold separator — minimal, elegant */}
         <div className="mx-auto max-w-[300px]">
           <div className="h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.15) 50%, transparent 100%)" }} />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-[780px] px-5 sm:px-6 pt-14 sm:pt-20 pb-16 sm:pb-24">
+        <div className="relative z-10 mx-auto max-w-[780px] px-5 sm:px-6 pt-16 sm:pt-24 pb-16 sm:pb-24">
 
           {/* ── Section Header (matching homepage style) ───────────── */}
           <ScrollReveal>
-            <div className="text-center mb-10 sm:mb-14">
+            <div className="text-center mb-12 sm:mb-16">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full mb-5" style={{ background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.1)" }}>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]/50" />
                 <span className="text-[10px] font-bold text-[#C9A84C]/60 uppercase tracking-wider">How It Works</span>
               </div>
-              <h2 className="text-[24px] sm:text-[32px] font-extrabold text-white tracking-[-0.03em] mb-3">
-                <span className="font-medium text-white/60">Two programs.</span>
+              <h2 className="text-[26px] sm:text-[36px] font-extrabold text-white tracking-[-0.03em] mb-4 leading-[1.15]">
+                <span className="font-medium text-white/50">Two programs.</span>
                 <br />
                 <span className="text-white">One right answer for your farm.</span>
               </h2>
-              <p className="text-[14px] sm:text-[15px] text-white/30 leading-relaxed max-w-[480px] mx-auto">
+              <p className="text-[15px] sm:text-[16px] text-white/35 leading-relaxed max-w-[500px] mx-auto">
                 Every year, farmers with base acres choose between ARC-CO and PLC. The right choice can mean thousands of dollars in difference.
               </p>
             </div>
           </ScrollReveal>
 
-          {/* ── ARC vs PLC Comparison — Bento Cards (matching homepage) ── */}
-          <div className="grid sm:grid-cols-2 gap-4 mb-14 sm:mb-20">
+          {/* ── ARC vs PLC Comparison — Bento Cards ────────────────── */}
+          <div className="grid sm:grid-cols-2 gap-4 mb-16 sm:mb-24">
             {[
               {
                 label: "ARC-CO",
@@ -1319,16 +1325,20 @@ export default function CheckCalculator() {
             ].map((card, i) => (
               <ScrollReveal key={card.label} delay={i * 100}>
                 <div
-                  className="p-6 sm:p-7 rounded-[20px] border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] hover:bg-white/[0.03] transition-all duration-300 h-full"
+                  className="p-7 sm:p-8 rounded-[20px] hover:border-white/[0.12] transition-all duration-300 h-full"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}
                 >
-                  <div className="flex items-center gap-2.5 mb-4">
-                    <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: `${card.accent}10`, border: `1px solid ${card.accent}20` }}>
+                  <div className="flex items-center gap-2.5 mb-5">
+                    <div className="w-9 h-9 rounded-[10px] flex items-center justify-center" style={{ background: `${card.accent}12`, border: `1px solid ${card.accent}25` }}>
                       {card.icon}
                     </div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: card.accent }}>{card.label}</span>
+                    <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: card.accent }}>{card.label}</span>
                   </div>
-                  <h3 className="text-[16px] sm:text-[17px] font-bold text-white mb-2">{card.title}</h3>
-                  <p className="text-[13px] text-white/30 leading-relaxed">{card.desc}</p>
+                  <h3 className="text-[18px] sm:text-[19px] font-bold text-white/90 mb-3">{card.title}</h3>
+                  <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed">{card.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
@@ -1336,9 +1346,15 @@ export default function CheckCalculator() {
 
           {/* ── OBBBA Changes — Bento Card (single wide card) ────────── */}
           <ScrollReveal>
-            <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8 mb-14 sm:mb-20">
-              <div className="flex items-center gap-2.5 mb-5">
-                <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)" }}>
+            <div
+              className="rounded-[20px] p-7 sm:p-9 mb-16 sm:mb-24"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <div className="flex items-center gap-2.5 mb-6">
+                <div className="w-9 h-9 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.15)" }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <polyline points="14 2 14 8 20 8" />
@@ -1346,12 +1362,12 @@ export default function CheckCalculator() {
                     <line x1="16" y1="17" x2="8" y2="17" />
                   </svg>
                 </div>
-                <span className="text-[11px] font-bold text-[#C9A84C]/60 uppercase tracking-wider">2025 Farm Bill</span>
+                <span className="text-[12px] font-bold text-[#C9A84C]/60 uppercase tracking-wider">2025 Farm Bill</span>
               </div>
-              <h3 className="text-[18px] sm:text-[20px] font-extrabold text-white tracking-[-0.02em] mb-5">
+              <h3 className="text-[20px] sm:text-[24px] font-extrabold text-white/90 tracking-[-0.02em] mb-6">
                 What changed under OBBBA?
               </h3>
-              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
+              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
                 {[
                   "ARC guarantee raised to 90% of benchmark",
                   "Payment cap raised to 12% of benchmark",
@@ -1362,7 +1378,7 @@ export default function CheckCalculator() {
                   "30M new base acres now eligible",
                   "Programs extended through 2031",
                 ].map((item) => (
-                  <div key={item} className="flex items-start gap-2.5 text-[13px] text-white/35 leading-relaxed">
+                  <div key={item} className="flex items-start gap-2.5 text-[14px] sm:text-[15px] text-white/40 leading-relaxed">
                     <span className="text-[#C9A84C] mt-0.5 shrink-0"><IconCheck /></span>
                     {item}
                   </div>
@@ -1373,14 +1389,14 @@ export default function CheckCalculator() {
 
           {/* ── FAQ — Clean Card Style ────────────────────────────── */}
           <ScrollReveal>
-            <div className="mb-14 sm:mb-20">
-              <div className="flex items-center gap-2.5 mb-6">
-                <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="mb-16 sm:mb-24">
+              <div className="flex items-center gap-2.5 mb-7">
+                <div className="w-9 h-9 rounded-[10px] flex items-center justify-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
                 </div>
-                <h2 className="text-[18px] sm:text-[20px] font-extrabold text-white tracking-[-0.02em]">
+                <h2 className="text-[20px] sm:text-[24px] font-extrabold text-white/90 tracking-[-0.02em]">
                   Frequently asked questions
                 </h2>
               </div>
@@ -1407,14 +1423,21 @@ export default function CheckCalculator() {
                     a: "The free calculator processes everything in your browser — no farm data is stored on our servers unless you create an account. We never sell your data to third parties. See our privacy policy for full details.",
                   },
                 ].map((faq) => (
-                  <details key={faq.q} className="group rounded-[16px] border border-white/[0.06] bg-white/[0.02] overflow-hidden hover:border-white/[0.1] transition-all duration-200">
-                    <summary className="flex items-center justify-between p-4 sm:p-5 cursor-pointer text-[14px] sm:text-[15px] font-semibold text-white/60 hover:text-white/80 transition-colors list-none [&::-webkit-details-marker]:hidden">
+                  <details
+                    key={faq.q}
+                    className="group rounded-[16px] overflow-hidden hover:border-white/[0.12] transition-all duration-200"
+                    style={{
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    <summary className="flex items-center justify-between p-5 sm:p-6 cursor-pointer text-[15px] sm:text-[16px] font-semibold text-white/70 hover:text-white/90 transition-colors list-none [&::-webkit-details-marker]:hidden">
                       {faq.q}
-                      <svg className="w-4 h-4 text-white/20 group-open:rotate-180 transition-transform shrink-0 ml-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="w-4 h-4 text-white/25 group-open:rotate-180 transition-transform shrink-0 ml-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="6 9 12 15 18 9" />
                       </svg>
                     </summary>
-                    <div className="px-4 sm:px-5 pb-4 sm:pb-5 text-[13px] text-white/30 leading-relaxed -mt-1">
+                    <div className="px-5 sm:px-6 pb-5 sm:pb-6 text-[14px] sm:text-[15px] text-white/35 leading-relaxed -mt-1">
                       {faq.a}
                     </div>
                   </details>
@@ -1425,9 +1448,15 @@ export default function CheckCalculator() {
 
           {/* ── Data Sources — Horizontal Trust Bar ────────────────── */}
           <ScrollReveal>
-            <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6">
-              <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-4">Built on official data sources</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div
+              className="rounded-[20px] p-6 sm:p-7"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <h3 className="text-[12px] font-bold text-white/40 uppercase tracking-wider mb-5">Built on official data sources</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
                 {[
                   { abbr: "NASS", name: "County yields via Quick Stats API" },
                   { abbr: "FSA", name: "ARC/PLC program rules" },
@@ -1435,8 +1464,8 @@ export default function CheckCalculator() {
                   { abbr: "ERS", name: "Price forecasts & baselines" },
                 ].map((src) => (
                   <div key={src.abbr} className="text-center">
-                    <div className="text-[15px] font-extrabold text-[#C9A84C]/50 mb-1">{src.abbr}</div>
-                    <div className="text-[11px] text-white/20 leading-snug">{src.name}</div>
+                    <div className="text-[16px] font-extrabold text-[#C9A84C]/50 mb-1">{src.abbr}</div>
+                    <div className="text-[12px] text-white/25 leading-snug">{src.name}</div>
                   </div>
                 ))}
               </div>
