@@ -1,25 +1,20 @@
 // =============================================================================
-// HarvestFile — HeroSection (COMPLETE REWRITE)
-// Build 13 Deploy 2 (Deploy 2B): Bold Hero Redesign
+// HarvestFile — HeroSection (v2 — Research-Informed Redesign)
+// Build 13 Deploy 2B: Bold, Trustworthy, Farmer-First Hero
 //
-// WHAT CHANGED:
-//   - REMOVED all inline data fetching (grain bids, weather, futures)
-//   - REMOVED HeroDataCards, GrainCard, WeatherMiniCard, PaymentMiniCard
-//   - REMOVED HeroCardsSkeleton, CROP_PARAMS, calc functions
-//   - Data cards were redundant with MarketTicker (now at position 3)
-//   - Hero is now: bold headline → subtext → CTA → email capture → trust
-//   - Geo-personalization appears in CTA button text and subheadline
-//   - File: 32KB → ~8KB | 750 lines → ~180 lines
-//
-// WHY:
-//   Research shows heroes with <44 char headlines and 1 CTA convert best.
-//   Live data creates cognitive overload in the 50ms first-impression window.
-//   The hero sells the promise; the MarketTicker (below) proves it.
+// DESIGN PRINCIPLES (from typography + farmer trust research):
+//   - Zero italic serif — Bricolage Grotesque only, using weight contrast
+//   - Headline leads with benefit: "Know exactly what your farm is owed"
+//   - Gold gradient applied to only 1-2 accent words, not entire lines
+//   - Geo-personalized eyebrow: "Live ARC/PLC data for [County], [State]"
+//   - CTA shows detected county name for 202% conversion lift
+//   - USDA data attribution adjacent to CTA (farmer trust signal)
+//   - No data cards in hero (MarketTicker at position 3 handles this)
 //
 // Architecture:
-//   - Server Component shell renders headline + CTA instantly
-//   - HeroEmailCapture is the only client component (~3KB)
-//   - Total client JS: ~3KB (email form only)
+//   - Server Component (zero client JS except HeroEmailCapture ~3KB)
+//   - All hover effects via CSS classes (no JS event handlers)
+//   - Off-white text (#F0EDE6) on dark (#0C1F17) — 15:1 contrast ratio
 // =============================================================================
 
 import Link from 'next/link';
@@ -57,7 +52,7 @@ export function HeroSection({
     <section className="relative overflow-hidden" style={{ background: '#0C1F17' }}>
       {/* ─── Background layers ──────────────────────────────────────────── */}
 
-      {/* Primary radial gradient — creates depth behind headline */}
+      {/* Primary radial — creates depth behind headline */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -66,16 +61,16 @@ export function HeroSection({
         }}
       />
 
-      {/* Gold accent glow — subtle warmth behind the headline */}
+      {/* Gold accent glow — subtle warmth, not dominant */}
       <div
         className="absolute pointer-events-none"
         style={{
-          top: '15%',
+          top: '20%',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '600px',
-          height: '300px',
-          background: 'radial-gradient(ellipse, rgba(201,168,76,0.06) 0%, transparent 70%)',
+          width: '500px',
+          height: '250px',
+          background: 'radial-gradient(ellipse, rgba(201,168,76,0.05) 0%, transparent 70%)',
           filter: 'blur(60px)',
         }}
       />
@@ -86,96 +81,106 @@ export function HeroSection({
       {/* ─── Content ────────────────────────────────────────────────────── */}
       <div className="relative z-10 mx-auto max-w-[1100px] px-5 pt-32 pb-16 sm:pt-36 sm:pb-20 md:pt-40 md:pb-24">
 
-        {/* Eyebrow badge */}
-        <div className="text-center mb-6">
+        {/* ─── Geo-Personalized Eyebrow ─────────────────────────────────── */}
+        <div className="text-center mb-7">
           {locationLine ? (
             <div
-              className="inline-flex items-center gap-2 rounded-full px-4 py-1.5"
+              className="inline-flex items-center gap-2.5 rounded-full px-4 py-1.5"
               style={{
                 background: 'rgba(201,168,76,0.08)',
                 border: '1px solid rgba(201,168,76,0.15)',
               }}
             >
               <div
-                className="w-1.5 h-1.5 rounded-full"
+                className="w-1.5 h-1.5 rounded-full shrink-0"
                 style={{
                   background: '#22C55E',
                   boxShadow: '0 0 6px rgba(34,197,94,0.5)',
                 }}
               />
               <span
-                className="text-[12px] font-semibold"
-                style={{ color: 'rgba(201,168,76,0.8)' }}
+                className="text-[12px] font-semibold tracking-wide"
+                style={{ color: 'rgba(201,168,76,0.85)' }}
               >
-                Today in {locationLine}
+                Live ARC/PLC data for {locationLine}
               </span>
             </div>
           ) : (
             <div
-              className="inline-flex items-center gap-2 rounded-full px-4 py-1.5"
+              className="inline-flex items-center gap-2.5 rounded-full px-4 py-1.5"
               style={{
                 background: 'rgba(201,168,76,0.08)',
                 border: '1px solid rgba(201,168,76,0.15)',
               }}
             >
+              <div
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{
+                  background: '#22C55E',
+                  boxShadow: '0 0 6px rgba(34,197,94,0.5)',
+                }}
+              />
               <span
-                className="text-[12px] font-semibold"
-                style={{ color: 'rgba(201,168,76,0.8)' }}
+                className="text-[12px] font-semibold tracking-wide"
+                style={{ color: 'rgba(201,168,76,0.85)' }}
               >
-                3,143 counties. Updated daily. Free.
+                Live ARC/PLC data for 3,143 U.S. counties
               </span>
             </div>
           )}
         </div>
 
         {/* ─── Headline ─────────────────────────────────────────────────── */}
-        <h1 className="text-center mb-5">
-          <span
-            className="block text-white"
-            style={{
-              fontSize: 'clamp(2.5rem, 5.5vw + 0.5rem, 4.5rem)',
-              lineHeight: 1.05,
-              letterSpacing: '-0.035em',
-              fontWeight: 700,
-            }}
-          >
-            Your farm&apos;s
+        {/*
+          Research: benefit-driven, specific, under 44 characters.
+          Weight contrast within Bricolage Grotesque creates hierarchy:
+          - "Know exactly what" = Bold (700)
+          - "your farm" = ExtraBold (800) + gold gradient accent
+          - "is owed." = Bold (700)
+          All one font family. Zero italic serif. Zero decorative fonts.
+        */}
+        <h1
+          className="text-center mb-6"
+          style={{
+            fontSize: 'clamp(2.25rem, 5vw + 0.5rem, 4rem)',
+            lineHeight: 1.08,
+            letterSpacing: '-0.03em',
+          }}
+        >
+          <span className="text-white/90 font-bold">
+            Know exactly what{' '}
           </span>
           <span
-            className="block"
+            className="font-extrabold"
             style={{
-              fontSize: 'clamp(2.5rem, 5.5vw + 0.5rem, 4.5rem)',
-              lineHeight: 1.05,
-              letterSpacing: '-0.035em',
-              fontWeight: 400,
-              fontFamily: 'var(--font-instrument)',
-              fontStyle: 'italic',
-              backgroundImage: 'linear-gradient(135deg, #C9A84C 0%, #E2C366 50%, #C9A84C 100%)',
+              backgroundImage: 'linear-gradient(135deg, #C9A84C, #E2C366, #D4B55A)',
               WebkitBackgroundClip: 'text',
               backgroundClip: 'text',
               color: 'transparent',
             }}
           >
-            financial intelligence.
+            your&nbsp;farm
+          </span>
+          <span className="text-white/90 font-bold">
+            {' '}is&nbsp;owed.
           </span>
         </h1>
 
         {/* ─── Subheadline ──────────────────────────────────────────────── */}
         <p
-          className="text-center max-w-xl mx-auto mb-10 leading-relaxed"
+          className="text-center max-w-lg mx-auto mb-10 leading-relaxed"
           style={{
             color: 'rgba(255,255,255,0.45)',
-            fontSize: 'clamp(0.95rem, 1.2vw, 1.125rem)',
+            fontSize: 'clamp(0.95rem, 1.1vw + 0.1rem, 1.1rem)',
           }}
         >
           Live grain prices, ARC/PLC payment estimates, and county election
-          data — updated daily
-          {locationLine ? ` for ${locationLine}` : ' for every county in America'}.
-          {' '}Free. No account needed.
+          data{locationLine ? ` for ${locationLine}` : ''} — updated daily
+          from official USDA sources. Free. No account needed.
         </p>
 
         {/* ─── Primary CTA ──────────────────────────────────────────────── */}
-        <div className="text-center mb-8">
+        <div className="flex flex-col items-center gap-3 mb-10">
           <Link
             href="/check"
             className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl
@@ -187,7 +192,9 @@ export function HeroSection({
               active:translate-y-0
               transition-all duration-200"
           >
-            {locationLine ? `See ${countyName} Data` : 'Get Started Free'}
+            {locationLine
+              ? `See ${countyName}\u2019s Data \u2014 Free`
+              : 'Find Your County \u2014 Free'}
             <svg
               width="16"
               height="16"
@@ -201,6 +208,26 @@ export function HeroSection({
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </Link>
+
+          {/* USDA attribution — critical farmer trust signal */}
+          <span
+            className="text-[11px] font-medium flex items-center gap-1.5"
+            style={{ color: 'rgba(255,255,255,0.25)' }}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(201,168,76,0.4)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 21h18M4 18h16M6 18V9m4 9V9m4 9V9m4 9V9M2 9l10-6 10 6" />
+            </svg>
+            Data sourced from USDA NASS, FSA, and Barchart
+          </span>
         </div>
 
         {/* ─── Email Capture ────────────────────────────────────────────── */}
@@ -255,7 +282,7 @@ export function HeroSection({
           ))}
         </div>
 
-        {/* ─── County fallback ──────────────────────────────────────────── */}
+        {/* ─── County fallback link ─────────────────────────────────────── */}
         {detected && locationLine && (
           <div className="text-center mt-6">
             <Link
