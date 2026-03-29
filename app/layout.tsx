@@ -2,21 +2,18 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { Bricolage_Grotesque, Instrument_Serif, Geist } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Serif } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
-
 // =============================================================================
 // HarvestFile — Root Layout
-// Build 2: Upgraded to next/font/google for zero-CLS font loading
+// Build 14: shadcn/ui integration — Geist removed, Bricolage Grotesque primary
 // =============================================================================
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
-  variable: "--font-bricolage",
+  variable: "--font-sans",
   display: "swap",
   fallback: ["DM Sans", "system-ui", "-apple-system", "sans-serif"],
 });
@@ -135,7 +132,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(bricolage.variable, instrumentSerif.variable, "font-sans", geist.variable)}
+      className={cn(bricolage.variable, instrumentSerif.variable, "font-sans")}
     >
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
