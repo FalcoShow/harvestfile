@@ -2,6 +2,19 @@
 
 import { useEffect, useState, useCallback } from 'react';
 
+// =============================================================================
+// HarvestFile — MarketTicker (Client Component)
+// Build 13 Deploy 2E: Final Homepage Polish
+//
+// CHANGES:
+//   - Replaced C/S/W letter badges with recognizable SVG crop icons
+//     (corn ear, soybean pod, wheat stalk) matching the gold icon style
+//   - REMOVED dangerouslySetInnerHTML <style> tag — hf-pulse animation
+//     already exists in globals.css (eliminates hydration risk)
+//   - All other functionality preserved: live Yahoo Finance prices,
+//     PLC payment status, price reference bar, 5-min auto-refresh
+// =============================================================================
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // OBBBA Effective Reference Prices (ERP) — the PLC payment trigger thresholds
 // These are the prices below which PLC payments kick in for 2025/2026
@@ -54,6 +67,55 @@ interface TickerData {
   wheat: PriceData | null;
   lastUpdated: string | null;
   error: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SVG Crop Icons — replaces plain C/S/W letter badges
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CornIcon({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2c-1 4-4 6-4 12 0 3 2 6 4 8 2-2 4-5 4-8 0-6-3-8-4-12z" />
+      <path d="M8 10c-1.5.5-3 2-3 4" />
+      <path d="M16 10c1.5.5 3 2 3 4" />
+      <path d="M12 6v16" opacity="0.4" />
+    </svg>
+  );
+}
+
+function SoybeanIcon({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="9" cy="10" rx="4" ry="6" />
+      <ellipse cx="15" cy="10" rx="4" ry="6" />
+      <path d="M12 4c0 0-1 3-1 6s1 6 1 6" opacity="0.4" />
+      <path d="M7 18c2 2 8 2 10 0" />
+    </svg>
+  );
+}
+
+function WheatIcon({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22V8" />
+      <path d="M9 5c0 0 3 1 3 3" />
+      <path d="M15 5c0 0-3 1-3 3" />
+      <path d="M8 8c0 0 4 1 4 3" />
+      <path d="M16 8c0 0-4 1-4 3" />
+      <path d="M9 12c0 0 3 1 3 2" />
+      <path d="M15 12c0 0-3 1-3 2" />
+      <path d="M12 2l-1 3h2l-1-3z" fill={color} stroke="none" opacity="0.6" />
+    </svg>
+  );
+}
+
+function getCropIcon(key: CommodityKey, color: string) {
+  switch (key) {
+    case 'corn': return <CornIcon color={color} />;
+    case 'soybeans': return <SoybeanIcon color={color} />;
+    case 'wheat': return <WheatIcon color={color} />;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -151,7 +213,6 @@ function TickerSkeleton() {
 // Price Reference Bar — visual gauge showing price position relative to ERP
 // ═══════════════════════════════════════════════════════════════════════════════
 function PriceBar({ price, erp, loanRate }: { price: number; erp: number; loanRate: number }) {
-  // Scale: loanRate to erp+20% of range
   const range = erp - loanRate;
   const scaleMax = erp + range * 0.3;
   const scaleMin = loanRate;
@@ -223,17 +284,16 @@ function CommodityCard({
         (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
       }}
     >
-      {/* Commodity Header */}
+      {/* Commodity Header — SVG crop icons replace letter badges */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-extrabold tracking-tight"
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{
               background: `${config.color}18`,
-              color: config.color,
             }}
           >
-            {commodityKey === 'corn' ? 'C' : commodityKey === 'soybeans' ? 'S' : 'W'}
+            {getCropIcon(commodityKey, config.color)}
           </div>
           <span
             className="font-semibold text-sm tracking-wide"
@@ -327,7 +387,6 @@ export function MarketTicker() {
       if (!res.ok) throw new Error('Fetch failed');
       const json = await res.json();
 
-      // API returns: { success, data: { CORN: { latestSettle, change, changePct, ... }, SOYBEANS: {...}, WHEAT: {...} } }
       const apiData = json.data || json;
 
       const parseCommodity = (raw: Record<string, unknown>): PriceData | null => {
@@ -336,14 +395,11 @@ export function MarketTicker() {
         if (price === 0) return null;
         const change = Number(raw.change || 0);
         const changePct = Number(raw.changePct || raw.changePct === 0 ? raw.changePct : 0);
-        // Check if market is open: compare latestDate to today
         const today = new Date().toISOString().split('T')[0];
         const latestDate = String(raw.latestDate || '');
         const isToday = latestDate === today;
         const now = new Date();
         const hour = now.getUTCHours();
-        // CME grain futures: open Sun 7PM CT - Fri 1:20PM CT
-        // Approximate: market open Mon-Fri 8AM-2PM CT (13:00-19:00 UTC)
         const isWeekday = now.getUTCDay() >= 1 && now.getUTCDay() <= 5;
         const isTradingHours = hour >= 13 && hour <= 19;
         return {
@@ -374,13 +430,12 @@ export function MarketTicker() {
 
   useEffect(() => {
     fetchPrices();
-    // Refresh every 5 minutes
     const interval = setInterval(fetchPrices, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchPrices]);
 
   if (loading) return <TickerSkeleton />;
-  if (data.error && !data.corn) return null; // Silently hide on total failure
+  if (data.error && !data.corn) return null;
 
   const commodities: CommodityKey[] = ['corn', 'soybeans', 'wheat'];
   const hasData = commodities.some((k) => data[k] !== null);
@@ -393,11 +448,10 @@ export function MarketTicker() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
             <div
-              className="w-2 h-2 rounded-full"
+              className="w-2 h-2 rounded-full hf-pulse-dot"
               style={{
                 background: '#22C55E',
                 boxShadow: '0 0 6px rgba(34,197,94,0.4)',
-                animation: 'hf-pulse 2s ease-in-out infinite',
               }}
             />
             <span
@@ -434,7 +488,6 @@ export function MarketTicker() {
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
               {(() => {
-                // Calculate which commodities are below ERP
                 const belowErp = commodities.filter(
                   (k) => data[k] && data[k]!.price < COMMODITY_CONFIG[k].erp
                 );
@@ -460,14 +513,6 @@ export function MarketTicker() {
           CME settlement prices via Yahoo Finance. Reference prices per OBBBA (Pub. L. 119-21). Data for educational purposes only.
         </p>
       </div>
-
-      {/* Pulse animation */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes hf-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}} />
     </section>
   );
 }
