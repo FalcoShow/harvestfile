@@ -175,13 +175,21 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* iOS horizontal scroll fix — BOTH html AND body required */
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
     @apply font-sans;
   }
 
   body {
     background: var(--hf-background);
     color: var(--hf-foreground);
+    /* iOS horizontal scroll fix — prevents white bar on swipe/pinch */
     overflow-x: hidden;
+    overscroll-behavior-x: none;
+    position: relative;
+    width: 100%; /* NOT 100vw — 100vw includes scrollbar width and overflows */
+    min-height: 100svh; /* Small viewport height — accounts for iOS Safari dynamic toolbar */
     font-family: var(--font-sans);
     @apply bg-background text-foreground;
   }

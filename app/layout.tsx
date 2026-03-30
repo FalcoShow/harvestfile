@@ -8,7 +8,13 @@ import { cn } from "@/lib/utils";
 
 // =============================================================================
 // HarvestFile — Root Layout
-// Build 14: shadcn/ui integration — Geist removed, Bricolage Grotesque primary
+// Build 17 Deploy 1: iOS horizontal scroll fix
+//
+// Changes from Build 14:
+//   1. overflow-x-hidden + overscroll-behavior-x: none on html AND body
+//   2. Removed maximumScale: 5 (accessibility violation — prevents pinch zoom)
+//   3. min-h-svh on body for iOS Safari dynamic toolbar
+//   4. w-full (not w-screen) to prevent 100vw overflow
 // =============================================================================
 
 const bricolage = Bricolage_Grotesque({
@@ -114,10 +120,12 @@ export const metadata: Metadata = {
   category: "agriculture",
 };
 
+// ── Viewport: iOS Safari hardening ──────────────────────────────────────
+// Removed maximumScale restriction — violates WCAG accessibility standards.
+// overflow-x fix handled via Tailwind classes on html/body elements.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FAFAF6" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0f0d" },
@@ -132,13 +140,19 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(bricolage.variable, instrumentSerif.variable, "font-sans")}
+      className={cn(
+        bricolage.variable,
+        instrumentSerif.variable,
+        "font-sans",
+        // iOS horizontal scroll fix — prevents white bar on swipe/pinch
+        "overflow-x-hidden overscroll-x-none"
+      )}
     >
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <JsonLd />
       </head>
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased overflow-x-hidden overscroll-x-none relative w-full min-h-svh">
         {children}
         <Analytics />
         <SpeedInsights />
