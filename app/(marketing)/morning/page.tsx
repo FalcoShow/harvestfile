@@ -1,6 +1,6 @@
 // =============================================================================
 // app/(marketing)/morning/page.tsx
-// HarvestFile — Build 17 Deploy 2: Morning Dashboard Visual Redesign
+// HarvestFile — Build 17 Deploy 3: Morning Dashboard FULL DARK THEME
 //
 // SERVER COMPONENT — renders static sections instantly (zero JS), wraps
 // the interactive data sections in a client boundary.
@@ -10,12 +10,15 @@
 //   Client-rendered (interactive): header, payment estimate, weather, markets,
 //     grain bids — all managed by MorningDashboardClient with shared state
 //
-// Build 17 changes:
-//   1. Consistent card styling (border-gray-100/80, no shadows by default)
-//   2. tabular-nums on countdown numbers
-//   3. Typography restraint (font-semibold not font-bold on titles)
-//   4. Refined calendar card with better imminent-report styling
-//   5. Bottom CTA with improved visual hierarchy
+// Build 17 Deploy 3 changes:
+//   FULL DARK THEME — all cards flip from white to dark forest green
+//   Design target: homepage bento Morning Dashboard preview card
+//   - Page bg: dark gradient (#050f09 → mesh aurora)
+//   - Cards: rgba(27,67,50,0.30) with white/6% borders
+//   - Text: white opacity hierarchy (87%/60%/38%)
+//   - CalendarCard: dark variant with amber imminent styling
+//   - BottomCTA: refined for dark context (gold gradient preserved)
+//   - Skeletons: dark shimmer states
 //
 // Performance targets:
 //   FCP: < 1.0s (server HTML streams immediately)
@@ -78,12 +81,12 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
   if (reports.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-gray-100/80 bg-white p-5 sm:p-6">
+    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-4">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" />
         </svg>
-        <h2 className="text-sm font-semibold text-gray-900 tracking-tight">USDA Reports That Move Markets</h2>
+        <h2 className="text-sm font-semibold text-white/90 tracking-tight">USDA Reports That Move Markets</h2>
       </div>
 
       <div className="space-y-2">
@@ -97,20 +100,20 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
               key={`${r.name}-${r.date}-${i}`}
               className={`flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors ${
                 isImminent
-                  ? 'bg-amber-50/70 border border-amber-100'
-                  : 'bg-gray-50/70 border border-gray-100/50'
+                  ? 'bg-amber-500/[0.08] border border-amber-500/20'
+                  : 'bg-white/[0.03] border border-white/[0.04]'
               }`}
             >
               {/* Date chip */}
               <div className="flex-shrink-0 text-center w-12">
                 <div
                   className={`text-[10px] font-bold uppercase tracking-wider ${
-                    isImminent ? 'text-amber-500' : 'text-gray-400'
+                    isImminent ? 'text-amber-400' : 'text-white/30'
                   }`}
                 >
                   {dateObj.toLocaleDateString('en-US', { month: 'short' })}
                 </div>
-                <div className={`text-lg font-bold tabular-nums ${isImminent ? 'text-amber-700' : 'text-gray-800'}`}>
+                <div className={`text-lg font-bold tabular-nums ${isImminent ? 'text-amber-300' : 'text-white/80'}`}>
                   {dateObj.getDate()}
                 </div>
               </div>
@@ -118,18 +121,18 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
               {/* Report info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-900 truncate">{r.name}</span>
+                  <span className="text-sm font-semibold text-white/90 truncate">{r.name}</span>
                   {r.impact === 'high' && (
-                    <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-600 uppercase">
+                    <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 uppercase">
                       High Impact
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-gray-500 mt-0.5 truncate">{r.shortDesc}</p>
+                <p className="text-[11px] text-white/30 mt-0.5 truncate">{r.shortDesc}</p>
               </div>
 
               {/* Days countdown */}
-              <div className={`flex-shrink-0 text-xs font-bold tabular-nums ${isImminent ? 'text-amber-600' : 'text-gray-400'}`}>
+              <div className={`flex-shrink-0 text-xs font-bold tabular-nums ${isImminent ? 'text-amber-400' : 'text-white/25'}`}>
                 {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`}
               </div>
             </div>
@@ -139,7 +142,7 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
 
       <Link
         href="/calendar"
-        className="flex items-center justify-center gap-1 mt-3 text-xs font-semibold text-[#1B4332] hover:text-emerald-600 transition-colors"
+        className="flex items-center justify-center gap-1 mt-3 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
       >
         Full USDA calendar
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -156,8 +159,10 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
 
 function BottomCTA() {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 text-center relative overflow-hidden">
+    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#163826] to-[#1B4332] p-6 text-center relative overflow-hidden">
       <div className="hf-noise-subtle" />
+      {/* Subtle gold glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[200px] bg-[radial-gradient(ellipse,rgba(201,168,76,0.08)_0%,transparent_70%)] pointer-events-none" />
       <div className="relative z-10">
         <h3 className="text-lg font-bold text-white tracking-[-0.02em] mb-2">
           See what today&apos;s prices mean for{' '}
@@ -165,7 +170,7 @@ function BottomCTA() {
             your farm
           </span>
         </h3>
-        <p className="text-white/40 text-sm mb-4 max-w-md mx-auto">
+        <p className="text-white/30 text-sm mb-4 max-w-md mx-auto">
           Enter your county and crops to get personalized ARC/PLC payment projections based on live market data.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -178,7 +183,7 @@ function BottomCTA() {
               <path d="m9 18 6-6-6-6" />
             </svg>
           </Link>
-          <Link href="/signup" className="text-white/40 hover:text-white text-sm font-medium transition-colors">
+          <Link href="/signup" className="text-white/30 hover:text-white/60 text-sm font-medium transition-colors">
             Create free account →
           </Link>
         </div>
@@ -188,7 +193,7 @@ function BottomCTA() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LOADING SKELETON (shown while client component loads)
+// LOADING SKELETON (shown while client component loads) — DARK THEME
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MorningSkeleton() {
@@ -197,9 +202,9 @@ function MorningSkeleton() {
       {/* Header skeleton */}
       <section className="relative bg-gradient-to-br from-[#0C1F17] via-[#1B4332] to-[#0f2b1e] pt-24 pb-8 sm:pt-28 sm:pb-10">
         <div className="mx-auto max-w-[680px] px-5">
-          <div className="w-48 h-8 rounded-lg bg-white/10 animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/10 via-white/5 to-white/10 mb-2" />
-          <div className="w-64 h-4 rounded bg-white/5 animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/5 via-white/[0.02] to-white/5 mb-5" />
-          <div className="w-36 h-9 rounded-xl bg-white/5 animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/5 via-white/[0.02] to-white/5" />
+          <div className="w-48 h-8 rounded-lg bg-white/[0.06] animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/[0.06] via-white/[0.03] to-white/[0.06] mb-2" />
+          <div className="w-64 h-4 rounded bg-white/[0.04] animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/[0.04] via-white/[0.02] to-white/[0.04] mb-5" />
+          <div className="w-36 h-9 rounded-xl bg-white/[0.04] animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/[0.04] via-white/[0.02] to-white/[0.04]" />
         </div>
       </section>
 
@@ -208,18 +213,18 @@ function MorningSkeleton() {
         {/* Quick actions skeleton */}
         <div className="grid grid-cols-4 gap-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[72px] rounded-xl bg-white border border-gray-100/80 animate-pulse" />
+            <div key={i} className="h-[72px] rounded-xl bg-white/[0.04] border border-white/[0.06] animate-pulse" />
           ))}
         </div>
 
         {/* Payment card skeleton */}
-        <div className="rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 h-[260px] animate-pulse" />
+        <div className="rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] border border-white/[0.06] p-6 h-[260px] animate-pulse" />
 
         {/* Weather skeleton */}
-        <div className="rounded-2xl border border-gray-100/80 bg-white p-6 h-[200px] animate-pulse" />
+        <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-6 h-[200px] animate-pulse" />
 
         {/* Markets skeleton */}
-        <div className="rounded-2xl border border-gray-100/80 bg-white p-6 h-[280px] animate-pulse" />
+        <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-6 h-[280px] animate-pulse" />
       </div>
     </>
   );
@@ -233,25 +238,45 @@ export default function MorningPage() {
   const reports = getUpcomingReports();
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7]">
-      {/* ═══ INTERACTIVE SECTIONS (Client Component) ═══ */}
-      <Suspense fallback={<MorningSkeleton />}>
-        <MorningDashboardClient />
-      </Suspense>
+    <div className="min-h-screen bg-[#050f09] relative overflow-hidden">
+      {/* Aurora mesh gradient background — creates depth without competing with data */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage: [
+            'radial-gradient(at 40% 20%, rgba(16,185,129,0.06) 0px, transparent 50%)',
+            'radial-gradient(at 80% 0%, rgba(6,95,70,0.05) 0px, transparent 50%)',
+            'radial-gradient(at 0% 80%, rgba(5,150,105,0.04) 0px, transparent 50%)',
+            'radial-gradient(at 60% 60%, rgba(201,168,76,0.03) 0px, transparent 50%)',
+          ].join(','),
+        }}
+      />
+      {/* Subtle noise texture */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+      }} />
 
-      {/* ═══ SERVER-RENDERED SECTIONS (zero JS, instant) ═══ */}
-      <div className="mx-auto max-w-[680px] px-5 space-y-4 pb-20">
-        {/* USDA Calendar */}
-        <CalendarCard reports={reports} />
+      {/* Content layer */}
+      <div className="relative z-10">
+        {/* ═══ INTERACTIVE SECTIONS (Client Component) ═══ */}
+        <Suspense fallback={<MorningSkeleton />}>
+          <MorningDashboardClient />
+        </Suspense>
 
-        {/* Bottom CTA */}
-        <BottomCTA />
+        {/* ═══ SERVER-RENDERED SECTIONS (zero JS, instant) ═══ */}
+        <div className="mx-auto max-w-[680px] px-5 space-y-4 pb-20">
+          {/* USDA Calendar */}
+          <CalendarCard reports={reports} />
 
-        {/* Data freshness note */}
-        <p className="text-center text-[10px] text-gray-300 px-4">
-          Futures: CME settlement prices via Nasdaq Data Link, updated daily after 1:15 PM CT.
-          Weather: Open-Meteo, updated hourly. Market data provided by Barchart. Data for educational purposes only.
-        </p>
+          {/* Bottom CTA */}
+          <BottomCTA />
+
+          {/* Data freshness note */}
+          <p className="text-center text-[10px] text-white/15 px-4">
+            Futures: CME settlement prices via Nasdaq Data Link, updated daily after 1:15 PM CT.
+            Weather: Open-Meteo, updated hourly. Market data provided by Barchart. Data for educational purposes only.
+          </p>
+        </div>
       </div>
     </div>
   );

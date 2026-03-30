@@ -1,26 +1,23 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
-// HarvestFile — Build 17 Deploy 2: Morning Dashboard Visual Redesign
+// HarvestFile — Build 17 Deploy 3: Morning Dashboard FULL DARK THEME
 //
 // CLIENT COMPONENT — handles all interactive/data-driven sections:
 //   - Morning header with greeting + market status
 //   - Quick action links
-//   - Payment estimate card (via PaymentEstimateCard)
+//   - Payment estimate card (via PaymentEstimateCard — already dark)
 //   - Weather card with geolocation + API fetching
 //   - Markets card with price polling + PLC impact
 //   - Grain bid card (via GrainBidCard)
 //
-// Build 17 changes from Build 10:
-//   1. tabular-nums on ALL financial numbers
-//   2. Shimmer skeleton loading (replaces basic pulse)
-//   3. Scroll-triggered fade-up animations via IntersectionObserver
-//   4. Refined card borders and spacing (no shadows by default)
-//   5. Typography restraint — weight 400/500 default, 700 hero only
-//   6. 48px+ touch targets for farmer demographics
-//   7. Consistent SVG crop icons (no emojis)
-//   8. Market status with proper pulse animation
-//   9. Better visual hierarchy in MarketsCard (PLC callouts)
-//  10. prefers-reduced-motion respected
+// Build 17 Deploy 3 — FULL DARK THEME:
+//   All cards: bg-white → rgba(27,67,50,0.30) with white/6% borders
+//   Text hierarchy: white at 90%/60%/30% opacity
+//   Borders: gray-100 → white/[0.06]
+//   Skeletons: dark shimmer gradients
+//   Icons: strokes adjusted for dark backgrounds
+//   Accents: gold (#C9A84C) for CTAs, emerald (#34D399) for positive
+//   Status colors: desaturated for dark bg readability
 //
 // Recharts sparklines lazy-loaded to reduce initial JS bundle.
 // All data fetches execute in parallel on mount.
@@ -132,7 +129,7 @@ const COMMODITIES: Record<string, CommodityConfig> = {
 const COMMODITY_ORDER = ['CORN', 'SOYBEANS', 'WHEAT'];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CROP ICONS (SVG — premium botanical style, matching /check page)
+// CROP ICONS (SVG — premium botanical style, adjusted for dark backgrounds)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function CropIcon({ code, size = 20 }: { code: string; size?: number }) {
@@ -224,20 +221,20 @@ function formatDateHeader(): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHIMMER SKELETON (premium loading state — replaces basic pulse)
+// SHIMMER SKELETON — DARK THEME (premium loading state)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function Shimmer({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`rounded-lg bg-gradient-to-r from-gray-200/60 via-gray-100/60 to-gray-200/60 bg-[length:200%_100%] animate-[hf-shimmer_1.4s_ease-in-out_infinite] ${className}`}
+      className={`rounded-lg bg-gradient-to-r from-white/[0.06] via-white/[0.03] to-white/[0.06] bg-[length:200%_100%] animate-[hf-shimmer_1.4s_ease-in-out_infinite] ${className}`}
     />
   );
 }
 
 function WeatherSkeleton() {
   return (
-    <div className="rounded-2xl border border-gray-100/80 bg-white p-5 sm:p-6">
+    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-4">
         <Shimmer className="w-5 h-5 rounded" />
         <Shimmer className="w-36 h-4" />
@@ -254,7 +251,7 @@ function WeatherSkeleton() {
       </div>
       <div className="grid grid-cols-5 gap-2">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="rounded-xl bg-gray-50/80 p-2.5">
+          <div key={i} className="rounded-xl bg-white/[0.03] p-2.5">
             <Shimmer className="w-full h-3 mb-2" />
             <Shimmer className="w-full h-4" />
           </div>
@@ -266,7 +263,7 @@ function WeatherSkeleton() {
 
 function MarketsSkeleton() {
   return (
-    <div className="rounded-2xl border border-gray-100/80 bg-white overflow-hidden">
+    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] overflow-hidden">
       <div className="p-5 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -276,7 +273,7 @@ function MarketsSkeleton() {
           <Shimmer className="w-24 h-6 rounded-full" />
         </div>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
+          <div key={i} className="flex items-center justify-between py-4 border-b border-white/[0.04] last:border-0">
             <div className="flex items-center gap-3">
               <Shimmer className="w-10 h-10 rounded-xl" />
               <div className="space-y-1.5">
@@ -333,9 +330,9 @@ function WeatherIcon({ code, size = 32 }: { code: number; size?: number }) {
     return (
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
         <path d="M8 16a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 17a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#94A3B8" />
-        <line x1="12" y1="24" x2="11" y2="28" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="17" y1="24" x2="16" y2="28" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="22" y1="24" x2="21" y2="27" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="12" y1="24" x2="11" y2="28" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="17" y1="24" x2="16" y2="28" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="22" y1="24" x2="21" y2="27" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     );
   }
@@ -353,13 +350,13 @@ function WeatherIcon({ code, size = 32 }: { code: number; size?: number }) {
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
       <path d="M8 14a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 15a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#64748B" />
       <path d="M17 22l-2 4h4l-2 4" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <line x1="12" y1="22" x2="11" y2="26" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="12" y1="22" x2="11" y2="26" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WEATHER CARD
+// WEATHER CARD — DARK THEME
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface WeatherData {
@@ -461,44 +458,44 @@ function getWeatherDescription(code: number): string {
 
 function WeatherCard({ data }: { data: WeatherData }) {
   return (
-    <div className="rounded-2xl border border-gray-100/80 bg-white overflow-hidden">
+    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] overflow-hidden">
       <div className="p-5 sm:p-6">
         {/* Header with spray status */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
             </svg>
-            <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Agricultural Weather</h2>
+            <h2 className="text-sm font-semibold text-white/90 tracking-tight">Agricultural Weather</h2>
           </div>
           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${
             data.sprayOk
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-              : 'bg-amber-50 text-amber-700 border border-amber-100'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${data.sprayOk ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${data.sprayOk ? 'bg-emerald-400' : 'bg-amber-400'}`} />
             Spray: {data.sprayOk ? 'GO' : 'HOLD'}
           </span>
         </div>
 
         {/* Current conditions */}
         <div className="flex items-start gap-4 mb-5">
-          <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center border border-blue-100/50">
+          <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-white/[0.06] flex items-center justify-center border border-white/[0.06]">
             <WeatherIcon code={data.current.weatherCode} size={36} />
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-[36px] font-bold text-gray-900 leading-none tracking-tight tabular-nums">
+              <span className="text-[36px] font-bold text-white leading-none tracking-tight tabular-nums">
                 {data.current.temp}°
               </span>
-              <span className="text-sm text-gray-400 font-medium">F</span>
+              <span className="text-sm text-white/30 font-medium">F</span>
             </div>
-            <p className="text-sm text-gray-600 font-medium mt-0.5">{data.current.description}</p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-sm text-white/60 font-medium mt-0.5">{data.current.description}</p>
+            <p className="text-xs text-white/30 mt-0.5">
               Feels {data.current.feelsLike}°
-              <span className="mx-1.5 text-gray-200">·</span>
+              <span className="mx-1.5 text-white/10">·</span>
               Wind {data.current.windSpeed} mph {data.current.windDir}
-              <span className="mx-1.5 text-gray-200">·</span>
+              <span className="mx-1.5 text-white/10">·</span>
               {data.current.humidity}% humid
             </p>
           </div>
@@ -510,11 +507,13 @@ function WeatherCard({ data }: { data: WeatherData }) {
             <div
               key={d.date}
               className={`rounded-xl p-2.5 text-center transition-colors ${
-                i === 0 ? 'bg-emerald-50/60 border border-emerald-100/50' : 'bg-gray-50/80 border border-gray-100/40'
+                i === 0
+                  ? 'bg-emerald-500/[0.08] border border-emerald-500/15'
+                  : 'bg-white/[0.03] border border-white/[0.04]'
               }`}
             >
               <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
-                i === 0 ? 'text-emerald-600' : 'text-gray-400'
+                i === 0 ? 'text-emerald-400' : 'text-white/30'
               }`}>
                 {d.dayName}
               </div>
@@ -522,11 +521,11 @@ function WeatherCard({ data }: { data: WeatherData }) {
                 <WeatherIcon code={d.weatherCode} size={20} />
               </div>
               <div className="flex items-center justify-center gap-1">
-                <span className="text-xs font-bold text-gray-900 tabular-nums">{d.high}°</span>
-                <span className="text-[10px] text-gray-400 tabular-nums">{d.low}°</span>
+                <span className="text-xs font-bold text-white/90 tabular-nums">{d.high}°</span>
+                <span className="text-[10px] text-white/30 tabular-nums">{d.low}°</span>
               </div>
               {d.precipProb > 0 && (
-                <div className="text-[10px] text-blue-500 font-semibold mt-0.5 tabular-nums">{d.precipProb}%</div>
+                <div className="text-[10px] text-blue-400 font-semibold mt-0.5 tabular-nums">{d.precipProb}%</div>
               )}
             </div>
           ))}
@@ -536,30 +535,30 @@ function WeatherCard({ data }: { data: WeatherData }) {
         {(data.soil || (data.daily[0]?.gdd ?? 0) > 0) && (
           <div className="grid grid-cols-3 gap-2 mt-4">
             {data.soil && (
-              <div className="rounded-xl bg-amber-50/60 border border-amber-100/50 p-3">
-                <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Soil Temp</div>
-                <div className="text-lg font-bold text-amber-800 mt-0.5 tabular-nums">
-                  {data.soil.temp2in}°<span className="text-[10px] font-medium text-amber-500 ml-0.5">2&quot;</span>
+              <div className="rounded-xl bg-amber-500/[0.06] border border-amber-500/10 p-3">
+                <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Soil Temp</div>
+                <div className="text-lg font-bold text-amber-300 mt-0.5 tabular-nums">
+                  {data.soil.temp2in}°<span className="text-[10px] font-medium text-amber-500/60 ml-0.5">2&quot;</span>
                 </div>
-                {data.soil.temp2in >= 50 && <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">Corn: plantable</div>}
+                {data.soil.temp2in >= 50 && <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">Corn: plantable</div>}
               </div>
             )}
             {(data.daily[0]?.gdd ?? 0) > 0 && (
-              <div className="rounded-xl bg-emerald-50/60 border border-emerald-100/50 p-3">
-                <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Today GDD</div>
-                <div className="text-lg font-bold text-emerald-800 mt-0.5 tabular-nums">
-                  {data.daily[0].gdd}<span className="text-[10px] font-medium text-emerald-500 ml-0.5">base 50</span>
+              <div className="rounded-xl bg-emerald-500/[0.06] border border-emerald-500/10 p-3">
+                <div className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Today GDD</div>
+                <div className="text-lg font-bold text-emerald-300 mt-0.5 tabular-nums">
+                  {data.daily[0].gdd}<span className="text-[10px] font-medium text-emerald-500/60 ml-0.5">base 50</span>
                 </div>
               </div>
             )}
-            <div className="rounded-xl bg-blue-50/60 border border-blue-100/50 p-3">
-              <div className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Max Wind</div>
-              <div className="text-lg font-bold text-blue-800 mt-0.5 tabular-nums">
+            <div className="rounded-xl bg-blue-500/[0.06] border border-blue-500/10 p-3">
+              <div className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Max Wind</div>
+              <div className="text-lg font-bold text-blue-300 mt-0.5 tabular-nums">
                 {data.daily[0]?.windMax ?? data.current.windSpeed}
-                <span className="text-[10px] font-medium text-blue-500 ml-0.5">mph</span>
+                <span className="text-[10px] font-medium text-blue-500/60 ml-0.5">mph</span>
               </div>
               {(data.daily[0]?.windMax ?? data.current.windSpeed) > 10 && (
-                <div className="text-[10px] text-amber-600 font-semibold mt-0.5">Drift risk</div>
+                <div className="text-[10px] text-amber-400 font-semibold mt-0.5">Drift risk</div>
               )}
             </div>
           </div>
@@ -570,7 +569,7 @@ function WeatherCard({ data }: { data: WeatherData }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MARKETS CARD
+// MARKETS CARD — DARK THEME
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface PriceData {
@@ -583,16 +582,16 @@ interface PriceData {
 
 function MarketsCard({ data, status }: { data: Record<string, PriceData>; status: MarketStatus }) {
   return (
-    <div className="rounded-2xl border border-gray-100/80 bg-white overflow-hidden">
+    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] overflow-hidden">
       <div className="p-5 sm:p-6">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" />
             </svg>
-            <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Commodity Prices</h2>
+            <h2 className="text-sm font-semibold text-white/90 tracking-tight">Commodity Prices</h2>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gray-50 border border-gray-100/80">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.06]">
             <span
               className="w-1.5 h-1.5 rounded-full flex-shrink-0"
               style={{
@@ -601,12 +600,12 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
                 animation: status.isLive ? 'hf-pulse 2s ease-in-out infinite' : 'none',
               }}
             />
-            <span className="text-[11px] font-semibold text-gray-500">{status.label}</span>
+            <span className="text-[11px] font-semibold text-white/50">{status.label}</span>
           </div>
         </div>
-        <p className="text-[11px] text-gray-400 mb-4">CME settlement prices with ARC/PLC payment impact</p>
+        <p className="text-[11px] text-white/25 mb-4">CME settlement prices with ARC/PLC payment impact</p>
 
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-white/[0.04]">
           {COMMODITY_ORDER.map((code) => {
             const d = data[code];
             const cfg = COMMODITIES[code];
@@ -622,20 +621,20 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
               <div key={code} className="py-4 first:pt-0 last:pb-0">
                 <div className="flex items-center gap-3">
                   {/* Crop icon badge */}
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${cfg.color}12` }}>
+                  <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${cfg.color}18` }}>
                     <CropIcon code={code} size={20} />
                   </div>
 
                   {/* Crop info */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-gray-900">{cfg.name}</div>
+                    <div className="text-sm font-semibold text-white/90">{cfg.name}</div>
                     {plc && (
                       <div
                         className={`inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold ${
-                          plc.status === 'above' ? 'text-emerald-600' : plc.status === 'near' ? 'text-amber-600' : 'text-red-600'
+                          plc.status === 'above' ? 'text-emerald-400' : plc.status === 'near' ? 'text-amber-400' : 'text-red-400'
                         }`}
                       >
-                        <span className={`w-1 h-1 rounded-full ${plc.status === 'above' ? 'bg-emerald-500' : plc.status === 'near' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                        <span className={`w-1 h-1 rounded-full ${plc.status === 'above' ? 'bg-emerald-400' : plc.status === 'near' ? 'bg-amber-400' : 'bg-red-400'}`} />
                         {plc.status === 'above'
                           ? 'Above ref price'
                           : plc.status === 'near'
@@ -648,7 +647,7 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
                   {/* Lazy-loaded sparkline */}
                   <div className="w-[80px] h-[36px] flex-shrink-0 hidden sm:block">
                     {priceHistory.length > 3 && (
-                      <Suspense fallback={<div className="w-full h-full bg-gray-50 rounded animate-pulse" />}>
+                      <Suspense fallback={<div className="w-full h-full bg-white/[0.04] rounded animate-pulse" />}>
                         <LazySparkline data={priceHistory.slice(-20)} color={cfg.color} refPrice={cfg.effectiveRefPrice} code={code} />
                       </Suspense>
                     )}
@@ -656,11 +655,11 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
 
                   {/* Price + change */}
                   <div className="text-right flex-shrink-0">
-                    <div className="text-lg font-bold text-gray-900 tracking-[-0.02em] tabular-nums">
+                    <div className="text-lg font-bold text-white tracking-[-0.02em] tabular-nums">
                       {price !== null ? `$${price.toFixed(2)}` : '—'}
                     </div>
                     {change !== null && (
-                      <div className={`text-xs font-semibold tabular-nums ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
+                      <div className={`text-xs font-semibold tabular-nums ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
                         {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{change.toFixed(2)}
                         {d?.changePct !== null && d?.changePct !== undefined && (
                           <span className="opacity-60 ml-0.5">({isUp ? '+' : ''}{d.changePct.toFixed(1)}%)</span>
@@ -672,9 +671,9 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
 
                 {/* PLC payment projection bar */}
                 {plc && plc.rate > 0 && (
-                  <div className="mt-2.5 ml-[52px] rounded-lg bg-red-50/70 border border-red-100/50 px-3 py-2 flex items-center justify-between">
-                    <span className="text-[11px] text-red-700 font-medium">Est. PLC payment on national avg yield</span>
-                    <span className="text-[11px] text-red-800 font-bold tabular-nums">
+                  <div className="mt-2.5 ml-[52px] rounded-lg bg-red-500/[0.08] border border-red-500/15 px-3 py-2 flex items-center justify-between">
+                    <span className="text-[11px] text-red-300 font-medium">Est. PLC payment on national avg yield</span>
+                    <span className="text-[11px] text-red-200 font-bold tabular-nums">
                       ≈ ${plc.perAcre.toFixed(0)}/acre
                     </span>
                   </div>
@@ -686,14 +685,14 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
       </div>
 
       {/* Footer */}
-      <div className="border-t border-gray-50 px-5 sm:px-6 py-3 flex items-center justify-between bg-gray-50/40">
-        <Link href="/markets" className="text-xs font-semibold text-[#1B4332] hover:text-emerald-600 transition-colors flex items-center gap-1">
+      <div className="border-t border-white/[0.04] px-5 sm:px-6 py-3 flex items-center justify-between bg-white/[0.02]">
+        <Link href="/markets" className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1">
           Full market dashboard
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="m9 18 6-6-6-6" />
           </svg>
         </Link>
-        <Link href="/check" className="text-xs font-semibold text-[#C9A84C] hover:text-amber-600 transition-colors">
+        <Link href="/check" className="text-xs font-semibold text-[#C9A84C] hover:text-[#E2C366] transition-colors">
           Calculate your payment →
         </Link>
       </div>
@@ -702,7 +701,7 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// QUICK ACTIONS BAR
+// QUICK ACTIONS BAR — DARK THEME
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuickActions() {
@@ -711,7 +710,7 @@ function QuickActions() {
       href: '/check',
       label: 'ARC/PLC Calculator',
       icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" />
         </svg>
       ),
@@ -720,7 +719,7 @@ function QuickActions() {
       href: '/farm-score',
       label: 'Farm Score',
       icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" />
         </svg>
       ),
@@ -729,7 +728,7 @@ function QuickActions() {
       href: '/weather',
       label: 'Full Weather',
       icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
         </svg>
       ),
@@ -738,7 +737,7 @@ function QuickActions() {
       href: '/markets',
       label: 'All Markets',
       icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" />
         </svg>
       ),
@@ -751,10 +750,10 @@ function QuickActions() {
         <Link
           key={action.href}
           href={action.href}
-          className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100/80 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group min-h-[72px] justify-center"
+          className="flex flex-col items-center gap-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] py-3 px-2 hover:bg-white/[0.08] hover:border-white/[0.12] transition-all group min-h-[72px] justify-center"
         >
           <div className="group-hover:scale-110 transition-transform">{action.icon}</div>
-          <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">
+          <span className="text-[10px] font-semibold text-white/40 group-hover:text-white/70 text-center leading-tight transition-colors">
             {action.label}
           </span>
         </Link>
@@ -863,7 +862,7 @@ export default function MorningDashboardClient() {
           <QuickActions />
         </AnimateIn>
 
-        {/* Payment Estimate — THE hero metric */}
+        {/* Payment Estimate — THE hero metric (already dark themed) */}
         <AnimateIn delay={75}>
           <PaymentEstimateCard prices={prices} loading={pricesLoading} />
         </AnimateIn>
@@ -873,11 +872,11 @@ export default function MorningDashboardClient() {
           {weatherLoading ? (
             <WeatherSkeleton />
           ) : weatherError ? (
-            <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5 text-center">
-              <p className="text-sm text-red-600 font-medium">{weatherError}</p>
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
+              <p className="text-sm text-red-400 font-medium">{weatherError}</p>
               <button
                 onClick={() => { setWeatherLoading(true); setWeatherError(''); fetchWeather(); }}
-                className="mt-2 text-xs font-semibold text-red-700 underline"
+                className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors"
               >
                 Retry
               </button>
@@ -892,11 +891,11 @@ export default function MorningDashboardClient() {
           {pricesLoading ? (
             <MarketsSkeleton />
           ) : pricesError ? (
-            <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5 text-center">
-              <p className="text-sm text-red-600 font-medium">{pricesError}</p>
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
+              <p className="text-sm text-red-400 font-medium">{pricesError}</p>
               <button
                 onClick={() => { setPricesLoading(true); setPricesError(''); fetchPrices(); }}
-                className="mt-2 text-xs font-semibold text-red-700 underline"
+                className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors"
               >
                 Retry
               </button>
@@ -912,6 +911,7 @@ export default function MorningDashboardClient() {
             lat={geo.lat}
             lng={geo.lng}
             compact={true}
+            darkMode={true}
             countyName={geo.isDefault ? 'Summit County' : geo.locationName.split(',')[0] || 'Your Area'}
             stateAbbr={geo.isDefault ? 'OH' : geo.locationName.split(',')[1]?.trim() || 'US'}
           />

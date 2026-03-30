@@ -1,17 +1,17 @@
 // =============================================================================
 // HarvestFile — GrainBidCard (Client Component)
-// THE GREAT CONSOLIDATION — Build 2: Barchart Grain Bid UI
+// Build 17 Deploy 3: Dark Mode Support for Morning Dashboard
 //
 // Self-contained component that fetches and displays local grain elevator bids.
 // Used on TWO surfaces:
 //   1. County ARC/PLC pages (full mode — filters, 10 elevators, expandable)
-//   2. Morning Dashboard (compact mode — 3 elevators, no filters)
+//   2. Morning Dashboard (compact mode — 3 elevators, no filters, DARK THEME)
+//
+// Build 17 Deploy 3: Added darkMode prop for full dark theme integration.
+// When darkMode=true: dark card backgrounds, light text, dark borders.
+// Default (darkMode=false): original light theme preserved for county pages.
 //
 // Data: /api/grain-bids (server-side Barchart proxy with caching)
-// Types: GrainElevator, NormalizedBid from lib/barchart/types
-//
-// When Barchart key arrives: plug in BARCHART_API_KEY env var → live data.
-// Until then: graceful empty state with "Coming soon" messaging.
 // =============================================================================
 
 'use client';
@@ -65,6 +65,8 @@ interface GrainBidCardProps {
   lng?: number;
   /** Compact mode for Morning Dashboard (3 elevators, no filters) */
   compact?: boolean;
+  /** Dark mode for Morning Dashboard dark theme */
+  darkMode?: boolean;
   /** County name for display */
   countyName?: string;
   /** State abbreviation for display */
@@ -95,41 +97,47 @@ function getCommodityColor(commodity: string): string {
 
 // ── Basis formatter ─────────────────────────────────────────────────────
 
-function formatBasis(basis: number): { text: string; color: string } {
+function formatBasis(basis: number, dark: boolean): { text: string; color: string } {
   if (basis >= 0) {
-    return { text: `+${basis}`, color: 'text-emerald-600' };
+    return { text: `+${basis}`, color: dark ? 'text-emerald-400' : 'text-emerald-600' };
   }
-  return { text: `${basis}`, color: 'text-red-500' };
+  return { text: `${basis}`, color: dark ? 'text-red-400' : 'text-red-500' };
 }
 
 // ── Skeleton ────────────────────────────────────────────────────────────
 
-function GrainBidSkeleton({ compact }: { compact: boolean }) {
+function GrainBidSkeleton({ compact, dark }: { compact: boolean; dark: boolean }) {
   const count = compact ? 3 : 5;
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+    <div className={`rounded-2xl border overflow-hidden ${
+      dark
+        ? 'border-white/[0.06] bg-[rgba(27,67,50,0.30)]'
+        : 'border-gray-100 bg-white shadow-sm'
+    }`}>
       <div className="p-5 sm:p-6">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-5 h-5 rounded bg-gray-200 animate-pulse" />
-          <div className="w-32 h-4 rounded bg-gray-200 animate-pulse" />
+          <div className={`w-5 h-5 rounded animate-pulse ${dark ? 'bg-white/[0.06]' : 'bg-gray-200'}`} />
+          <div className={`w-32 h-4 rounded animate-pulse ${dark ? 'bg-white/[0.06]' : 'bg-gray-200'}`} />
         </div>
         {!compact && (
           <div className="flex gap-2 mb-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="w-16 h-7 rounded-full bg-gray-100 animate-pulse" />
+              <div key={i} className={`w-16 h-7 rounded-full animate-pulse ${dark ? 'bg-white/[0.04]' : 'bg-gray-100'}`} />
             ))}
           </div>
         )}
         <div className="space-y-3">
           {Array.from({ length: count }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+            <div key={i} className={`flex items-center justify-between py-3 border-b last:border-0 ${
+              dark ? 'border-white/[0.04]' : 'border-gray-50'
+            }`}>
               <div className="space-y-1.5">
-                <div className="w-36 h-4 rounded bg-gray-200 animate-pulse" />
-                <div className="w-24 h-3 rounded bg-gray-100 animate-pulse" />
+                <div className={`w-36 h-4 rounded animate-pulse ${dark ? 'bg-white/[0.06]' : 'bg-gray-200'}`} />
+                <div className={`w-24 h-3 rounded animate-pulse ${dark ? 'bg-white/[0.04]' : 'bg-gray-100'}`} />
               </div>
               <div className="text-right space-y-1.5">
-                <div className="w-16 h-5 rounded bg-gray-200 animate-pulse ml-auto" />
-                <div className="w-12 h-3 rounded bg-gray-100 animate-pulse ml-auto" />
+                <div className={`w-16 h-5 rounded animate-pulse ml-auto ${dark ? 'bg-white/[0.06]' : 'bg-gray-200'}`} />
+                <div className={`w-12 h-3 rounded animate-pulse ml-auto ${dark ? 'bg-white/[0.04]' : 'bg-gray-100'}`} />
               </div>
             </div>
           ))}
@@ -147,6 +155,7 @@ export function GrainBidCard({
   lat,
   lng,
   compact = false,
+  darkMode = false,
   countyName,
   stateAbbr,
 }: GrainBidCardProps) {
@@ -156,6 +165,8 @@ export function GrainBidCard({
   const [selectedCommodity, setSelectedCommodity] = useState('all');
   const [expandedElevator, setExpandedElevator] = useState<string | null>(null);
   const [attribution, setAttribution] = useState('');
+
+  const dark = darkMode;
 
   // ── Fetch grain bids ────────────────────────────────────────────────
   const fetchBids = useCallback(async () => {
@@ -207,71 +218,40 @@ export function GrainBidCard({
       .filter((e) => e.bids.length > 0);
   }, [elevators, selectedCommodity]);
 
-  // ── Get best bid across all elevators for a commodity ─────────────
+  // ── Find best bid across all elevators ────────────────────────────
   const bestBid = useMemo(() => {
     let best: { elevator: GrainElevator; bid: NormalizedBid } | null = null;
-    for (const elev of filteredElevators) {
-      for (const bid of elev.bids) {
+    for (const elevator of filteredElevators) {
+      for (const bid of elevator.bids) {
         if (!best || bid.cashPrice > best.bid.cashPrice) {
-          best = { elevator: elev, bid };
+          best = { elevator, bid };
         }
       }
     }
     return best;
   }, [filteredElevators]);
 
-  // ── Available commodities (for filter visibility) ─────────────────
-  const availableCommodities = useMemo(() => {
-    const set = new Set<string>();
-    elevators.forEach((e) => e.bids.forEach((b) => set.add(b.commodity.toLowerCase())));
-    return set;
-  }, [elevators]);
-
-  // ── Display limit ─────────────────────────────────────────────────
+  // ── Display limits ────────────────────────────────────────────────
   const displayLimit = compact ? 3 : 10;
   const displayElevators = filteredElevators.slice(0, displayLimit);
 
-  // ── Loading state ─────────────────────────────────────────────────
-  if (loading) {
-    return <GrainBidSkeleton compact={compact} />;
-  }
+  // ── Loading State ─────────────────────────────────────────────────
+  if (loading) return <GrainBidSkeleton compact={compact} dark={dark} />;
 
-  // ── Empty state (no API key or no data) ───────────────────────────
-  if (elevators.length === 0 && !error) {
-    return (
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-        <div className="p-5 sm:p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
-            </svg>
-            <h2 className="text-sm font-bold text-gray-900 tracking-tight">Local Grain Bids</h2>
-          </div>
-          <div className="text-center py-8">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-gray-900 mb-1">Grain Bids Coming Soon</h3>
-            <p className="text-xs text-gray-500 max-w-xs mx-auto">
-              Live cash grain bids from nearby elevators — powered by Barchart.
-              {countyName && ` Showing bids near ${countyName}${stateAbbr ? `, ${stateAbbr}` : ''}.`}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Error state ───────────────────────────────────────────────────
+  // ── Error State ───────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5 text-center">
-        <p className="text-sm text-red-600 font-medium">{error}</p>
+      <div className={`rounded-2xl border p-5 text-center ${
+        dark
+          ? 'border-red-500/20 bg-red-500/[0.06]'
+          : 'border-red-100 bg-red-50/50'
+      }`}>
+        <p className={`text-sm font-medium ${dark ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
         <button
-          onClick={fetchBids}
-          className="mt-2 text-xs font-semibold text-red-700 underline"
+          onClick={() => fetchBids()}
+          className={`mt-2 text-xs font-semibold underline ${
+            dark ? 'text-red-300 hover:text-red-200' : 'text-red-700 hover:text-red-800'
+          } transition-colors`}
         >
           Retry
         </button>
@@ -279,50 +259,82 @@ export function GrainBidCard({
     );
   }
 
-  // ── Render ────────────────────────────────────────────────────────
+  // ── Empty State ───────────────────────────────────────────────────
+  if (elevators.length === 0) {
+    return (
+      <div className={`rounded-2xl border p-5 text-center ${
+        dark
+          ? 'border-white/[0.06] bg-[rgba(27,67,50,0.30)]'
+          : 'border-gray-100 bg-white shadow-sm'
+      }`}>
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={dark ? 'rgba(255,255,255,0.4)' : '#1B4332'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" />
+          </svg>
+          <h3 className={`text-sm font-semibold ${dark ? 'text-white/90' : 'text-gray-900'}`}>Local Grain Bids</h3>
+        </div>
+        <p className={`text-xs ${dark ? 'text-white/30' : 'text-gray-400'}`}>
+          No grain bids found for this area. Bids update throughout the day.
+        </p>
+      </div>
+    );
+  }
+
+  // ── Main Render ───────────────────────────────────────────────────
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+    <div className={`rounded-2xl border overflow-hidden ${
+      dark
+        ? 'border-white/[0.06] bg-[rgba(27,67,50,0.30)]'
+        : 'border-gray-100 bg-white shadow-sm'
+    }`}>
       <div className="p-5 sm:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={dark ? 'rgba(255,255,255,0.6)' : '#1B4332'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" />
             </svg>
-            <h2 className="text-sm font-bold text-gray-900 tracking-tight">
+            <h2 className={`text-sm font-semibold tracking-tight ${dark ? 'text-white/90' : 'text-gray-900'}`}>
               Local Grain Bids
             </h2>
           </div>
           {bestBid && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-[11px] font-bold text-emerald-700">
-                Best: ${bestBid.bid.cashPrice.toFixed(2)}
-              </span>
-            </div>
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${
+              dark
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${dark ? 'bg-emerald-400' : 'bg-emerald-500'}`} />
+              Best: ${bestBid.bid.cashPrice.toFixed(2)}
+            </span>
           )}
         </div>
-        <p className="text-[11px] text-gray-400 mb-4">
+        <p className={`text-[11px] mb-4 ${dark ? 'text-white/25' : 'text-gray-400'}`}>
           Cash bids from nearby elevators
-          {countyName && ` · ${countyName}`}
-          {stateAbbr && `, ${stateAbbr}`}
+          {countyName && stateAbbr && (
+            <span className={dark ? 'text-white/15' : 'text-gray-300'}>
+              {' · '}{lat && lng ? `${lat.toFixed(2)}, ${lng.toFixed(2)}` : `${countyName}, ${stateAbbr}`}
+            </span>
+          )}
         </p>
 
-        {/* Commodity filter chips (full mode only) */}
-        {!compact && availableCommodities.size > 1 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {COMMODITY_FILTERS.filter(
-              (f) => f.key === 'all' || availableCommodities.has(f.key)
-            ).map((filter) => {
+        {/* Commodity filters (full mode only) */}
+        {!compact && (
+          <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+            {COMMODITY_FILTERS.map((filter) => {
               const isActive = selectedCommodity === filter.key;
               return (
                 <button
                   key={filter.key}
                   onClick={() => setSelectedCommodity(filter.key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all ${
                     isActive
-                      ? 'bg-[#1B4332] text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      ? dark
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                        : 'bg-[#1B4332] text-white border border-[#1B4332]'
+                      : dark
+                        ? 'bg-white/[0.04] text-white/40 border border-white/[0.06] hover:bg-white/[0.08]'
+                        : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
                   }`}
                 >
                   {filter.label}
@@ -334,25 +346,33 @@ export function GrainBidCard({
 
         {/* Best bid highlight (full mode only) */}
         {!compact && bestBid && (
-          <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 p-3.5 mb-4">
+          <div className={`rounded-xl p-3.5 mb-4 ${
+            dark
+              ? 'bg-emerald-500/[0.06] border border-emerald-500/15'
+              : 'bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100'
+          }`}>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5">
+                <div className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${
+                  dark ? 'text-emerald-400' : 'text-emerald-600'
+                }`}>
                   Best Local Bid — {bestBid.bid.commodity}
                 </div>
-                <div className="text-sm font-bold text-gray-900">
+                <div className={`text-sm font-bold ${dark ? 'text-white/90' : 'text-gray-900'}`}>
                   {bestBid.elevator.name}
-                  <span className="text-gray-400 font-normal ml-1.5">
+                  <span className={`font-normal ml-1.5 ${dark ? 'text-white/30' : 'text-gray-400'}`}>
                     {bestBid.elevator.distance.toFixed(1)} mi
                   </span>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xl font-extrabold text-emerald-700 tracking-[-0.02em]">
+                <div className={`text-xl font-extrabold tracking-[-0.02em] ${
+                  dark ? 'text-emerald-400' : 'text-emerald-700'
+                }`}>
                   ${bestBid.bid.cashPrice.toFixed(2)}
                 </div>
-                <div className={`text-[11px] font-bold ${formatBasis(bestBid.bid.basis).color}`}>
-                  Basis: {formatBasis(bestBid.bid.basis).text}
+                <div className={`text-[11px] font-bold ${formatBasis(bestBid.bid.basis, dark).color}`}>
+                  Basis: {formatBasis(bestBid.bid.basis, dark).text}
                 </div>
               </div>
             </div>
@@ -360,7 +380,7 @@ export function GrainBidCard({
         )}
 
         {/* Elevator list */}
-        <div className="divide-y divide-gray-50">
+        <div className={`divide-y ${dark ? 'divide-white/[0.04]' : 'divide-gray-50'}`}>
           {displayElevators.map((elevator) => {
             const isExpanded = expandedElevator === elevator.id;
             // Get the best bid per commodity for this elevator
@@ -385,24 +405,28 @@ export function GrainBidCard({
                 >
                   <div className="flex items-center gap-3">
                     {/* Distance badge */}
-                    <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-gray-50 border border-gray-100 flex flex-col items-center justify-center">
-                      <span className="text-[11px] font-extrabold text-gray-700">
+                    <div className={`flex-shrink-0 w-11 h-11 rounded-xl flex flex-col items-center justify-center ${
+                      dark
+                        ? 'bg-white/[0.04] border border-white/[0.06]'
+                        : 'bg-gray-50 border border-gray-100'
+                    }`}>
+                      <span className={`text-[11px] font-extrabold ${dark ? 'text-white/70' : 'text-gray-700'}`}>
                         {elevator.distance < 10
                           ? elevator.distance.toFixed(1)
                           : Math.round(elevator.distance)}
                       </span>
-                      <span className="text-[8px] font-bold text-gray-400 uppercase">mi</span>
+                      <span className={`text-[8px] font-bold uppercase ${dark ? 'text-white/30' : 'text-gray-400'}`}>mi</span>
                     </div>
 
                     {/* Elevator info */}
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-gray-900 truncate">
+                      <div className={`text-sm font-bold truncate ${dark ? 'text-white/90' : 'text-gray-900'}`}>
                         {elevator.name}
                       </div>
-                      <div className="text-[11px] text-gray-400 truncate">
+                      <div className={`text-[11px] truncate ${dark ? 'text-white/30' : 'text-gray-400'}`}>
                         {elevator.city}, {elevator.state}
                         {topBids.length > 1 && (
-                          <span className="ml-1.5 text-gray-300">
+                          <span className={`ml-1.5 ${dark ? 'text-white/15' : 'text-gray-300'}`}>
                             · {topBids.length} commodities
                           </span>
                         )}
@@ -416,15 +440,15 @@ export function GrainBidCard({
                           className="w-1.5 h-1.5 rounded-full"
                           style={{ backgroundColor: getCommodityColor(primaryBid.commodity) }}
                         />
-                        <span className="text-lg font-extrabold text-gray-900 tracking-[-0.02em]">
+                        <span className={`text-lg font-extrabold tracking-[-0.02em] ${dark ? 'text-white' : 'text-gray-900'}`}>
                           ${primaryBid.cashPrice.toFixed(2)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 justify-end">
-                        <span className={`text-[11px] font-bold ${formatBasis(primaryBid.basis).color}`}>
-                          {formatBasis(primaryBid.basis).text}
+                        <span className={`text-[11px] font-bold ${formatBasis(primaryBid.basis, dark).color}`}>
+                          {formatBasis(primaryBid.basis, dark).text}
                         </span>
-                        <span className="text-[10px] text-gray-300">
+                        <span className={`text-[10px] ${dark ? 'text-white/20' : 'text-gray-300'}`}>
                           {primaryBid.commodity}
                         </span>
                       </div>
@@ -441,7 +465,9 @@ export function GrainBidCard({
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className={`text-gray-300 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''} ${
+                          dark ? 'text-white/20' : 'text-gray-300'
+                        }`}
                       >
                         <polyline points="6 9 12 15 18 9" />
                       </svg>
@@ -455,25 +481,27 @@ export function GrainBidCard({
                     {topBids.map((bid) => (
                       <div
                         key={`${bid.commodity}-${bid.deliveryPeriod}`}
-                        className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+                        className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                          dark ? 'bg-white/[0.04]' : 'bg-gray-50'
+                        }`}
                       >
                         <div className="flex items-center gap-2">
                           <span
                             className="w-2 h-2 rounded-full"
                             style={{ backgroundColor: getCommodityColor(bid.commodity) }}
                           />
-                          <span className="text-xs font-semibold text-gray-700">
+                          <span className={`text-xs font-semibold ${dark ? 'text-white/70' : 'text-gray-700'}`}>
                             {bid.commodity}
                           </span>
-                          <span className="text-[10px] text-gray-400">
+                          <span className={`text-[10px] ${dark ? 'text-white/25' : 'text-gray-400'}`}>
                             {bid.deliveryPeriod}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className={`text-xs font-bold ${formatBasis(bid.basis).color}`}>
-                            {formatBasis(bid.basis).text}
+                          <span className={`text-xs font-bold ${formatBasis(bid.basis, dark).color}`}>
+                            {formatBasis(bid.basis, dark).text}
                           </span>
-                          <span className="text-sm font-extrabold text-gray-900">
+                          <span className={`text-sm font-extrabold ${dark ? 'text-white' : 'text-gray-900'}`}>
                             ${bid.cashPrice.toFixed(2)}
                           </span>
                         </div>
@@ -481,12 +509,12 @@ export function GrainBidCard({
                     ))}
                     {/* Elevator contact */}
                     {elevator.phone && (
-                      <div className="flex items-center gap-2 text-[11px] text-gray-400 pt-1">
+                      <div className={`flex items-center gap-2 text-[11px] pt-1 ${dark ? 'text-white/25' : 'text-gray-400'}`}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72" />
                         </svg>
                         {elevator.phone}
-                        <span className="text-gray-300 mx-1">·</span>
+                        <span className={`mx-1 ${dark ? 'text-white/10' : 'text-gray-300'}`}>·</span>
                         {elevator.address && `${elevator.address}, `}{elevator.city}, {elevator.state} {elevator.zip}
                       </div>
                     )}
@@ -500,7 +528,7 @@ export function GrainBidCard({
         {/* Show more indicator */}
         {filteredElevators.length > displayLimit && (
           <div className="mt-3 text-center">
-            <span className="text-xs text-gray-400 font-medium">
+            <span className={`text-xs font-medium ${dark ? 'text-white/25' : 'text-gray-400'}`}>
               +{filteredElevators.length - displayLimit} more elevators nearby
             </span>
           </div>
@@ -508,14 +536,22 @@ export function GrainBidCard({
       </div>
 
       {/* Footer: Attribution + CTA */}
-      <div className="border-t border-gray-50 px-5 sm:px-6 py-3 flex items-center justify-between bg-gray-50/40">
-        <span className="text-[10px] text-gray-300 max-w-[60%] leading-relaxed">
-          {attribution || 'Market data provided by Barchart. Cash grain bids are for informational purposes only.'}
+      <div className={`border-t px-5 sm:px-6 py-3 flex items-center justify-between ${
+        dark
+          ? 'border-white/[0.04] bg-white/[0.02]'
+          : 'border-gray-50 bg-gray-50/40'
+      }`}>
+        <span className={`text-[10px] max-w-[60%] leading-relaxed ${dark ? 'text-white/15' : 'text-gray-300'}`}>
+          {attribution || 'Market data provided by Barchart Solutions. Cash grain bids are based on delayed futures prices and are subject to change. Information is provided as-is for informational purposes only, not for trading purposes or advice.'}
         </span>
         {compact && (
           <Link
             href="/grain"
-            className="text-xs font-semibold text-[#1B4332] hover:text-emerald-600 transition-colors flex items-center gap-1"
+            className={`text-xs font-semibold transition-colors flex items-center gap-1 ${
+              dark
+                ? 'text-emerald-400 hover:text-emerald-300'
+                : 'text-[#1B4332] hover:text-emerald-600'
+            }`}
           >
             All bids
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
