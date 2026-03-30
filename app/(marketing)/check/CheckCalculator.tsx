@@ -2,17 +2,16 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Build 14 Deploy 3: Background depth + below-fold contrast fix
+// Build 15 Deploy 1: Step 3 Results Redesign — CTA Consolidation + Premium UX
 //
-// Deploy 2 changes:
-// - Removed all noise/grain textures for clean, smooth background
-// - Background gradient matched to homepage (no near-black at bottom)
-// - Eliminated dead space between calculator and below-fold content
-// - Below-fold completely redesigned: bento cards, icon headers, wider layout
-// - ARC vs PLC comparison cards with icon badges (matching homepage bento)
-// - OBBBA changes in single wide card with 2-column grid
-// - FAQ with improved hover states and spacing
-// - Consistent #0C1F17 background throughout (no dark-to-black fade)
+// Changes from Build 14:
+// - Step 3 results: consolidated 7 CTAs → 2 (Save My Results + View County)
+// - Winner card elevated with "Recommended" badge, subtle lift, gold border
+// - Trust signals repositioned between results and CTA for conversion boost
+// - Share button demoted to inline utility (no longer full-width CTA)
+// - Removed: separate Pro Trial CTA, Compare Plans link, email capture widget
+// - Added micro-copy beneath primary CTA for doubt removal
+// - Cleaner visual hierarchy with better spacing rhythm
 // =============================================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -878,7 +877,10 @@ export default function CheckCalculator() {
             )}
 
             {/* ════════════════════════════════════════════════════════════
-                 STEP 3: RESULTS
+                 STEP 3: RESULTS — Build 15 Redesign
+                 CTA consolidation: 7 → 2
+                 Winner card elevated with "Recommended" badge
+                 Trust signals between results and CTA
                  ════════════════════════════════════════════════════════ */}
             {step === 3 && (results || calculating) && (
               <div>
@@ -896,7 +898,7 @@ export default function CheckCalculator() {
 
                 {!calculating && (
                 <>
-                {/* Results card */}
+                {/* ── Results Hero Card ──────────────────────────────────── */}
                 <div
                   className="rounded-[24px] p-7 sm:p-10 text-center mb-6"
                   style={{
@@ -921,9 +923,9 @@ export default function CheckCalculator() {
                   </div>
 
                   {/* Winner badge */}
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-5" style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)" }}>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-5" style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.2)" }}>
                     <IconTrophy />
-                    <span className="text-[12px] font-bold text-[#C9A84C] uppercase tracking-wider">
+                    <span className="text-[13px] font-bold text-[#C9A84C] uppercase tracking-wider">
                       {results.best} Wins
                     </span>
                   </div>
@@ -947,11 +949,11 @@ export default function CheckCalculator() {
                   <div className="text-[14px] text-[#C9A84C] font-semibold mb-1">
                     more per year
                   </div>
-                  <div className="text-[12px] text-white/25 mb-7">
+                  <div className="text-[12px] text-white/25 mb-8">
                     ${results.diffPerAcre}/acre advantage
                   </div>
 
-                  {/* Comparison cards */}
+                  {/* ── Comparison Cards — Winner Elevated ──────────────── */}
                   <div className="grid grid-cols-2 gap-3">
                     {([
                       { name: "ARC-CO", total: results.arc, perAcre: results.arcPerAcre, isBest: results.best === "ARC-CO" },
@@ -959,12 +961,27 @@ export default function CheckCalculator() {
                     ]).map((p) => (
                       <div
                         key={p.name}
-                        className="rounded-[16px] p-4 sm:p-5 text-left transition-all"
+                        className="relative rounded-[16px] p-4 sm:p-5 text-left transition-all duration-300"
                         style={{
                           background: p.isBest ? "rgba(201,168,76,0.06)" : "rgba(255,255,255,0.02)",
-                          border: p.isBest ? "1.5px solid rgba(201,168,76,0.25)" : "1px solid rgba(255,255,255,0.04)",
+                          border: p.isBest ? "1.5px solid rgba(201,168,76,0.3)" : "1px solid rgba(255,255,255,0.04)",
+                          boxShadow: p.isBest ? "0 8px 32px rgba(201,168,76,0.08)" : "none",
+                          transform: p.isBest ? "translateY(-2px)" : "none",
                         }}
                       >
+                        {/* Recommended badge — only on winner */}
+                        {p.isBest && (
+                          <div
+                            className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest whitespace-nowrap"
+                            style={{
+                              background: "linear-gradient(135deg, #C9A84C, #E2C366)",
+                              color: "#0C1F17",
+                              boxShadow: "0 2px 8px rgba(201,168,76,0.25)",
+                            }}
+                          >
+                            Recommended
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5 mb-2">
                           <span
                             className="text-[11px] font-bold uppercase tracking-wider"
@@ -1065,166 +1082,109 @@ export default function CheckCalculator() {
                   </div>
                 </StaggerItem>
 
-                {/* Disclaimer */}
-                <div className="text-[11px] text-white/20 text-center leading-relaxed mb-6 max-w-[420px] mx-auto" style={{ opacity: 0, animation: "qc-enter 0.4s cubic-bezier(0.16,1,0.3,1) 0.5s forwards" }}>
-                  {isCountySpecific
-                    ? `Based on ${dataYears} years of real USDA county data and OBBBA program rules.`
-                    : "Estimates based on national benchmark data and OBBBA program rules."
-                  }{" "}
-                  {countySlug && stateSlug ? (
-                    <Link
-                      href={`/${stateSlug}/${countySlug}/arc-plc`}
-                      className="text-[#C9A84C]/60 underline underline-offset-2 hover:text-[#C9A84C] transition-colors"
-                    >
-                      View {countyName} county-specific analysis →
-                    </Link>
-                  ) : (
-                    "Run the full county analysis for exact numbers."
-                  )}
-                </div>
+                {/* ── Trust Signals — positioned before CTA for conversion ── */}
+                <StaggerItem index={5}>
+                  <div className="mb-6 flex items-center justify-center gap-4 sm:gap-5 flex-wrap text-[10px] sm:text-[11px] text-white/20 font-medium">
+                    <span className="flex items-center gap-1.5"><span className="text-emerald-500/60"><IconCheck /></span> USDA NASS data</span>
+                    <span className="flex items-center gap-1.5"><span className="text-emerald-500/60"><IconCheck /></span> OBBBA 2025 rules</span>
+                    <span className="flex items-center gap-1.5"><span className="text-emerald-500/60"><IconCheck /></span> 256-bit encryption</span>
+                    <span className="flex items-center gap-1.5"><span className="text-emerald-500/60"><IconCheck /></span> We never sell your data</span>
+                  </div>
+                </StaggerItem>
 
-                {/* ── PRIMARY CTA: Save Results + Create Account (Phase 13 Build 1) ── */}
-                <Link
-                  href="/signup"
-                  className="flex items-center justify-center gap-2 w-full p-4 sm:p-[18px] rounded-[14px] text-[15px] sm:text-base font-bold border-none cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 mb-3 no-underline"
-                  style={{
-                    background: "linear-gradient(90deg, #9E7E30, #C9A84C, #E2C366, #C9A84C, #9E7E30)",
-                    backgroundSize: "200% auto",
-                    animation: "hf-shimmer 3s linear infinite",
-                    color: "#0C1F17",
-                    boxShadow: "0 6px 28px rgba(201,168,76,0.2)",
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  Save Your Results — Create Free Account →
-                </Link>
-                <p className="text-[11px] text-white/20 text-center mb-3">
-                  Your {countyName} analysis will be saved to your dashboard automatically
-                </p>
+                {/* ══════════════════════════════════════════════════════════
+                     CONVERSION ZONE — 2 CTAs only (consolidated from 7)
+                     ══════════════════════════════════════════════════════ */}
 
-                {/* ── SECONDARY CTA: Pro Trial ─────────────────────────── */}
-                <Link
-                  href="/signup"
-                  className="flex items-center justify-center gap-2 w-full p-3 sm:p-3.5 rounded-[12px] text-[13px] font-semibold no-underline transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    color: "rgba(255,255,255,0.5)",
-                  }}
-                >
-                  Start 14-Day Pro Trial · Multi-year projections + Scenario modeling
-                </Link>
-                <p className="text-[11px] text-white/15 text-center mb-5">
-                  Plans from $29/month · Cancel anytime
-                </p>
-
-                {/* ── TERTIARY: See Plans ───────────────────────────────── */}
-                <Link
-                  href="/pricing"
-                  className="block text-center text-[12px] text-white/20 hover:text-white/40 transition-colors no-underline mb-6"
-                >
-                  Compare all plans →
-                </Link>
-
-                {/* ── County deep-dive link ─────────────────────────────── */}
-                {countySlug && stateSlug && (
+                {/* ── PRIMARY CTA: Save My Results ──────────────────────── */}
+                <StaggerItem index={6}>
                   <Link
-                    href={`/${stateSlug}/${countySlug}/arc-plc`}
-                    className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[14px] font-semibold cursor-pointer transition-all duration-200 hover:bg-white/[0.03] mb-6 no-underline"
+                    href="/signup"
+                    className="flex items-center justify-center gap-2.5 w-full p-4 sm:p-[18px] rounded-[14px] text-[15px] sm:text-base font-bold border-none cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(201,168,76,0.3)] active:scale-[0.98] active:duration-75 no-underline"
                     style={{
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.5)",
+                      background: "linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)",
+                      color: "#0C1F17",
+                      boxShadow: "0 6px 28px rgba(201,168,76,0.2), 0 0 0 0.5px rgba(201,168,76,0.3)",
                     }}
                   >
-                    View Full {countyName} Analysis →
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                      <polyline points="17 21 17 13 7 13 7 21" />
+                      <polyline points="7 3 7 8 15 8" />
+                    </svg>
+                    Save My Results
                   </Link>
+                  {/* Doubt-removal micro-copy */}
+                  <div className="flex items-center justify-center gap-1.5 mt-2.5 mb-5">
+                    <span className="text-[11px] text-white/20">Free</span>
+                    <span className="text-white/10">·</span>
+                    <span className="text-[11px] text-white/20">No credit card required</span>
+                    <span className="text-white/10">·</span>
+                    <span className="text-[11px] text-white/20">Your data stays private</span>
+                  </div>
+                </StaggerItem>
+
+                {/* ── SECONDARY CTA: View County Analysis ──────────────── */}
+                {countySlug && stateSlug && (
+                  <StaggerItem index={7}>
+                    <Link
+                      href={`/${stateSlug}/${countySlug}/arc-plc`}
+                      className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[13px] sm:text-[14px] font-semibold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] hover:border-white/[0.12] active:scale-[0.98] active:duration-75 mb-5 no-underline"
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.5)",
+                      }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      View Full {countyName} Analysis →
+                    </Link>
+                  </StaggerItem>
                 )}
 
-                {/* ── Share button ────────────────────────────────────── */}
-                <button
-                  onClick={() => {
-                    const url = window.location.href;
-                    navigator.clipboard.writeText(url).then(() => {
-                      setShared(true);
-                      setTimeout(() => setShared(false), 3000);
-                    }).catch(() => {
-                      // Fallback for older browsers
-                      const input = document.createElement("input");
-                      input.value = url;
-                      document.body.appendChild(input);
-                      input.select();
-                      document.execCommand("copy");
-                      document.body.removeChild(input);
-                      setShared(true);
-                      setTimeout(() => setShared(false), 3000);
-                    });
-                  }}
-                  className="flex items-center justify-center gap-2 w-full p-3 rounded-[14px] text-[13px] font-semibold cursor-pointer transition-all duration-200 hover:bg-white/[0.03] active:scale-[0.98] active:duration-75 mb-2 bg-transparent"
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    color: shared ? "#34D399" : "rgba(255,255,255,0.35)",
-                  }}
-                >
-                  {shared ? (
-                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg> Link copied — share it!</>
-                  ) : (
-                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg> Share these results</>
-                  )}
-                </button>
-
-                {/* ── Email capture (optional) ─────────────────────────── */}
-                {!showEmailCapture && !emailSaved && (
+                {/* ── Utility Actions (share + recalculate) ─────────────── */}
+                <div className="flex items-center justify-center gap-4 mt-2" style={{ opacity: 0, animation: "qc-enter 0.4s cubic-bezier(0.16,1,0.3,1) 0.7s forwards" }}>
+                  {/* Share — inline utility, not a CTA */}
                   <button
-                    onClick={() => setShowEmailCapture(true)}
-                    className="block mx-auto text-[12px] text-white/20 hover:text-white/40 transition-colors cursor-pointer bg-transparent border-none underline underline-offset-2"
+                    onClick={() => {
+                      const url = window.location.href;
+                      navigator.clipboard.writeText(url).then(() => {
+                        setShared(true);
+                        setTimeout(() => setShared(false), 3000);
+                      }).catch(() => {
+                        const input = document.createElement("input");
+                        input.value = url;
+                        document.body.appendChild(input);
+                        input.select();
+                        document.execCommand("copy");
+                        document.body.removeChild(input);
+                        setShared(true);
+                        setTimeout(() => setShared(false), 3000);
+                      });
+                    }}
+                    className="flex items-center gap-1.5 text-[12px] font-medium cursor-pointer bg-transparent border-none transition-colors duration-200"
+                    style={{ color: shared ? "#34D399" : "rgba(255,255,255,0.25)" }}
                   >
-                    Save my results & get price alerts
+                    {shared ? (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg> Copied!</>
+                    ) : (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg> Share</>
+                    )}
                   </button>
-                )}
 
-                {showEmailCapture && !emailSaved && (
-                  <div className="mt-4 p-5 rounded-[16px] border border-white/[0.06] bg-white/[0.02]" style={{ animation: "qc-enter 0.35s ease" }}>
-                    <div className="text-[13px] font-semibold text-white/60 mb-3">
-                      Get notified when USDA prices change your estimate
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="your@email.com"
-                        className="flex-1 px-4 py-3 rounded-xl text-[14px] text-white bg-white/[0.04] border border-white/[0.08] outline-none focus:border-[#C9A84C]/40 transition-colors"
-                        onKeyDown={(e) => { if (e.key === "Enter") saveEmail(); }}
-                      />
-                      <button
-                        onClick={saveEmail}
-                        className="px-5 py-3 rounded-xl text-[13px] font-bold border-none cursor-pointer transition-colors"
-                        style={{ background: "rgba(201,168,76,0.15)", color: "#C9A84C" }}
-                      >
-                        Save
-                      </button>
-                    </div>
-                    <div className="text-[10px] text-white/15 mt-2">No spam. Unsubscribe anytime.</div>
-                  </div>
-                )}
+                  <span className="text-white/10">·</span>
 
-                {emailSaved && (
-                  <div className="flex items-center justify-center gap-2 text-[13px] text-emerald-400/80 mt-4" style={{ animation: "qc-enter 0.35s ease" }}>
-                    <IconCheck /> Results saved — we&apos;ll notify you when estimates change.
-                  </div>
-                )}
-
-                {/* ── Start over ───────────────────────────────────────── */}
-                <button
-                  onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); window.history.replaceState(null, "", "/check"); }}
-                  className="block mx-auto mt-6 text-[12px] text-white/15 hover:text-white/30 transition-colors cursor-pointer bg-transparent border-none"
-                >
-                  ← Calculate for a different farm
-                </button>
+                  {/* Recalculate — simple text link */}
+                  <button
+                    onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); window.history.replaceState(null, "", "/check"); }}
+                    className="flex items-center gap-1.5 text-[12px] font-medium cursor-pointer bg-transparent border-none transition-colors duration-200 text-white/25 hover:text-white/40"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                    New calculation
+                  </button>
+                </div>
                 </>
                 )}
               </div>
@@ -1248,14 +1208,14 @@ export default function CheckCalculator() {
           </div>
         )}
 
-        {/* ── Trust section below results ───────────────────────────────── */}
+        {/* ── Data attribution below results ───────────────────────────── */}
         {step === 3 && (
-          <div className="mt-12 text-center" style={{ animation: "qc-enter 0.5s ease 0.6s both" }}>
-            <div className="inline-flex items-center gap-5 flex-wrap justify-center text-[11px] text-white/15">
-              <span className="flex items-center gap-1.5"><span className="text-emerald-500/50"><IconCheck /></span> USDA NASS data</span>
-              <span className="flex items-center gap-1.5"><span className="text-emerald-500/50"><IconCheck /></span> OBBBA 2025 rules</span>
-              <span className="flex items-center gap-1.5"><span className="text-emerald-500/50"><IconCheck /></span> 256-bit encryption</span>
-              <span className="flex items-center gap-1.5"><span className="text-emerald-500/50"><IconCheck /></span> We never sell your data</span>
+          <div className="mt-8 text-center" style={{ animation: "qc-enter 0.5s ease 0.8s both" }}>
+            <div className="text-[11px] text-white/15 leading-relaxed max-w-[420px] mx-auto">
+              {isCountySpecific
+                ? `Based on ${dataYears} years of real USDA county data and OBBBA program rules.`
+                : "Estimates based on national benchmark data and OBBBA program rules."
+              }
             </div>
           </div>
         )}
