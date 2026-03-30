@@ -1,6 +1,6 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
-// HarvestFile — Build 10 Deploy 2: Interactive Morning Dashboard
+// HarvestFile — Build 17 Deploy 2: Morning Dashboard Visual Redesign
 //
 // CLIENT COMPONENT — handles all interactive/data-driven sections:
 //   - Morning header with greeting + market status
@@ -10,13 +10,25 @@
 //   - Markets card with price polling + PLC impact
 //   - Grain bid card (via GrainBidCard)
 //
-// Recharts sparklines are lazy-loaded to reduce initial JS bundle.
+// Build 17 changes from Build 10:
+//   1. tabular-nums on ALL financial numbers
+//   2. Shimmer skeleton loading (replaces basic pulse)
+//   3. Scroll-triggered fade-up animations via IntersectionObserver
+//   4. Refined card borders and spacing (no shadows by default)
+//   5. Typography restraint — weight 400/500 default, 700 hero only
+//   6. 48px+ touch targets for farmer demographics
+//   7. Consistent SVG crop icons (no emojis)
+//   8. Market status with proper pulse animation
+//   9. Better visual hierarchy in MarketsCard (PLC callouts)
+//  10. prefers-reduced-motion respected
+//
+// Recharts sparklines lazy-loaded to reduce initial JS bundle.
 // All data fetches execute in parallel on mount.
 // =============================================================================
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { GrainBidCard } from '@/components/grain/GrainBidCard';
 import { PaymentEstimateCard } from '@/components/morning/PaymentEstimateCard';
@@ -24,6 +36,64 @@ import { useGeolocation } from '@/lib/hooks/useGeolocation';
 
 // Lazy-load Recharts — saves ~80KB from initial bundle
 const LazySparkline = lazy(() => import('./SparklineChart'));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCROLL ANIMATION HOOK (~500 bytes — CSS-only animations, JS for triggering)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function useScrollAnimation() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // Respect reduced motion preference
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add('hf-animate-in');
+          observer.unobserve(el);
+        }
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return ref;
+}
+
+/** Wrapper component for scroll-triggered fade-up */
+function AnimateIn({
+  children,
+  delay = 0,
+  className = '',
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const ref = useScrollAnimation();
+  return (
+    <div
+      ref={ref}
+      className={`hf-animate-target ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMMODITY CONFIGURATION
@@ -60,6 +130,36 @@ const COMMODITIES: Record<string, CommodityConfig> = {
 };
 
 const COMMODITY_ORDER = ['CORN', 'SOYBEANS', 'WHEAT'];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROP ICONS (SVG — premium botanical style, matching /check page)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CropIcon({ code, size = 20 }: { code: string; size?: number }) {
+  const cfg = COMMODITIES[code];
+  const color = cfg?.color || '#6B7280';
+
+  if (code === 'CORN') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v20" /><path d="M8 6c0 0 4 2 4 6s-4 6-4 6" /><path d="M16 6c0 0-4 2-4 6s4 6 4 6" />
+      </svg>
+    );
+  }
+  if (code === 'SOYBEANS') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="12" r="4" /><circle cx="15" cy="12" r="4" /><path d="M12 8v-4" />
+      </svg>
+    );
+  }
+  // WHEAT
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2v10" /><path d="M8 6l4-4 4 4" /><path d="M4 22c0-4 4-8 8-10" /><path d="M20 22c0-4-4-8-8-10" />
+    </svg>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKET STATUS
@@ -124,37 +224,39 @@ function formatDateHeader(): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SKELETON COMPONENTS
+// SHIMMER SKELETON (premium loading state — replaces basic pulse)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function SkeletonPulse({ className = '' }: { className?: string }) {
+function Shimmer({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`animate-pulse rounded-lg bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] ${className}`}
-      style={{ animation: 'hf-shimmer 1.5s ease-in-out infinite' }}
+      className={`rounded-lg bg-gradient-to-r from-gray-200/60 via-gray-100/60 to-gray-200/60 bg-[length:200%_100%] animate-[hf-shimmer_1.4s_ease-in-out_infinite] ${className}`}
     />
   );
 }
 
 function WeatherSkeleton() {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 sm:p-6 shadow-sm">
+    <div className="rounded-2xl border border-gray-100/80 bg-white p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-4">
-        <SkeletonPulse className="w-5 h-5 rounded" />
-        <SkeletonPulse className="w-32 h-4" />
+        <Shimmer className="w-5 h-5 rounded" />
+        <Shimmer className="w-36 h-4" />
+        <div className="flex-1" />
+        <Shimmer className="w-24 h-6 rounded-full" />
       </div>
       <div className="flex items-start gap-4 mb-5">
-        <SkeletonPulse className="w-20 h-16 rounded-xl" />
+        <Shimmer className="w-14 h-14 rounded-xl flex-shrink-0" />
         <div className="flex-1 space-y-2">
-          <SkeletonPulse className="w-48 h-5" />
-          <SkeletonPulse className="w-36 h-4" />
+          <Shimmer className="w-20 h-8" />
+          <Shimmer className="w-36 h-4" />
+          <Shimmer className="w-48 h-3" />
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl bg-gray-50 p-3">
-            <SkeletonPulse className="w-12 h-3 mb-2" />
-            <SkeletonPulse className="w-16 h-5" />
+      <div className="grid grid-cols-5 gap-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="rounded-xl bg-gray-50/80 p-2.5">
+            <Shimmer className="w-full h-3 mb-2" />
+            <Shimmer className="w-full h-4" />
           </div>
         ))}
       </div>
@@ -164,29 +266,31 @@ function WeatherSkeleton() {
 
 function MarketsSkeleton() {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 sm:p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <SkeletonPulse className="w-5 h-5 rounded" />
-          <SkeletonPulse className="w-36 h-4" />
+    <div className="rounded-2xl border border-gray-100/80 bg-white overflow-hidden">
+      <div className="p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Shimmer className="w-5 h-5 rounded" />
+            <Shimmer className="w-36 h-4" />
+          </div>
+          <Shimmer className="w-24 h-6 rounded-full" />
         </div>
-        <SkeletonPulse className="w-24 h-5 rounded-full" />
-      </div>
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
-          <div className="flex items-center gap-3">
-            <SkeletonPulse className="w-10 h-10 rounded-xl" />
-            <div className="space-y-1.5">
-              <SkeletonPulse className="w-20 h-4" />
-              <SkeletonPulse className="w-28 h-3" />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
+            <div className="flex items-center gap-3">
+              <Shimmer className="w-10 h-10 rounded-xl" />
+              <div className="space-y-1.5">
+                <Shimmer className="w-20 h-4" />
+                <Shimmer className="w-32 h-3" />
+              </div>
+            </div>
+            <div className="text-right space-y-1.5">
+              <Shimmer className="w-16 h-5 ml-auto" />
+              <Shimmer className="w-20 h-3 ml-auto" />
             </div>
           </div>
-          <div className="text-right space-y-1.5">
-            <SkeletonPulse className="w-16 h-5 ml-auto" />
-            <SkeletonPulse className="w-20 h-3 ml-auto" />
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -350,81 +454,91 @@ function getWeatherDescription(code: number): string {
   if (code <= 65) return 'Rain';
   if (code <= 77) return 'Snow';
   if (code <= 82) return 'Rain showers';
-  return 'Thunderstorm';
+  if (code <= 86) return 'Snow showers';
+  if (code <= 99) return 'Thunderstorm';
+  return 'Unknown';
 }
 
 function WeatherCard({ data }: { data: WeatherData }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-      {data.alerts.length > 0 && (
-        <div className="px-5 py-2.5 bg-red-50 border-b border-red-100">
-          <div className="flex items-center gap-2 text-red-700 text-xs font-semibold">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" />
-            </svg>
-            {data.alerts[0].headline}
-          </div>
-        </div>
-      )}
-
+    <div className="rounded-2xl border border-gray-100/80 bg-white overflow-hidden">
       <div className="p-5 sm:p-6">
+        {/* Header with spray status */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
             </svg>
-            <h2 className="text-sm font-bold text-gray-900 tracking-tight">Agricultural Weather</h2>
+            <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Agricultural Weather</h2>
           </div>
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-              data.sprayOk ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-            }`}
-          >
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${
+            data.sprayOk
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+              : 'bg-amber-50 text-amber-700 border border-amber-100'
+          }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${data.sprayOk ? 'bg-emerald-500' : 'bg-amber-500'}`} />
             Spray: {data.sprayOk ? 'GO' : 'HOLD'}
-          </div>
+          </span>
         </div>
 
+        {/* Current conditions */}
         <div className="flex items-start gap-4 mb-5">
-          <div className="flex-shrink-0 w-[72px] h-[72px] rounded-2xl bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center border border-blue-100/50">
-            <WeatherIcon code={data.current.weatherCode} size={38} />
+          <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center border border-blue-100/50">
+            <WeatherIcon code={data.current.weatherCode} size={36} />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-4xl font-extrabold text-gray-900 tracking-[-0.03em]">{data.current.temp}°</span>
+          <div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-[36px] font-bold text-gray-900 leading-none tracking-tight tabular-nums">
+                {data.current.temp}°
+              </span>
               <span className="text-sm text-gray-400 font-medium">F</span>
             </div>
-            <p className="text-sm text-gray-500 mt-0.5">{data.current.description}</p>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
-              <span>Feels {data.current.feelsLike}°</span>
-              <span>·</span>
-              <span>Wind {data.current.windSpeed} mph {data.current.windDir}</span>
-              <span>·</span>
-              <span>{data.current.humidity}% humid</span>
-            </div>
+            <p className="text-sm text-gray-600 font-medium mt-0.5">{data.current.description}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Feels {data.current.feelsLike}°
+              <span className="mx-1.5 text-gray-200">·</span>
+              Wind {data.current.windSpeed} mph {data.current.windDir}
+              <span className="mx-1.5 text-gray-200">·</span>
+              {data.current.humidity}% humid
+            </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-2">
+        {/* 5-day forecast */}
+        <div className="grid grid-cols-5 gap-1.5">
           {data.daily.map((d, i) => (
-            <div key={d.date} className={`rounded-xl p-2.5 text-center transition-colors ${i === 0 ? 'bg-[#1B4332]/[0.04] border border-[#1B4332]/10' : 'bg-gray-50'}`}>
-              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{d.dayName}</div>
-              <WeatherIcon code={d.weatherCode} size={20} />
-              <div className="flex items-center justify-center gap-1 mt-1">
-                <span className="text-xs font-bold text-gray-900">{d.high}°</span>
-                <span className="text-[10px] text-gray-400">{d.low}°</span>
+            <div
+              key={d.date}
+              className={`rounded-xl p-2.5 text-center transition-colors ${
+                i === 0 ? 'bg-emerald-50/60 border border-emerald-100/50' : 'bg-gray-50/80 border border-gray-100/40'
+              }`}
+            >
+              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+                i === 0 ? 'text-emerald-600' : 'text-gray-400'
+              }`}>
+                {d.dayName}
               </div>
-              {d.precipProb > 0 && <div className="text-[10px] text-blue-500 font-semibold mt-0.5">{d.precipProb}%</div>}
+              <div className="flex justify-center mb-1.5">
+                <WeatherIcon code={d.weatherCode} size={20} />
+              </div>
+              <div className="flex items-center justify-center gap-1">
+                <span className="text-xs font-bold text-gray-900 tabular-nums">{d.high}°</span>
+                <span className="text-[10px] text-gray-400 tabular-nums">{d.low}°</span>
+              </div>
+              {d.precipProb > 0 && (
+                <div className="text-[10px] text-blue-500 font-semibold mt-0.5 tabular-nums">{d.precipProb}%</div>
+              )}
             </div>
           ))}
         </div>
 
+        {/* Soil + GDD + Wind metrics */}
         {(data.soil || (data.daily[0]?.gdd ?? 0) > 0) && (
           <div className="grid grid-cols-3 gap-2 mt-4">
             {data.soil && (
               <div className="rounded-xl bg-amber-50/60 border border-amber-100/50 p-3">
                 <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Soil Temp</div>
-                <div className="text-lg font-extrabold text-amber-800 mt-0.5">
+                <div className="text-lg font-bold text-amber-800 mt-0.5 tabular-nums">
                   {data.soil.temp2in}°<span className="text-[10px] font-medium text-amber-500 ml-0.5">2&quot;</span>
                 </div>
                 {data.soil.temp2in >= 50 && <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">Corn: plantable</div>}
@@ -433,14 +547,14 @@ function WeatherCard({ data }: { data: WeatherData }) {
             {(data.daily[0]?.gdd ?? 0) > 0 && (
               <div className="rounded-xl bg-emerald-50/60 border border-emerald-100/50 p-3">
                 <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Today GDD</div>
-                <div className="text-lg font-extrabold text-emerald-800 mt-0.5">
+                <div className="text-lg font-bold text-emerald-800 mt-0.5 tabular-nums">
                   {data.daily[0].gdd}<span className="text-[10px] font-medium text-emerald-500 ml-0.5">base 50</span>
                 </div>
               </div>
             )}
             <div className="rounded-xl bg-blue-50/60 border border-blue-100/50 p-3">
               <div className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Max Wind</div>
-              <div className="text-lg font-extrabold text-blue-800 mt-0.5">
+              <div className="text-lg font-bold text-blue-800 mt-0.5 tabular-nums">
                 {data.daily[0]?.windMax ?? data.current.windSpeed}
                 <span className="text-[10px] font-medium text-blue-500 ml-0.5">mph</span>
               </div>
@@ -469,18 +583,18 @@ interface PriceData {
 
 function MarketsCard({ data, status }: { data: Record<string, PriceData>; status: MarketStatus }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-gray-100/80 bg-white overflow-hidden">
       <div className="p-5 sm:p-6">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" />
             </svg>
-            <h2 className="text-sm font-bold text-gray-900 tracking-tight">Commodity Prices</h2>
+            <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Commodity Prices</h2>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-100">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gray-50 border border-gray-100/80">
             <span
-              className="w-1.5 h-1.5 rounded-full"
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
               style={{
                 background: status.color,
                 boxShadow: status.isLive ? `0 0 6px ${status.color}` : 'none',
@@ -507,20 +621,14 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
             return (
               <div key={code} className="py-4 first:pt-0 last:pb-0">
                 <div className="flex items-center gap-3">
+                  {/* Crop icon badge */}
                   <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${cfg.color}12` }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={cfg.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {code === 'CORN' ? (
-                        <><path d="M12 2v20" /><path d="M8 6c0 0 4 2 4 6s-4 6-4 6" /><path d="M16 6c0 0-4 2-4 6s4 6 4 6" /></>
-                      ) : code === 'SOYBEANS' ? (
-                        <><circle cx="9" cy="12" r="4" /><circle cx="15" cy="12" r="4" /><path d="M12 8v-4" /></>
-                      ) : (
-                        <><path d="M12 2v10" /><path d="M8 6l4-4 4 4" /><path d="M4 22c0-4 4-8 8-10" /><path d="M20 22c0-4-4-8-8-10" /></>
-                      )}
-                    </svg>
+                    <CropIcon code={code} size={20} />
                   </div>
 
+                  {/* Crop info */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-gray-900">{cfg.name}</div>
+                    <div className="text-sm font-semibold text-gray-900">{cfg.name}</div>
                     {plc && (
                       <div
                         className={`inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold ${
@@ -546,12 +654,13 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
                     )}
                   </div>
 
+                  {/* Price + change */}
                   <div className="text-right flex-shrink-0">
-                    <div className="text-lg font-extrabold text-gray-900 tracking-[-0.02em]">
+                    <div className="text-lg font-bold text-gray-900 tracking-[-0.02em] tabular-nums">
                       {price !== null ? `$${price.toFixed(2)}` : '—'}
                     </div>
                     {change !== null && (
-                      <div className={`text-xs font-bold ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
+                      <div className={`text-xs font-semibold tabular-nums ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
                         {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{change.toFixed(2)}
                         {d?.changePct !== null && d?.changePct !== undefined && (
                           <span className="opacity-60 ml-0.5">({isUp ? '+' : ''}{d.changePct.toFixed(1)}%)</span>
@@ -561,10 +670,13 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
                   </div>
                 </div>
 
+                {/* PLC payment projection bar */}
                 {plc && plc.rate > 0 && (
-                  <div className="mt-2 ml-[52px] rounded-lg bg-red-50/70 border border-red-100/50 px-3 py-2 flex items-center justify-between">
+                  <div className="mt-2.5 ml-[52px] rounded-lg bg-red-50/70 border border-red-100/50 px-3 py-2 flex items-center justify-between">
                     <span className="text-[11px] text-red-700 font-medium">Est. PLC payment on national avg yield</span>
-                    <span className="text-[11px] text-red-800 font-bold">≈ ${plc.perAcre.toFixed(0)}/acre</span>
+                    <span className="text-[11px] text-red-800 font-bold tabular-nums">
+                      ≈ ${plc.perAcre.toFixed(0)}/acre
+                    </span>
                   </div>
                 )}
               </div>
@@ -573,6 +685,7 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
         </div>
       </div>
 
+      {/* Footer */}
       <div className="border-t border-gray-50 px-5 sm:px-6 py-3 flex items-center justify-between bg-gray-50/40">
         <Link href="/markets" className="text-xs font-semibold text-[#1B4332] hover:text-emerald-600 transition-colors flex items-center gap-1">
           Full market dashboard
@@ -593,32 +706,59 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuickActions() {
-  return (
-    <div className="grid grid-cols-4 gap-2">
-      <Link href="/check" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+  const actions = [
+    {
+      href: '/check',
+      label: 'ARC/PLC Calculator',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" />
         </svg>
-        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">ARC/PLC Calculator</span>
-      </Link>
-      <Link href="/farm-score" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+      ),
+    },
+    {
+      href: '/farm-score',
+      label: 'Farm Score',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" />
         </svg>
-        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">Farm Score</span>
-      </Link>
-      <Link href="/weather" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+      ),
+    },
+    {
+      href: '/weather',
+      label: 'Full Weather',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
         </svg>
-        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">Full Weather</span>
-      </Link>
-      <Link href="/markets" className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+      ),
+    },
+    {
+      href: '/markets',
+      label: 'All Markets',
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" />
         </svg>
-        <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">All Markets</span>
-      </Link>
+      ),
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {actions.map((action) => (
+        <Link
+          key={action.href}
+          href={action.href}
+          className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-gray-100/80 py-3 px-2 hover:border-emerald-200 hover:shadow-sm transition-all group min-h-[72px] justify-center"
+        >
+          <div className="group-hover:scale-110 transition-transform">{action.icon}</div>
+          <span className="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-700 text-center leading-tight transition-colors">
+            {action.label}
+          </span>
+        </Link>
+      ))}
     </div>
   );
 }
@@ -693,15 +833,17 @@ export default function MorningDashboardClient() {
         <div className="hf-noise-subtle" />
         <div className="relative z-10 mx-auto max-w-[680px] px-5">
           <div className="mb-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-[-0.03em]">{getGreeting()}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-[-0.03em]">{getGreeting()}</h1>
           </div>
           <p className="text-white/40 text-sm font-medium mb-5">
             {formatDateHeader()}
-            {!geo.isDefault && geo.locationName && <span className="text-white/25 ml-2">· {geo.locationName}</span>}
+            {!geo.isDefault && geo.locationName && (
+              <span className="text-white/25 ml-2">· {geo.locationName}</span>
+            )}
           </p>
           <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] backdrop-blur-sm">
             <span
-              className="w-2 h-2 rounded-full"
+              className="w-2 h-2 rounded-full flex-shrink-0"
               style={{
                 background: marketStatus.color,
                 boxShadow: marketStatus.isLive ? `0 0 8px ${marketStatus.color}` : 'none',
@@ -715,48 +857,65 @@ export default function MorningDashboardClient() {
       </section>
 
       {/* ═══ DASHBOARD CARDS ═══ */}
-      <div className="mx-auto max-w-[680px] px-5 -mt-3 space-y-4">
-        <QuickActions />
+      <div className="mx-auto max-w-[680px] px-5 -mt-3 space-y-4 pb-4">
+        {/* Quick Actions */}
+        <AnimateIn>
+          <QuickActions />
+        </AnimateIn>
 
         {/* Payment Estimate — THE hero metric */}
-        <PaymentEstimateCard prices={prices} loading={pricesLoading} />
+        <AnimateIn delay={75}>
+          <PaymentEstimateCard prices={prices} loading={pricesLoading} />
+        </AnimateIn>
 
         {/* Weather Card */}
-        {weatherLoading ? (
-          <WeatherSkeleton />
-        ) : weatherError ? (
-          <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5 text-center">
-            <p className="text-sm text-red-600 font-medium">{weatherError}</p>
-            <button onClick={() => { setWeatherLoading(true); setWeatherError(''); fetchWeather(); }} className="mt-2 text-xs font-semibold text-red-700 underline">
-              Retry
-            </button>
-          </div>
-        ) : weather ? (
-          <WeatherCard data={weather} />
-        ) : null}
+        <AnimateIn delay={150}>
+          {weatherLoading ? (
+            <WeatherSkeleton />
+          ) : weatherError ? (
+            <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5 text-center">
+              <p className="text-sm text-red-600 font-medium">{weatherError}</p>
+              <button
+                onClick={() => { setWeatherLoading(true); setWeatherError(''); fetchWeather(); }}
+                className="mt-2 text-xs font-semibold text-red-700 underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : weather ? (
+            <WeatherCard data={weather} />
+          ) : null}
+        </AnimateIn>
 
         {/* Markets Card */}
-        {pricesLoading ? (
-          <MarketsSkeleton />
-        ) : pricesError ? (
-          <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5 text-center">
-            <p className="text-sm text-red-600 font-medium">{pricesError}</p>
-            <button onClick={() => { setPricesLoading(true); setPricesError(''); fetchPrices(); }} className="mt-2 text-xs font-semibold text-red-700 underline">
-              Retry
-            </button>
-          </div>
-        ) : (
-          <MarketsCard data={prices} status={marketStatus} />
-        )}
+        <AnimateIn delay={225}>
+          {pricesLoading ? (
+            <MarketsSkeleton />
+          ) : pricesError ? (
+            <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5 text-center">
+              <p className="text-sm text-red-600 font-medium">{pricesError}</p>
+              <button
+                onClick={() => { setPricesLoading(true); setPricesError(''); fetchPrices(); }}
+                className="mt-2 text-xs font-semibold text-red-700 underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <MarketsCard data={prices} status={marketStatus} />
+          )}
+        </AnimateIn>
 
         {/* Local Grain Bids */}
-        <GrainBidCard
-          lat={geo.lat}
-          lng={geo.lng}
-          compact={true}
-          countyName={geo.isDefault ? 'Summit County' : geo.locationName.split(',')[0] || 'Your Area'}
-          stateAbbr={geo.isDefault ? 'OH' : geo.locationName.split(',')[1]?.trim() || 'US'}
-        />
+        <AnimateIn delay={300}>
+          <GrainBidCard
+            lat={geo.lat}
+            lng={geo.lng}
+            compact={true}
+            countyName={geo.isDefault ? 'Summit County' : geo.locationName.split(',')[0] || 'Your Area'}
+            stateAbbr={geo.isDefault ? 'OH' : geo.locationName.split(',')[1]?.trim() || 'US'}
+          />
+        </AnimateIn>
       </div>
     </>
   );

@@ -607,6 +607,34 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   BUILD 17: SCROLL-TRIGGERED ANIMATIONS (Morning Dashboard)
+   IntersectionObserver adds .hf-animate-in class on viewport entry.
+   GPU-composited: only transform + opacity for 60fps.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.hf-animate-target {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.hf-animate-target.hf-animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .hf-animate-target {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    UTILITY CLASSES
    ═══════════════════════════════════════════════════════════════════════════════ */
 .hf-float {

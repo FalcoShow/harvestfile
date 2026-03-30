@@ -1,6 +1,6 @@
 // =============================================================================
 // app/(marketing)/morning/page.tsx
-// HarvestFile — Build 10 Deploy 2: Morning Dashboard Architecture Refactor
+// HarvestFile — Build 17 Deploy 2: Morning Dashboard Visual Redesign
 //
 // SERVER COMPONENT — renders static sections instantly (zero JS), wraps
 // the interactive data sections in a client boundary.
@@ -10,10 +10,17 @@
 //   Client-rendered (interactive): header, payment estimate, weather, markets,
 //     grain bids — all managed by MorningDashboardClient with shared state
 //
+// Build 17 changes:
+//   1. Consistent card styling (border-gray-100/80, no shadows by default)
+//   2. tabular-nums on countdown numbers
+//   3. Typography restraint (font-semibold not font-bold on titles)
+//   4. Refined calendar card with better imminent-report styling
+//   5. Bottom CTA with improved visual hierarchy
+//
 // Performance targets:
 //   FCP: < 1.0s (server HTML streams immediately)
 //   LCP: < 2.5s on rural LTE
-//   Client JS: < 100KB gzipped (down from ~140KB monolith)
+//   Client JS: < 100KB gzipped
 // =============================================================================
 
 import { Suspense } from 'react';
@@ -53,7 +60,6 @@ function getUpcomingReports(): USDAReport[] {
 
   return reports
     .filter((r) => {
-      // Parse date at noon to avoid timezone off-by-one
       const reportDate = new Date(r.date + 'T12:00:00');
       return reportDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate());
     })
@@ -72,19 +78,18 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
   if (reports.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 sm:p-6">
+    <div className="rounded-2xl border border-gray-100/80 bg-white p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-4">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" />
         </svg>
-        <h2 className="text-sm font-bold text-gray-900 tracking-tight">USDA Reports That Move Markets</h2>
+        <h2 className="text-sm font-semibold text-gray-900 tracking-tight">USDA Reports That Move Markets</h2>
       </div>
 
       <div className="space-y-2">
         {reports.map((r, i) => {
           const days = daysUntil(r.date);
           const isImminent = days <= 3;
-          // Parse at noon to avoid timezone off-by-one
           const dateObj = new Date(r.date + 'T12:00:00');
 
           return (
@@ -105,7 +110,7 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
                 >
                   {dateObj.toLocaleDateString('en-US', { month: 'short' })}
                 </div>
-                <div className={`text-lg font-extrabold ${isImminent ? 'text-amber-700' : 'text-gray-800'}`}>
+                <div className={`text-lg font-bold tabular-nums ${isImminent ? 'text-amber-700' : 'text-gray-800'}`}>
                   {dateObj.getDate()}
                 </div>
               </div>
@@ -113,7 +118,7 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
               {/* Report info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-900 truncate">{r.name}</span>
+                  <span className="text-sm font-semibold text-gray-900 truncate">{r.name}</span>
                   {r.impact === 'high' && (
                     <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-600 uppercase">
                       High Impact
@@ -124,7 +129,7 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
               </div>
 
               {/* Days countdown */}
-              <div className={`flex-shrink-0 text-xs font-bold ${isImminent ? 'text-amber-600' : 'text-gray-400'}`}>
+              <div className={`flex-shrink-0 text-xs font-bold tabular-nums ${isImminent ? 'text-amber-600' : 'text-gray-400'}`}>
                 {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`}
               </div>
             </div>
@@ -154,7 +159,7 @@ function BottomCTA() {
     <div className="rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 text-center relative overflow-hidden">
       <div className="hf-noise-subtle" />
       <div className="relative z-10">
-        <h3 className="text-lg font-extrabold text-white tracking-[-0.02em] mb-2">
+        <h3 className="text-lg font-bold text-white tracking-[-0.02em] mb-2">
           See what today&apos;s prices mean for{' '}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C9A84C] to-[#E2C366]">
             your farm
@@ -192,9 +197,9 @@ function MorningSkeleton() {
       {/* Header skeleton */}
       <section className="relative bg-gradient-to-br from-[#0C1F17] via-[#1B4332] to-[#0f2b1e] pt-24 pb-8 sm:pt-28 sm:pb-10">
         <div className="mx-auto max-w-[680px] px-5">
-          <div className="w-48 h-8 rounded-lg bg-white/10 animate-pulse mb-2" />
-          <div className="w-64 h-4 rounded bg-white/5 animate-pulse mb-5" />
-          <div className="w-36 h-9 rounded-xl bg-white/5 animate-pulse" />
+          <div className="w-48 h-8 rounded-lg bg-white/10 animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/10 via-white/5 to-white/10 mb-2" />
+          <div className="w-64 h-4 rounded bg-white/5 animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/5 via-white/[0.02] to-white/5 mb-5" />
+          <div className="w-36 h-9 rounded-xl bg-white/5 animate-[hf-shimmer_1.4s_ease-in-out_infinite] bg-[length:200%_100%] bg-gradient-to-r from-white/5 via-white/[0.02] to-white/5" />
         </div>
       </section>
 
@@ -203,7 +208,7 @@ function MorningSkeleton() {
         {/* Quick actions skeleton */}
         <div className="grid grid-cols-4 gap-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[72px] rounded-xl bg-white border border-gray-100 animate-pulse" />
+            <div key={i} className="h-[72px] rounded-xl bg-white border border-gray-100/80 animate-pulse" />
           ))}
         </div>
 
@@ -211,10 +216,10 @@ function MorningSkeleton() {
         <div className="rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 h-[260px] animate-pulse" />
 
         {/* Weather skeleton */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 h-[200px] animate-pulse" />
+        <div className="rounded-2xl border border-gray-100/80 bg-white p-6 h-[200px] animate-pulse" />
 
         {/* Markets skeleton */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 h-[280px] animate-pulse" />
+        <div className="rounded-2xl border border-gray-100/80 bg-white p-6 h-[280px] animate-pulse" />
       </div>
     </>
   );
@@ -230,13 +235,11 @@ export default function MorningPage() {
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
       {/* ═══ INTERACTIVE SECTIONS (Client Component) ═══ */}
-      {/* Header, Quick Actions, Payment Estimate, Weather, Markets, Grain Bids */}
       <Suspense fallback={<MorningSkeleton />}>
         <MorningDashboardClient />
       </Suspense>
 
       {/* ═══ SERVER-RENDERED SECTIONS (zero JS, instant) ═══ */}
-      {/* These render immediately while client data loads above */}
       <div className="mx-auto max-w-[680px] px-5 space-y-4 pb-20">
         {/* USDA Calendar */}
         <CalendarCard reports={reports} />
