@@ -1,23 +1,19 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
-// HarvestFile — Build 17 Deploy 3: Morning Dashboard FULL DARK THEME
+// HarvestFile — Build 17 Deploy 4: Layout Architecture & Micro-Detail Polish
 //
-// CLIENT COMPONENT — handles all interactive/data-driven sections:
-//   - Morning header with greeting + market status
-//   - Quick action links
-//   - Payment estimate card (via PaymentEstimateCard — already dark)
-//   - Weather card with geolocation + API fetching
-//   - Markets card with price polling + PLC impact
-//   - Grain bid card (via GrainBidCard)
+// CLIENT COMPONENT — handles all interactive/data-driven sections.
 //
-// Build 17 Deploy 3 — FULL DARK THEME:
-//   All cards: bg-white → rgba(27,67,50,0.30) with white/6% borders
-//   Text hierarchy: white at 90%/60%/30% opacity
-//   Borders: gray-100 → white/[0.06]
-//   Skeletons: dark shimmer gradients
-//   Icons: strokes adjusted for dark backgrounds
-//   Accents: gold (#C9A84C) for CTAs, emerald (#34D399) for positive
-//   Status colors: desaturated for dark bg readability
+// Deploy 4 changes (Layout Architecture Overhaul):
+//   1. Section eyebrow labels between card groups
+//   2. Spacing rhythm: 32px between sections, 12px within, 8pt grid
+//   3. Refined stagger: 60ms gaps, 8px translateY, 400ms duration
+//   4. Price flash animation on commodity price changes
+//   5. Bloomberg-style dense commodity rows (tighter, always-visible sparklines)
+//   6. Quick action buttons with category-colored accent dots
+//   7. Weather card atmospheric gradient tint by condition
+//   8. Data freshness timestamps with live pulse dots
+//   9. Count-up animation on payment hero (in PaymentEstimateCard)
 //
 // Recharts sparklines lazy-loaded to reduce initial JS bundle.
 // All data fetches execute in parallel on mount.
@@ -35,7 +31,7 @@ import { useGeolocation } from '@/lib/hooks/useGeolocation';
 const LazySparkline = lazy(() => import('./SparklineChart'));
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SCROLL ANIMATION HOOK (~500 bytes — CSS-only animations, JS for triggering)
+// SCROLL ANIMATION HOOK — Deploy 4: 8px translate, 400ms, CSS --stagger
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function useScrollAnimation() {
@@ -45,7 +41,6 @@ function useScrollAnimation() {
     const el = ref.current;
     if (!el) return;
 
-    // Respect reduced motion preference
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced) {
       el.style.opacity = '1';
@@ -70,7 +65,6 @@ function useScrollAnimation() {
   return ref;
 }
 
-/** Wrapper component for scroll-triggered fade-up */
 function AnimateIn({
   children,
   delay = 0,
@@ -85,9 +79,53 @@ function AnimateIn({
     <div
       ref={ref}
       className={`hf-animate-target ${className}`}
-      style={{ transitionDelay: `${delay}ms` }}
+      style={{ '--stagger': `${delay}ms` } as React.CSSProperties}
     >
       {children}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION EYEBROW — Deploy 4: Visual section grouping
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function SectionEyebrow({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-2 pb-1">
+      <span className="text-[11px] font-semibold text-white/40 uppercase tracking-[0.1em] whitespace-nowrap">
+        {label}
+      </span>
+      <div className="hf-eyebrow-line" />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA FRESHNESS TIMESTAMP — Deploy 4: "Updated X min ago" + pulse dot
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function FreshnessTimestamp({ fetchedAt }: { fetchedAt: number | null }) {
+  const [, forceUpdate] = useState(0);
+
+  // Auto-refresh the relative time every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => forceUpdate((n) => n + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!fetchedAt) return null;
+
+  const seconds = Math.floor((Date.now() - fetchedAt) / 1000);
+  let label: string;
+  if (seconds < 60) label = 'Just now';
+  else if (seconds < 3600) label = `${Math.floor(seconds / 60)} min ago`;
+  else label = `${Math.floor(seconds / 3600)}h ago`;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="hf-live-dot" />
+      <span className="text-[10px] text-white/25 tabular-nums">{label}</span>
     </div>
   );
 }
@@ -129,7 +167,7 @@ const COMMODITIES: Record<string, CommodityConfig> = {
 const COMMODITY_ORDER = ['CORN', 'SOYBEANS', 'WHEAT'];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CROP ICONS (SVG — premium botanical style, adjusted for dark backgrounds)
+// CROP ICONS (SVG — premium botanical style)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function CropIcon({ code, size = 20 }: { code: string; size?: number }) {
@@ -150,7 +188,6 @@ function CropIcon({ code, size = 20 }: { code: string; size?: number }) {
       </svg>
     );
   }
-  // WHEAT
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2v10" /><path d="M8 6l4-4 4 4" /><path d="M4 22c0-4 4-8 8-10" /><path d="M20 22c0-4-4-8-8-10" />
@@ -221,7 +258,7 @@ function formatDateHeader(): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHIMMER SKELETON — DARK THEME (premium loading state)
+// SHIMMER SKELETON — DARK THEME
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function Shimmer({ className = '' }: { className?: string }) {
@@ -273,9 +310,9 @@ function MarketsSkeleton() {
           <Shimmer className="w-24 h-6 rounded-full" />
         </div>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center justify-between py-4 border-b border-white/[0.04] last:border-0">
+          <div key={i} className="flex items-center justify-between py-3 border-b border-white/[0.04] last:border-0">
             <div className="flex items-center gap-3">
-              <Shimmer className="w-10 h-10 rounded-xl" />
+              <Shimmer className="w-8 h-8 rounded-lg" />
               <div className="space-y-1.5">
                 <Shimmer className="w-20 h-4" />
                 <Shimmer className="w-32 h-3" />
@@ -293,7 +330,7 @@ function MarketsSkeleton() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WEATHER ICONS (SVG — no external dependencies)
+// WEATHER ICONS (SVG)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function WeatherIcon({ code, size = 32 }: { code: number; size?: number }) {
@@ -356,7 +393,7 @@ function WeatherIcon({ code, size = 32 }: { code: number; size?: number }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WEATHER CARD — DARK THEME
+// WEATHER CARD — Deploy 4: Atmospheric tint + freshness timestamp
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface WeatherData {
@@ -456,17 +493,34 @@ function getWeatherDescription(code: number): string {
   return 'Unknown';
 }
 
-function WeatherCard({ data }: { data: WeatherData }) {
+/** Deploy 4: Atmospheric gradient tint based on weather condition */
+function getAtmosphericTint(code: number): string {
+  if (code === 0) return 'rgba(245,158,11,0.03)';       // Clear — warm amber
+  if (code <= 3) return 'rgba(148,163,184,0.02)';       // Partly cloudy — neutral
+  if (code <= 48) return 'rgba(148,163,184,0.03)';      // Fog — cool gray
+  if (code <= 65) return 'rgba(59,130,246,0.03)';       // Rain — blue
+  if (code <= 77) return 'rgba(203,213,225,0.03)';      // Snow — cool white
+  if (code <= 99) return 'rgba(139,92,246,0.03)';       // Storm — purple
+  return 'transparent';
+}
+
+function WeatherCard({ data, fetchedAt }: { data: WeatherData; fetchedAt: number | null }) {
+  const atmosphericTint = getAtmosphericTint(data.current.weatherCode);
+
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] overflow-hidden">
+    <div
+      className="rounded-2xl border border-white/[0.06] overflow-hidden"
+      style={{ background: `linear-gradient(135deg, ${atmosphericTint}, rgba(27,67,50,0.30))` }}
+    >
       <div className="p-5 sm:p-6">
-        {/* Header with spray status */}
+        {/* Header with spray status + freshness */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
             </svg>
             <h2 className="text-sm font-semibold text-white/90 tracking-tight">Agricultural Weather</h2>
+            <FreshnessTimestamp fetchedAt={fetchedAt} />
           </div>
           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${
             data.sprayOk
@@ -569,7 +623,7 @@ function WeatherCard({ data }: { data: WeatherData }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MARKETS CARD — DARK THEME
+// MARKETS CARD — Deploy 4: Dense rows, price flash, freshness timestamp
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface PriceData {
@@ -580,16 +634,28 @@ interface PriceData {
   prices: Array<{ date: string; settle: number | null }>;
 }
 
-function MarketsCard({ data, status }: { data: Record<string, PriceData>; status: MarketStatus }) {
+function MarketsCard({
+  data,
+  status,
+  fetchedAt,
+  flashStates,
+}: {
+  data: Record<string, PriceData>;
+  status: MarketStatus;
+  fetchedAt: number | null;
+  flashStates: Record<string, 'up' | 'down' | null>;
+}) {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] overflow-hidden">
       <div className="p-5 sm:p-6">
+        {/* Header */}
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" />
             </svg>
             <h2 className="text-sm font-semibold text-white/90 tracking-tight">Commodity Prices</h2>
+            <FreshnessTimestamp fetchedAt={fetchedAt} />
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.06]">
             <span
@@ -603,10 +669,11 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
             <span className="text-[11px] font-semibold text-white/50">{status.label}</span>
           </div>
         </div>
-        <p className="text-[11px] text-white/25 mb-4">CME settlement prices with ARC/PLC payment impact</p>
+        <p className="text-[11px] text-white/25 mb-3">CME settlement prices with ARC/PLC payment impact</p>
 
-        <div className="divide-y divide-white/[0.04]">
-          {COMMODITY_ORDER.map((code) => {
+        {/* Dense commodity rows — Bloomberg style */}
+        <div>
+          {COMMODITY_ORDER.map((code, idx) => {
             const d = data[code];
             const cfg = COMMODITIES[code];
             if (!cfg) return null;
@@ -616,18 +683,23 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
             const isUp = change !== null && change >= 0;
             const plc = price ? calcPLC(price, cfg) : null;
             const priceHistory = (d?.prices || []).filter((p) => p.settle !== null);
+            const flash = flashStates[code];
 
             return (
-              <div key={code} className="py-4 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-3">
-                  {/* Crop icon badge */}
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${cfg.color}18` }}>
+              <div key={code}>
+                <div
+                  className={`flex items-center gap-3 py-3 rounded-lg transition-colors ${
+                    flash === 'up' ? 'hf-flash-up' : flash === 'down' ? 'hf-flash-down' : ''
+                  }`}
+                >
+                  {/* Crop icon — no badge background, just the icon */}
+                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
                     <CropIcon code={code} size={20} />
                   </div>
 
-                  {/* Crop info */}
+                  {/* Crop info — compact */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white/90">{cfg.name}</div>
+                    <div className="text-[13px] font-semibold text-white/90">{cfg.name}</div>
                     {plc && (
                       <div
                         className={`inline-flex items-center gap-1 mt-0.5 text-[10px] font-bold ${
@@ -644,8 +716,8 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
                     )}
                   </div>
 
-                  {/* Lazy-loaded sparkline */}
-                  <div className="w-[80px] h-[36px] flex-shrink-0 hidden sm:block">
+                  {/* Always-visible sparkline (no hidden sm:block) */}
+                  <div className="w-[72px] h-[28px] flex-shrink-0">
                     {priceHistory.length > 3 && (
                       <Suspense fallback={<div className="w-full h-full bg-white/[0.04] rounded animate-pulse" />}>
                         <LazySparkline data={priceHistory.slice(-20)} color={cfg.color} refPrice={cfg.effectiveRefPrice} code={code} />
@@ -653,13 +725,13 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
                     )}
                   </div>
 
-                  {/* Price + change */}
+                  {/* Price + change — tighter */}
                   <div className="text-right flex-shrink-0">
-                    <div className="text-lg font-bold text-white tracking-[-0.02em] tabular-nums">
+                    <div className="text-[17px] font-bold text-white tracking-[-0.02em] tabular-nums">
                       {price !== null ? `$${price.toFixed(2)}` : '—'}
                     </div>
                     {change !== null && (
-                      <div className={`text-xs font-semibold tabular-nums ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <div className={`text-[11px] font-semibold tabular-nums ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
                         {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{change.toFixed(2)}
                         {d?.changePct !== null && d?.changePct !== undefined && (
                           <span className="opacity-60 ml-0.5">({isUp ? '+' : ''}{d.changePct.toFixed(1)}%)</span>
@@ -669,14 +741,19 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
                   </div>
                 </div>
 
-                {/* PLC payment projection bar */}
+                {/* PLC payment bar */}
                 {plc && plc.rate > 0 && (
-                  <div className="mt-2.5 ml-[52px] rounded-lg bg-red-500/[0.08] border border-red-500/15 px-3 py-2 flex items-center justify-between">
+                  <div className="ml-11 mb-1 rounded-lg bg-red-500/[0.08] border border-red-500/15 px-3 py-1.5 flex items-center justify-between">
                     <span className="text-[11px] text-red-300 font-medium">Est. PLC payment on national avg yield</span>
                     <span className="text-[11px] text-red-200 font-bold tabular-nums">
                       ≈ ${plc.perAcre.toFixed(0)}/acre
                     </span>
                   </div>
+                )}
+
+                {/* Hairline divider (not on last) */}
+                {idx < COMMODITY_ORDER.length - 1 && (
+                  <div className="ml-11 h-px bg-white/[0.04]" />
                 )}
               </div>
             );
@@ -701,7 +778,7 @@ function MarketsCard({ data, status }: { data: Record<string, PriceData>; status
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// QUICK ACTIONS BAR — DARK THEME
+// QUICK ACTIONS — Deploy 4: Category-colored accent dots
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuickActions() {
@@ -709,6 +786,7 @@ function QuickActions() {
     {
       href: '/check',
       label: 'ARC/PLC Calculator',
+      dotColor: '#C9A84C', // gold — money tool
       icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" />
@@ -718,6 +796,7 @@ function QuickActions() {
     {
       href: '/farm-score',
       label: 'Farm Score',
+      dotColor: '#34D399', // emerald — health
       icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" />
@@ -727,6 +806,7 @@ function QuickActions() {
     {
       href: '/weather',
       label: 'Full Weather',
+      dotColor: '#60A5FA', // blue — weather
       icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
@@ -736,6 +816,7 @@ function QuickActions() {
     {
       href: '/markets',
       label: 'All Markets',
+      dotColor: '#F59E0B', // amber — markets
       icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" />
@@ -750,8 +831,13 @@ function QuickActions() {
         <Link
           key={action.href}
           href={action.href}
-          className="flex flex-col items-center gap-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] py-3 px-2 hover:bg-white/[0.08] hover:border-white/[0.12] transition-all group min-h-[72px] justify-center"
+          className="flex flex-col items-center gap-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] py-3 px-2 hover:bg-white/[0.08] hover:border-white/[0.12] transition-all group min-h-[72px] justify-center relative"
         >
+          {/* Category-colored accent dot */}
+          <span
+            className="absolute top-2.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full opacity-60 group-hover:opacity-100 transition-opacity"
+            style={{ backgroundColor: action.dotColor }}
+          />
           <div className="group-hover:scale-110 transition-transform">{action.icon}</div>
           <span className="text-[10px] font-semibold text-white/40 group-hover:text-white/70 text-center leading-tight transition-colors">
             {action.label}
@@ -763,7 +849,7 @@ function QuickActions() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN CLIENT COMPONENT
+// MAIN CLIENT COMPONENT — Deploy 4: Section architecture + all micro-details
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function MorningDashboardClient() {
@@ -773,6 +859,10 @@ export default function MorningDashboardClient() {
   const [pricesLoading, setPricesLoading] = useState(true);
   const [weatherError, setWeatherError] = useState('');
   const [pricesError, setPricesError] = useState('');
+  const [weatherFetchedAt, setWeatherFetchedAt] = useState<number | null>(null);
+  const [pricesFetchedAt, setPricesFetchedAt] = useState<number | null>(null);
+  const [flashStates, setFlashStates] = useState<Record<string, 'up' | 'down' | null>>({});
+  const prevPricesRef = useRef<Record<string, number | null>>({});
   const geo = useGeolocation();
 
   const marketStatus = useMemo(() => getMarketStatus(), []);
@@ -784,8 +874,10 @@ export default function MorningDashboardClient() {
       if (!res.ok) throw new Error('Weather fetch failed');
       const json = await res.json();
       const parsed = parseWeatherResponse(json);
-      if (parsed) setWeather(parsed);
-      else throw new Error('Invalid weather data');
+      if (parsed) {
+        setWeather(parsed);
+        setWeatherFetchedAt(Date.now());
+      } else throw new Error('Invalid weather data');
     } catch (err: any) {
       setWeatherError(err.message || 'Unable to load weather');
     } finally {
@@ -793,7 +885,7 @@ export default function MorningDashboardClient() {
     }
   }, [geo.lat, geo.lng]);
 
-  // ── Fetch Prices ──────────────────────────────────────────────────
+  // ── Fetch Prices (with flash detection) ───────────────────────────
   const fetchPrices = useCallback(async () => {
     try {
       const codes = COMMODITY_ORDER.join(',');
@@ -801,7 +893,29 @@ export default function MorningDashboardClient() {
       if (!res.ok) throw new Error('Price fetch failed');
       const json = await res.json();
       if (json.success && json.data) {
+        // Detect price changes for flash animation
+        const newFlash: Record<string, 'up' | 'down' | null> = {};
+        for (const code of COMMODITY_ORDER) {
+          const newPrice = json.data[code]?.latestSettle ?? null;
+          const oldPrice = prevPricesRef.current[code] ?? null;
+          if (oldPrice !== null && newPrice !== null && oldPrice !== newPrice) {
+            newFlash[code] = newPrice > oldPrice ? 'up' : 'down';
+          } else {
+            newFlash[code] = null;
+          }
+          prevPricesRef.current[code] = newPrice;
+        }
+
+        // Only flash if we had previous prices (not first load)
+        const hadPrevious = Object.values(prevPricesRef.current).some((v) => v !== null);
+        if (hadPrevious && Object.values(newFlash).some((v) => v !== null)) {
+          setFlashStates(newFlash);
+          // Clear flash after animation
+          setTimeout(() => setFlashStates({}), 700);
+        }
+
         setPrices(json.data);
+        setPricesFetchedAt(Date.now());
       } else {
         throw new Error(json.error || 'No price data');
       }
@@ -824,6 +938,10 @@ export default function MorningDashboardClient() {
     const timer = setInterval(fetchPrices, interval);
     return () => clearInterval(timer);
   }, [marketStatus.isLive, fetchPrices]);
+
+  // ── Stagger index counter ─────────────────────────────────────────
+  let staggerIdx = 0;
+  const nextStagger = () => (staggerIdx++) * 60;
 
   return (
     <>
@@ -855,67 +973,96 @@ export default function MorningDashboardClient() {
         </div>
       </section>
 
-      {/* ═══ DASHBOARD CARDS ═══ */}
-      <div className="mx-auto max-w-[680px] px-5 -mt-3 space-y-4 pb-4">
-        {/* Quick Actions */}
-        <AnimateIn>
+      {/* ═══ DASHBOARD SECTIONS — Deploy 4: Sectioned layout with eyebrows ═══ */}
+      <div className="mx-auto max-w-[680px] px-5 -mt-3 pb-4">
+
+        {/* ─── Quick Actions ─── */}
+        <AnimateIn delay={nextStagger()}>
           <QuickActions />
         </AnimateIn>
 
-        {/* Payment Estimate — THE hero metric (already dark themed) */}
-        <AnimateIn delay={75}>
-          <PaymentEstimateCard prices={prices} loading={pricesLoading} />
-        </AnimateIn>
+        {/* ─── PAYMENT ESTIMATE SECTION ─── */}
+        <div className="mt-6">
+          <AnimateIn delay={nextStagger()}>
+            <SectionEyebrow label="Farm Payment Estimate" />
+          </AnimateIn>
+          <div className="mt-3">
+            <AnimateIn delay={nextStagger()}>
+              <PaymentEstimateCard prices={prices} loading={pricesLoading} />
+            </AnimateIn>
+          </div>
+        </div>
 
-        {/* Weather Card */}
-        <AnimateIn delay={150}>
-          {weatherLoading ? (
-            <WeatherSkeleton />
-          ) : weatherError ? (
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
-              <p className="text-sm text-red-400 font-medium">{weatherError}</p>
-              <button
-                onClick={() => { setWeatherLoading(true); setWeatherError(''); fetchWeather(); }}
-                className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          ) : weather ? (
-            <WeatherCard data={weather} />
-          ) : null}
-        </AnimateIn>
+        {/* ─── WEATHER SECTION ─── */}
+        <div className="mt-8">
+          <AnimateIn delay={nextStagger()}>
+            <SectionEyebrow label="Weather & Field Conditions" />
+          </AnimateIn>
+          <div className="mt-3">
+            <AnimateIn delay={nextStagger()}>
+              {weatherLoading ? (
+                <WeatherSkeleton />
+              ) : weatherError ? (
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
+                  <p className="text-sm text-red-400 font-medium">{weatherError}</p>
+                  <button
+                    onClick={() => { setWeatherLoading(true); setWeatherError(''); fetchWeather(); }}
+                    className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : weather ? (
+                <WeatherCard data={weather} fetchedAt={weatherFetchedAt} />
+              ) : null}
+            </AnimateIn>
+          </div>
+        </div>
 
-        {/* Markets Card */}
-        <AnimateIn delay={225}>
-          {pricesLoading ? (
-            <MarketsSkeleton />
-          ) : pricesError ? (
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
-              <p className="text-sm text-red-400 font-medium">{pricesError}</p>
-              <button
-                onClick={() => { setPricesLoading(true); setPricesError(''); fetchPrices(); }}
-                className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          ) : (
-            <MarketsCard data={prices} status={marketStatus} />
-          )}
-        </AnimateIn>
+        {/* ─── COMMODITY PRICES SECTION ─── */}
+        <div className="mt-8">
+          <AnimateIn delay={nextStagger()}>
+            <SectionEyebrow label="Commodity Prices" />
+          </AnimateIn>
+          <div className="mt-3">
+            <AnimateIn delay={nextStagger()}>
+              {pricesLoading ? (
+                <MarketsSkeleton />
+              ) : pricesError ? (
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
+                  <p className="text-sm text-red-400 font-medium">{pricesError}</p>
+                  <button
+                    onClick={() => { setPricesLoading(true); setPricesError(''); fetchPrices(); }}
+                    className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <MarketsCard data={prices} status={marketStatus} fetchedAt={pricesFetchedAt} flashStates={flashStates} />
+              )}
+            </AnimateIn>
+          </div>
+        </div>
 
-        {/* Local Grain Bids */}
-        <AnimateIn delay={300}>
-          <GrainBidCard
-            lat={geo.lat}
-            lng={geo.lng}
-            compact={true}
-            darkMode={true}
-            countyName={geo.isDefault ? 'Summit County' : geo.locationName.split(',')[0] || 'Your Area'}
-            stateAbbr={geo.isDefault ? 'OH' : geo.locationName.split(',')[1]?.trim() || 'US'}
-          />
-        </AnimateIn>
+        {/* ─── LOCAL GRAIN BIDS SECTION ─── */}
+        <div className="mt-8">
+          <AnimateIn delay={nextStagger()}>
+            <SectionEyebrow label="Local Grain Bids" />
+          </AnimateIn>
+          <div className="mt-3">
+            <AnimateIn delay={nextStagger()}>
+              <GrainBidCard
+                lat={geo.lat}
+                lng={geo.lng}
+                compact={true}
+                darkMode={true}
+                countyName={geo.isDefault ? 'Summit County' : geo.locationName.split(',')[0] || 'Your Area'}
+                stateAbbr={geo.isDefault ? 'OH' : geo.locationName.split(',')[1]?.trim() || 'US'}
+              />
+            </AnimateIn>
+          </div>
+        </div>
       </div>
     </>
   );

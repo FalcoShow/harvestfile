@@ -1,42 +1,38 @@
 // =============================================================================
 // HarvestFile — Payment Estimate Card (Morning Dashboard Hero Metric)
-// Build 8 Deploy 1: The "Credit Karma Score" of Agriculture
+// Build 17 Deploy 4: Count-Up Animation + Scale Pop
 //
 // This is THE card that makes farmers come back every single morning.
 // Shows estimated 2026 ARC/PLC payments per acre for corn, soybeans, wheat
 // based on LIVE commodity futures prices. Updates every time prices change.
 //
+// Deploy 4 additions:
+//   - Count-up animation: $0 → final value over 1.2s on first load
+//   - Scale pop on completion (hf-count-pop CSS class)
+//   - tabular-nums prevents digit jitter during animation
+//   - requestAnimationFrame for smooth 60fps counting
+//   - Respects prefers-reduced-motion
+//
 // For anonymous users: national-average estimates using OBBBA parameters.
 // For authenticated users (future): personalized with their county + base acres.
-//
-// Architecture: Pure client component. Receives price data from parent.
-// No server dependencies — all calculation logic is inline for speed.
 // =============================================================================
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 // ── OBBBA Reference Prices & National Avg Yields ────────────────────────
-// These are the EXACT parameters from OBBBA §1101–§1103 and FSA Fact Sheet.
-// Used for "quick estimate" when we don't have county-specific data.
 
 interface CropEstimate {
   code: string;
   name: string;
   unit: string;
-  /** OBBBA Statutory Reference Price */
   statutoryRefPrice: number;
-  /** OBBBA Effective Reference Price (with ERP escalator) */
   effectiveRefPrice: number;
-  /** National average county yield (proxy for benchmark) */
   nationalAvgYield: number;
-  /** Loan rate floor */
   loanRate: number;
-  /** Color for UI */
   color: string;
-  /** Typical base acres for a mid-size operation */
   typicalBaseAcres: number;
 }
 
@@ -83,8 +79,6 @@ const PAYMENT_ACRES_PCT = 0.85;
 const SEQUESTRATION_PCT = 0.059;
 const PLC_YIELD_FRACTION = 0.80;
 
-// ── PLC Payment Calculation ─────────────────────────────────────────────
-
 function calcPlcPerAcre(
   currentPrice: number,
   erp: number,
@@ -96,8 +90,6 @@ function calcPlcPerAcre(
   return plcRate * plcPaymentYield * PAYMENT_ACRES_PCT * (1 - SEQUESTRATION_PCT);
 }
 
-// ── ARC-CO Payment Estimate (simplified national average) ───────────────
-
 function calcArcPerAcre(
   currentPrice: number,
   benchmarkYield: number,
@@ -106,10 +98,69 @@ function calcArcPerAcre(
   const benchmarkRevenue = benchmarkYield * benchmarkPrice;
   const guarantee = ARC_GUARANTEE_PCT * benchmarkRevenue;
   const maxPayment = ARC_PAYMENT_CAP_PCT * benchmarkRevenue;
-  const actualRevenue = benchmarkYield * Math.max(currentPrice, 2.0); // use yield at current price
+  const actualRevenue = benchmarkYield * Math.max(currentPrice, 2.0);
   const shortfall = Math.max(0, guarantee - actualRevenue);
   const paymentRate = Math.min(shortfall, maxPayment);
   return paymentRate * PAYMENT_ACRES_PCT * (1 - SEQUESTRATION_PCT);
+}
+
+// ── Count-Up Hook ────────────────────────────────────────────────────────
+
+function useCountUp(target: number, duration: number = 1200): { value: number; done: boolean } {
+  const [display, setDisplay] = useState(0);
+  const [done, setDone] = useState(false);
+  const hasAnimated = useRef(false);
+  const prevTarget = useRef(0);
+
+  useEffect(() => {
+    if (target === 0) return;
+
+    // If already animated and target hasn't changed significantly, just update
+    if (hasAnimated.current && Math.abs(target - prevTarget.current) < 5) {
+      setDisplay(target);
+      return;
+    }
+
+    // Respect reduced motion
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      setDisplay(target);
+      setDone(true);
+      hasAnimated.current = true;
+      prevTarget.current = target;
+      return;
+    }
+
+    const startValue = hasAnimated.current ? prevTarget.current : 0;
+    const startTime = performance.now();
+    setDone(false);
+
+    let raf: number;
+
+    function animate(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Cubic ease-out for natural deceleration
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(startValue + (target - startValue) * eased);
+
+      setDisplay(current);
+
+      if (progress < 1) {
+        raf = requestAnimationFrame(animate);
+      } else {
+        setDisplay(target);
+        setDone(true);
+        hasAnimated.current = true;
+        prevTarget.current = target;
+      }
+    }
+
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+
+  return { value: display, done };
 }
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -161,14 +212,13 @@ export function PaymentEstimateCard({ prices, loading }: PaymentEstimateCardProp
       const arcPerAcre = calcArcPerAcre(
         currentPrice,
         crop.nationalAvgYield,
-        crop.effectiveRefPrice, // Use ERP as benchmark price proxy
+        crop.effectiveRefPrice,
       );
 
       const bestPerAcre = Math.max(plcPerAcre, arcPerAcre);
       const bestProgram = plcPerAcre >= arcPerAcre ? 'PLC' : 'ARC-CO';
       const totalPayment = bestPerAcre * crop.typicalBaseAcres;
 
-      // Estimate previous day's payment for daily change
       const prevPrice = currentPrice - (priceData?.change ?? 0);
       const prevPlc = calcPlcPerAcre(prevPrice, crop.effectiveRefPrice, crop.loanRate, crop.nationalAvgYield);
       const prevArc = calcArcPerAcre(prevPrice, crop.nationalAvgYield, crop.effectiveRefPrice);
@@ -196,20 +246,24 @@ export function PaymentEstimateCard({ prices, loading }: PaymentEstimateCardProp
       previousTotalEstimate += prevTotal;
     }
 
-    const dailyTotalChange = totalPaymentEstimate - previousTotalEstimate;
-
     return {
       total: totalPaymentEstimate,
-      dailyChange: dailyTotalChange,
+      dailyChange: totalPaymentEstimate - previousTotalEstimate,
       totalBaseAcres,
       crops: cropEstimates,
     };
   }, [prices]);
 
+  // ── Count-Up Animation ────────────────────────────────────────────────
+  const { value: animatedTotal, done: countDone } = useCountUp(
+    estimates ? Math.round(estimates.total) : 0,
+    1200,
+  );
+
   // ── Loading State ─────────────────────────────────────────────────────
   if (loading || !estimates) {
     return (
-      <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 shadow-lg overflow-hidden relative">
+      <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-br from-[#0C1F17] to-[#1B4332] p-6 overflow-hidden relative">
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
         }} />
@@ -225,11 +279,10 @@ export function PaymentEstimateCard({ prices, loading }: PaymentEstimateCardProp
     );
   }
 
-  const isPaymentLikely = estimates.total > 50;
   const changeIsUp = estimates.dailyChange >= 0;
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-[#0C1F17] via-[#142B20] to-[#1B4332] shadow-lg overflow-hidden relative">
+    <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-br from-[#0C1F17] via-[#142B20] to-[#1B4332] overflow-hidden relative">
       {/* Noise texture */}
       <div className="absolute inset-0 opacity-[0.03]" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
@@ -251,17 +304,21 @@ export function PaymentEstimateCard({ prices, loading }: PaymentEstimateCardProp
           </span>
         </div>
 
-        {/* Hero Number */}
+        {/* Hero Number — Count-Up Animation */}
         <div className="mb-1">
-          <span className="text-[42px] sm:text-[48px] font-extrabold text-white tracking-[-0.04em] leading-none">
-            ${Math.round(estimates.total).toLocaleString()}
+          <span
+            className={`text-[42px] sm:text-[48px] font-extrabold text-white tracking-[-0.04em] leading-none tabular-nums inline-block ${
+              countDone ? 'hf-count-pop' : ''
+            }`}
+          >
+            ${animatedTotal.toLocaleString()}
           </span>
         </div>
 
         {/* Daily Change + Context */}
         <div className="flex items-center gap-3 mb-5">
           {Math.abs(estimates.dailyChange) >= 1 && (
-            <span className={`text-sm font-bold ${
+            <span className={`text-sm font-bold tabular-nums ${
               changeIsUp ? 'text-emerald-400' : 'text-red-400'
             }`}>
               {changeIsUp ? '▲' : '▼'} ${Math.abs(Math.round(estimates.dailyChange)).toLocaleString()} today
@@ -279,13 +336,10 @@ export function PaymentEstimateCard({ prices, loading }: PaymentEstimateCardProp
 
             return (
               <div key={est.crop.code} className="flex items-center gap-3">
-                {/* Crop indicator */}
                 <div
                   className="w-1.5 h-8 rounded-full flex-shrink-0"
                   style={{ backgroundColor: est.crop.color, opacity: est.status === 'above' ? 0.3 : 1 }}
                 />
-
-                {/* Crop info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-semibold text-white/80">
@@ -305,12 +359,10 @@ export function PaymentEstimateCard({ prices, loading }: PaymentEstimateCardProp
                         : 'Above ERP'}
                     </span>
                   </div>
-                  <div className="text-[11px] text-white/25 mt-0.5">
+                  <div className="text-[11px] text-white/25 mt-0.5 tabular-nums">
                     ${est.currentPrice.toFixed(2)}/{est.crop.unit} vs ${est.crop.effectiveRefPrice.toFixed(2)} ERP
                   </div>
                 </div>
-
-                {/* Payment amount */}
                 <div className="text-right flex-shrink-0">
                   <span className={`text-[15px] font-extrabold tabular-nums ${
                     est.totalPayment > 50 ? 'text-white' : 'text-white/25'

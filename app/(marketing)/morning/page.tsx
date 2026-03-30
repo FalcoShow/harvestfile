@@ -1,6 +1,6 @@
 // =============================================================================
 // app/(marketing)/morning/page.tsx
-// HarvestFile — Build 17 Deploy 3: Morning Dashboard FULL DARK THEME
+// HarvestFile — Build 17 Deploy 4: Layout Architecture & Micro-Detail Polish
 //
 // SERVER COMPONENT — renders static sections instantly (zero JS), wraps
 // the interactive data sections in a client boundary.
@@ -10,15 +10,10 @@
 //   Client-rendered (interactive): header, payment estimate, weather, markets,
 //     grain bids — all managed by MorningDashboardClient with shared state
 //
-// Build 17 Deploy 3 changes:
-//   FULL DARK THEME — all cards flip from white to dark forest green
-//   Design target: homepage bento Morning Dashboard preview card
-//   - Page bg: dark gradient (#050f09 → mesh aurora)
-//   - Cards: rgba(27,67,50,0.30) with white/6% borders
-//   - Text: white opacity hierarchy (87%/60%/38%)
-//   - CalendarCard: dark variant with amber imminent styling
-//   - BottomCTA: refined for dark context (gold gradient preserved)
-//   - Skeletons: dark shimmer states
+// Deploy 4 changes:
+//   - Section eyebrow labels for USDA calendar
+//   - Spacing rhythm: 32px between sections, 12px within
+//   - Consistent with client component section architecture
 //
 // Performance targets:
 //   FCP: < 1.0s (server HTML streams immediately)
@@ -161,7 +156,6 @@ function BottomCTA() {
   return (
     <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#163826] to-[#1B4332] p-6 text-center relative overflow-hidden">
       <div className="hf-noise-subtle" />
-      {/* Subtle gold glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[200px] bg-[radial-gradient(ellipse,rgba(201,168,76,0.08)_0%,transparent_70%)] pointer-events-none" />
       <div className="relative z-10">
         <h3 className="text-lg font-bold text-white tracking-[-0.02em] mb-2">
@@ -193,7 +187,7 @@ function BottomCTA() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LOADING SKELETON (shown while client component loads) — DARK THEME
+// LOADING SKELETON — DARK THEME
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MorningSkeleton() {
@@ -209,7 +203,7 @@ function MorningSkeleton() {
       </section>
 
       {/* Cards skeleton */}
-      <div className="mx-auto max-w-[680px] px-5 -mt-3 space-y-4">
+      <div className="mx-auto max-w-[680px] px-5 -mt-3">
         {/* Quick actions skeleton */}
         <div className="grid grid-cols-4 gap-2">
           {[1, 2, 3, 4].map((i) => (
@@ -218,15 +212,39 @@ function MorningSkeleton() {
         </div>
 
         {/* Payment card skeleton */}
-        <div className="rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] border border-white/[0.06] p-6 h-[260px] animate-pulse" />
+        <div className="mt-6">
+          <div className="w-40 h-3 rounded bg-white/[0.04] mb-3" />
+          <div className="rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] border border-white/[0.06] p-6 h-[260px] animate-pulse" />
+        </div>
 
         {/* Weather skeleton */}
-        <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-6 h-[200px] animate-pulse" />
+        <div className="mt-8">
+          <div className="w-48 h-3 rounded bg-white/[0.04] mb-3" />
+          <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-6 h-[200px] animate-pulse" />
+        </div>
 
         {/* Markets skeleton */}
-        <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-6 h-[280px] animate-pulse" />
+        <div className="mt-8">
+          <div className="w-36 h-3 rounded bg-white/[0.04] mb-3" />
+          <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-6 h-[280px] animate-pulse" />
+        </div>
       </div>
     </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION EYEBROW (server-side version for static sections)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function SectionEyebrow({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-2 pb-1">
+      <span className="text-[11px] font-semibold text-white/40 uppercase tracking-[0.1em] whitespace-nowrap">
+        {label}
+      </span>
+      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.08) 0%, transparent 100%)' }} />
+    </div>
   );
 }
 
@@ -239,7 +257,7 @@ export default function MorningPage() {
 
   return (
     <div className="min-h-screen bg-[#050f09] relative overflow-hidden">
-      {/* Aurora mesh gradient background — creates depth without competing with data */}
+      {/* Aurora mesh gradient background */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
@@ -264,15 +282,22 @@ export default function MorningPage() {
         </Suspense>
 
         {/* ═══ SERVER-RENDERED SECTIONS (zero JS, instant) ═══ */}
-        <div className="mx-auto max-w-[680px] px-5 space-y-4 pb-20">
-          {/* USDA Calendar */}
-          <CalendarCard reports={reports} />
+        <div className="mx-auto max-w-[680px] px-5 pb-20">
+          {/* USDA Calendar — section spacing matches client component */}
+          <div className="mt-8">
+            <SectionEyebrow label="USDA Calendar" />
+            <div className="mt-3">
+              <CalendarCard reports={reports} />
+            </div>
+          </div>
 
           {/* Bottom CTA */}
-          <BottomCTA />
+          <div className="mt-8">
+            <BottomCTA />
+          </div>
 
           {/* Data freshness note */}
-          <p className="text-center text-[10px] text-white/15 px-4">
+          <p className="text-center text-[10px] text-white/15 px-4 mt-6">
             Futures: CME settlement prices via Nasdaq Data Link, updated daily after 1:15 PM CT.
             Weather: Open-Meteo, updated hourly. Market data provided by Barchart. Data for educational purposes only.
           </p>

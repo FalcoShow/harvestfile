@@ -610,13 +610,15 @@
    BUILD 17: SCROLL-TRIGGERED ANIMATIONS (Morning Dashboard)
    IntersectionObserver adds .hf-animate-in class on viewport entry.
    GPU-composited: only transform + opacity for 60fps.
+   Deploy 4: Refined — 8px translate, 400ms duration, 60ms stagger
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 .hf-animate-target {
   opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(8px);
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--stagger, 0ms);
   will-change: opacity, transform;
 }
 
@@ -632,6 +634,63 @@
     transform: none;
     transition: none;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   BUILD 17 DEPLOY 4: COUNT-UP + PRICE FLASH + FRESHNESS ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Count-up completion pop (PaymentEstimateCard hero number) */
+@keyframes hf-count-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.hf-count-pop {
+  animation: hf-count-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Price flash — green pulse for price increase */
+@keyframes hf-flash-up {
+  0% { background-color: rgba(52, 211, 153, 0.15); }
+  100% { background-color: transparent; }
+}
+
+/* Price flash — red pulse for price decrease */
+@keyframes hf-flash-down {
+  0% { background-color: rgba(248, 113, 113, 0.15); }
+  100% { background-color: transparent; }
+}
+
+.hf-flash-up {
+  animation: hf-flash-up 0.6s ease-out forwards;
+}
+
+.hf-flash-down {
+  animation: hf-flash-down 0.6s ease-out forwards;
+}
+
+/* Live data pulse dot (freshness indicator) */
+.hf-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34D399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.4);
+  animation: hf-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hf-live-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(52, 211, 153, 0.4); }
+  50% { opacity: 0.5; box-shadow: 0 0 2px rgba(52, 211, 153, 0.2); }
+}
+
+/* Section eyebrow line fade */
+.hf-eyebrow-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, transparent 100%);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
