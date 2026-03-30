@@ -1,34 +1,31 @@
 // =============================================================================
-// HarvestFile — Build 16 Deploy 1: Premium Commodity Markets Dashboard
+// HarvestFile — Build 16 Deploy 2: TradingView Lightweight Charts Integration
 // app/(marketing)/markets/page.tsx
 //
-// COMPLETE REWRITE — inline styles → Tailwind + shadcn/ui
-// The only commodity price dashboard that connects futures prices to
-// ARC/PLC payment projections. No competitor offers this.
+// UPGRADE: Expanded commodity charts now use TradingView Lightweight Charts v4.2.2
+// Features: PriceLine overlays (USDA ref prices), magnet crosshair, gradient fills,
+// zoom/pan, 60fps canvas rendering. Sparklines remain Recharts (tiny, no interactivity needed).
 //
 // Data: Yahoo Finance v8 via /api/prices/futures (cents→dollars converted)
 // Reference prices: OBBBA parameters (Pub. L. 119-21)
+// Charts: TradingView Lightweight Charts v4.2.2 (Apache 2.0)
 // =============================================================================
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   AreaChart,
   Area,
   ResponsiveContainer,
   ReferenceLine,
-  Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
 // ─── Professional SVG Crop Icons ─────────────────────────────────────────────
-// Replace all emoji with clean, consistent inline SVGs
 
 function CornIcon({ className = "w-7 h-7" }: { className?: string }) {
   return (
@@ -182,6 +179,17 @@ const COMMODITIES: Record<string, CommodityConfig> = {
 
 const COMMODITY_ORDER = ["CORN", "SOYBEANS", "WHEAT", "OATS", "RICE"];
 
+// ─── Chart Period Type ──────────────────────────────────────────────────────
+
+type ChartPeriod = "1W" | "1M" | "3M" | "6M";
+
+const CHART_PERIODS: { key: ChartPeriod; label: string }[] = [
+  { key: "1W", label: "1W" },
+  { key: "1M", label: "1M" },
+  { key: "3M", label: "3M" },
+  { key: "6M", label: "6M" },
+];
+
 // ─── USDA Report Calendar (auto-computed) ────────────────────────────────────
 
 interface USDAReport {
@@ -195,9 +203,7 @@ function getUpcomingUSDAReports(): USDAReport[] {
   const now = new Date();
   const year = now.getFullYear();
 
-  // Known fixed-date reports for the current and next year
   const fixedReports: USDAReport[] = [
-    // WASDE — monthly, typically 2nd week
     { name: "WASDE Report", date: `${year}-01-12`, impact: "HIGH", description: "World Agricultural Supply & Demand Estimates" },
     { name: "WASDE Report", date: `${year}-02-10`, impact: "HIGH", description: "World Agricultural Supply & Demand Estimates" },
     { name: "WASDE Report", date: `${year}-03-10`, impact: "HIGH", description: "World Agricultural Supply & Demand Estimates" },
@@ -210,17 +216,13 @@ function getUpcomingUSDAReports(): USDAReport[] {
     { name: "WASDE Report", date: `${year}-10-09`, impact: "HIGH", description: "World Agricultural Supply & Demand Estimates" },
     { name: "WASDE Report", date: `${year}-11-10`, impact: "HIGH", description: "World Agricultural Supply & Demand Estimates" },
     { name: "WASDE Report", date: `${year}-12-10`, impact: "HIGH", description: "World Agricultural Supply & Demand Estimates" },
-    // Prospective Plantings — last business day of March
     { name: "Prospective Plantings", date: `${year}-03-31`, impact: "HIGH", description: "First planted acre intentions — major market mover" },
-    // Grain Stocks — quarterly
     { name: "Grain Stocks", date: `${year}-03-31`, impact: "HIGH", description: "Quarterly stocks — combined with Plantings" },
     { name: "Grain Stocks", date: `${year}-06-30`, impact: "HIGH", description: "Quarterly stocks — combined with Acreage" },
     { name: "Grain Stocks", date: `${year}-09-30`, impact: "HIGH", description: "Quarterly grain stocks report" },
-    // Acreage — last business day of June
     { name: "Acreage Report", date: `${year}-06-30`, impact: "HIGH", description: "Actual planted acres vs. March intentions" },
   ];
 
-  // Crop Progress — weekly Mondays, April through November
   const cropProgressReports: USDAReport[] = [];
   for (let month = 3; month <= 10; month++) {
     for (let day = 1; day <= 31; day++) {
@@ -239,7 +241,6 @@ function getUpcomingUSDAReports(): USDAReport[] {
     }
   }
 
-  // Export Sales — weekly Thursdays
   const exportSalesReports: USDAReport[] = [];
   const startDate = new Date(now);
   startDate.setDate(startDate.getDate() - startDate.getDay() + 4);
@@ -414,6 +415,261 @@ function SkeletonSummary() {
   );
 }
 
+// ─── TradingView Lightweight Chart Component ─────────────────────────────────
+// Replaces Recharts in expanded commodity detail view only.
+// Uses dynamic import for SSR safety. Canvas-rendered for 60fps performance.
+
+function CommodityDetailChart({
+  priceHistory,
+  config,
+  chartPeriod,
+}: {
+  priceHistory: PricePoint[];
+  config: CommodityConfig;
+  chartPeriod: ChartPeriod;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<any>(null);
+  const seriesRef = useRef<any>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Filter and convert data for the selected period
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const cutoff = new Date(now);
+    switch (chartPeriod) {
+      case "1W": cutoff.setDate(now.getDate() - 7); break;
+      case "1M": cutoff.setMonth(now.getMonth() - 1); break;
+      case "3M": cutoff.setMonth(now.getMonth() - 3); break;
+      case "6M": cutoff.setMonth(now.getMonth() - 6); break;
+    }
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+    return priceHistory
+      .filter((d) => d.settle !== null && d.date.substring(0, 10) >= cutoffStr)
+      .map((d) => ({ time: d.date.substring(0, 10), value: d.settle as number }))
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }, [priceHistory, chartPeriod]);
+
+  // Ref to always read latest chartData in async init
+  const chartDataRef = useRef(chartData);
+  chartDataRef.current = chartData;
+
+  // Create chart on mount — one-time init
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initChart() {
+      // Dynamic import: never enters server bundle
+      const lc = await import("lightweight-charts");
+      if (!isMounted || !containerRef.current) return;
+
+      // Guard: React Strict Mode double-mount
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+      }
+
+      const chart = lc.createChart(containerRef.current, {
+        autoSize: true,
+        layout: {
+          background: { type: lc.ColorType.Solid, color: "transparent" },
+          textColor: "#9ca3af",
+          attributionLogo: false,
+          fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+        },
+        grid: {
+          vertLines: { visible: false },
+          horzLines: { color: "rgba(0,0,0,0.04)", style: lc.LineStyle.Dotted },
+        },
+        crosshair: {
+          mode: lc.CrosshairMode.Magnet,
+          horzLine: {
+            style: lc.LineStyle.Dashed,
+            width: 1,
+            color: config.color + "50",
+            labelBackgroundColor: config.color,
+          },
+          vertLine: {
+            style: lc.LineStyle.Dashed,
+            width: 1,
+            color: config.color + "50",
+            labelBackgroundColor: "#374151",
+          },
+        },
+        rightPriceScale: {
+          borderVisible: false,
+          scaleMargins: { top: 0.1, bottom: 0.1 },
+        },
+        timeScale: {
+          borderVisible: false,
+          timeVisible: false,
+          fixLeftEdge: true,
+          fixRightEdge: true,
+        },
+        handleScroll: { vertTouchDrag: false },
+        handleScale: { pinch: true, mouseWheel: true },
+        kineticScroll: { touch: true, mouse: false },
+      });
+
+      // Area series with commodity-themed gradient
+      const series = chart.addAreaSeries({
+        topColor: config.color + "30",
+        bottomColor: config.color + "05",
+        lineColor: config.color,
+        lineWidth: 2,
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: 5,
+        crosshairMarkerBorderColor: config.color,
+        crosshairMarkerBackgroundColor: "#ffffff",
+        crosshairMarkerBorderWidth: 2,
+        lastValueVisible: true,
+        priceLineVisible: false,
+      });
+
+      // Set initial data
+      const initialData = chartDataRef.current;
+      if (initialData.length > 0) {
+        series.setData(initialData);
+      }
+
+      // ═══ USDA Reference Price Lines ═══
+      // This is the killer feature — farmers see exactly where current
+      // futures sit relative to the prices that trigger PLC payments
+
+      // Effective Reference Price (the key threshold)
+      series.createPriceLine({
+        price: config.effectiveRefPrice,
+        color: "#EF4444",
+        lineWidth: 2,
+        lineStyle: lc.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: `ERP $${config.effectiveRefPrice.toFixed(2)}`,
+      });
+
+      // Loan Rate (subtle — floor for PLC calculation)
+      series.createPriceLine({
+        price: config.loanRate,
+        color: "#9CA3AF",
+        lineWidth: 1,
+        lineStyle: lc.LineStyle.SparseDotted,
+        axisLabelVisible: true,
+        title: `Loan $${config.loanRate.toFixed(2)}`,
+      });
+
+      // ═══ Custom Tooltip ═══
+      chart.subscribeCrosshairMove((param: any) => {
+        const tooltip = tooltipRef.current;
+        const container = containerRef.current;
+        if (!tooltip || !container) return;
+
+        if (
+          !param.point ||
+          !param.time ||
+          param.point.x < 0 ||
+          param.point.y < 0
+        ) {
+          tooltip.style.display = "none";
+          return;
+        }
+
+        const seriesData = param.seriesData.get(series);
+        if (!seriesData) {
+          tooltip.style.display = "none";
+          return;
+        }
+
+        const price = (seriesData as any).value as number;
+        const timeStr = param.time as string;
+        const dateObj = new Date(timeStr + "T12:00:00");
+        const dateFormatted = dateObj.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        const delta = price - config.effectiveRefPrice;
+        const deltaSign = delta >= 0 ? "+" : "";
+        const deltaColor = delta >= 0 ? "#22C55E" : "#EF4444";
+        const deltaLabel = delta >= 0 ? "above" : "below";
+
+        tooltip.innerHTML = [
+          `<div style="font-size:11px;color:#9ca3af;margin-bottom:3px">${dateFormatted}</div>`,
+          `<div style="font-size:17px;font-weight:800;color:#111827;font-variant-numeric:tabular-nums">`,
+          `$${price.toFixed(2)}<span style="font-size:12px;font-weight:500;color:#9ca3af">/${config.unitLabel}</span>`,
+          `</div>`,
+          `<div style="font-size:11px;font-weight:600;color:${deltaColor};margin-top:2px;font-variant-numeric:tabular-nums">`,
+          `${deltaSign}$${Math.abs(delta).toFixed(2)} ${deltaLabel} reference`,
+          `</div>`,
+        ].join("");
+        tooltip.style.display = "block";
+
+        // Position tooltip near crosshair, clamped inside container
+        const cw = container.clientWidth;
+        const left =
+          param.point.x > cw - 185
+            ? param.point.x - 195
+            : param.point.x + 16;
+        const top =
+          param.point.y > 110 ? param.point.y - 85 : param.point.y + 16;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+      });
+
+      chart.timeScale().fitContent();
+      chartRef.current = chart;
+      seriesRef.current = series;
+    }
+
+    initChart();
+
+    return () => {
+      isMounted = false;
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.code]); // Only recreate chart when commodity changes
+
+  // Update data when period changes (no chart recreation needed)
+  useEffect(() => {
+    if (!seriesRef.current || !chartRef.current) return;
+    if (chartData.length === 0) return;
+    seriesRef.current.setData(chartData);
+    chartRef.current.timeScale().fitContent();
+  }, [chartData]);
+
+  if (chartData.length < 2) {
+    return (
+      <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">
+        Not enough price data for this period
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full">
+      <div
+        ref={containerRef}
+        className="w-full h-[260px] sm:h-[300px]"
+      />
+      {/* Floating tooltip — positioned by crosshair handler */}
+      <div
+        ref={tooltipRef}
+        className="absolute hidden pointer-events-none z-50 px-3 py-2.5 rounded-xl shadow-xl"
+        style={{
+          background: "rgba(255,255,255,0.96)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid rgba(0,0,0,0.08)",
+        }}
+      />
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function MarketsPage() {
@@ -421,18 +677,17 @@ export default function MarketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<"30d" | "90d">("30d");
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("3M");
   const [lastFetched, setLastFetched] = useState<string | null>(null);
 
   const marketStatus = useMemo(() => getMarketStatus(), []);
   const usdaReports = useMemo(() => getUpcomingUSDAReports(), []);
 
-  // Fetch futures data
+  // Fetch 6 months of futures data — client-side filtering handles period selection
   const fetchData = useCallback(async () => {
     try {
       const codes = COMMODITY_ORDER.join(",");
-      const days = timeRange === "90d" ? 90 : 30;
-      const res = await fetch(`/api/prices/futures?commodities=${codes}&days=${days}`);
+      const res = await fetch(`/api/prices/futures?commodities=${codes}&days=185`);
       if (!res.ok) throw new Error("Failed to fetch market data");
       const json = await res.json();
       if (json.success && json.data) {
@@ -446,7 +701,7 @@ export default function MarketsPage() {
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -543,50 +798,30 @@ export default function MarketsPage() {
           <SkeletonSummary />
         ) : !error && summary.total > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            <SummaryCard
-              value={summary.above}
-              label="Above Reference"
-              sublabel="No PLC payment expected"
-              variant="green"
-            />
-            <SummaryCard
-              value={summary.near}
-              label="Near Reference"
-              sublabel="PLC payment possible"
-              variant="amber"
-            />
-            <SummaryCard
-              value={summary.below}
-              label="Below Reference"
-              sublabel="PLC payment likely"
-              variant="red"
-            />
-            <SummaryCard
-              value={summary.total}
-              label="Commodities Tracked"
-              sublabel="CME settlement prices"
-              variant="blue"
-            />
+            <SummaryCard value={summary.above} label="Above Reference" sublabel="No PLC payment expected" variant="green" />
+            <SummaryCard value={summary.near} label="Near Reference" sublabel="PLC payment possible" variant="amber" />
+            <SummaryCard value={summary.below} label="Below Reference" sublabel="PLC payment likely" variant="red" />
+            <SummaryCard value={summary.total} label="Commodities Tracked" sublabel="CME settlement prices" variant="blue" />
           </div>
         ) : null}
 
-        {/* Section Header + Time Range Toggle */}
+        {/* Section Header + Chart Period Selector */}
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <h2 className="text-xl font-bold text-foreground">
             Commodity Futures
           </h2>
           <div className="flex gap-1 p-1 rounded-lg bg-muted">
-            {(["30d", "90d"] as const).map((range) => (
+            {CHART_PERIODS.map(({ key, label }) => (
               <button
-                key={range}
-                onClick={() => { setTimeRange(range); setLoading(true); }}
-                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-150 ${
-                  timeRange === range
+                key={key}
+                onClick={() => setChartPeriod(key)}
+                className={`px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all duration-150 ${
+                  chartPeriod === key
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {range === "30d" ? "30 Day" : "90 Day"}
+                {label}
               </button>
             ))}
           </div>
@@ -663,7 +898,7 @@ export default function MarketsPage() {
                       </div>
                     </div>
 
-                    {/* Mini Sparkline */}
+                    {/* Mini Sparkline — Recharts (tiny, no interactivity needed) */}
                     <div className="hidden sm:block flex-1 h-10 max-w-[200px]">
                       {priceHistory.length > 2 && (
                         <ResponsiveContainer width="100%" height="100%">
@@ -758,90 +993,34 @@ export default function MarketsPage() {
                     </div>
                   )}
 
-                  {/* Expanded Details */}
+                  {/* ═══ Expanded Details ═══ */}
                   {isExpanded && (
                     <div className="border-t border-border px-4 sm:px-5 py-5">
-                      {/* Price Chart */}
+                      {/* TradingView Lightweight Chart */}
                       {priceHistory.length > 2 && (
                         <div className="mb-6">
                           <div className="flex items-center gap-3 mb-3">
                             <span className="text-sm font-semibold text-muted-foreground">
-                              {timeRange === "30d" ? "30" : "90"}-Day Price History
+                              Price History
                             </span>
                             <span className="text-xs text-muted-foreground/60">
-                              Dashed line = Reference Price (${cfg.effectiveRefPrice.toFixed(2)})
+                              Red dashed = Reference Price · Gray dotted = Loan Rate
                             </span>
                           </div>
-                          <div className="h-56 bg-muted/30 rounded-xl p-3 pr-1">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart data={priceHistory.filter((p) => p.settle !== null)}>
-                                <defs>
-                                  <linearGradient id={`chart-${code}`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={cfg.color} stopOpacity={0.2} />
-                                    <stop offset="100%" stopColor={cfg.color} stopOpacity={0.02} />
-                                  </linearGradient>
-                                </defs>
-                                <XAxis
-                                  dataKey="date"
-                                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                  tickFormatter={(v: string) => {
-                                    const d = new Date(v);
-                                    return `${d.getMonth() + 1}/${d.getDate()}`;
-                                  }}
-                                  axisLine={false}
-                                  tickLine={false}
-                                  interval="preserveStartEnd"
-                                  minTickGap={40}
-                                />
-                                <YAxis
-                                  domain={["auto", "auto"]}
-                                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                  axisLine={false}
-                                  tickLine={false}
-                                  tickFormatter={(v: number) => `$${v.toFixed(2)}`}
-                                  width={55}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    background: "hsl(var(--card))",
-                                    border: "1px solid hsl(var(--border))",
-                                    borderRadius: 10,
-                                    fontSize: 12,
-                                    color: "hsl(var(--foreground))",
-                                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                  }}
-                                  formatter={(value: number) => [`$${value.toFixed(2)}`, "Settlement"]}
-                                  labelFormatter={(label: string) =>
-                                    new Date(label).toLocaleDateString("en-US", {
-                                      weekday: "short", month: "short", day: "numeric", year: "numeric",
-                                    })
-                                  }
-                                />
-                                <ReferenceLine
-                                  y={cfg.effectiveRefPrice}
-                                  stroke="#EF4444"
-                                  strokeDasharray="6 3"
-                                  strokeWidth={1.5}
-                                  label={{
-                                    value: `ERP $${cfg.effectiveRefPrice.toFixed(2)}`,
-                                    position: "right",
-                                    fill: "#EF4444",
-                                    fontSize: 10,
-                                    fontWeight: 600,
-                                  }}
-                                />
-                                <Area
-                                  type="monotone"
-                                  dataKey="settle"
-                                  stroke={cfg.color}
-                                  strokeWidth={2}
-                                  fill={`url(#chart-${code})`}
-                                  isAnimationActive={false}
-                                  dot={false}
-                                  activeDot={{ r: 4, fill: cfg.color, strokeWidth: 2, stroke: "#fff" }}
-                                />
-                              </AreaChart>
-                            </ResponsiveContainer>
+                          <div className="rounded-xl bg-muted/20 p-2 sm:p-3">
+                            <CommodityDetailChart
+                              priceHistory={priceHistory}
+                              config={cfg}
+                              chartPeriod={chartPeriod}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between mt-2 px-1">
+                            <span className="text-[10px] text-muted-foreground/50">
+                              Pinch to zoom · Drag to scroll
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/50">
+                              Hover/tap for price details
+                            </span>
                           </div>
                         </div>
                       )}
@@ -1058,6 +1237,15 @@ export default function MarketsPage() {
             estimates based on futures prices as a directional indicator — actual
             payments depend on the Marketing Year Average calculated from NASS monthly
             prices received. Prices update after daily settlement (~1:15 PM CT on trading days).
+            Charts powered by{" "}
+            <a
+              href="https://www.tradingview.com/lightweight-charts/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
+            >
+              TradingView
+            </a>.
           </p>
         </div>
 
