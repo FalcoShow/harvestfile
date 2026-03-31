@@ -2,10 +2,11 @@
 // HarvestFile — Consolidated Middleware
 // Phase 19: Added SMS webhook route exclusions
 // Build 5 Deploy 1: Added geo detection API route exclusion
+// Build 17 Deploy 6: Added sitemap + robots.txt bypass for Google crawling
 //
 // Handles: auth session refresh, dashboard route protection, auth redirects
-// CRITICAL: Stripe webhook + SMS webhooks + geo detection are EXCLUDED from
-// the matcher to prevent 307 redirects and avoid unnecessary auth overhead.
+// CRITICAL: Stripe webhook, SMS webhooks, geo detection, sitemaps, and
+// robots.txt are EXCLUDED to prevent 307 redirects and crawl failures.
 // =============================================================================
 
 import { createServerClient } from '@supabase/ssr';
@@ -13,6 +14,19 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ── EARLY RETURN: Skip auth for sitemaps + robots (Google crawling) ───
+  // This is the PRIMARY fix for "Couldn't fetch" in Google Search Console.
+  // Without this, Googlebot's requests run through Supabase auth.getUser()
+  // with no session cookie, adding latency and occasional failures that
+  // GSC caches for weeks.
+  if (
+    pathname === '/sitemap.xml' ||
+    pathname.startsWith('/sitemap/') ||
+    pathname === '/robots.txt'
+  ) {
+    return NextResponse.next();
+  }
 
   // ── EARLY RETURN: Skip auth logic for Stripe webhook ──────────────────
   if (pathname.startsWith('/api/stripe/webhook') || pathname.startsWith('/api/webhooks/stripe')) {
@@ -84,7 +98,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all routes except static files, _next, and API routes that need to be public
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|json)$).*)',
+    // Match all routes except static files, _next internals, and crawlable XML/JSON
+    // CRITICAL: sitemap.xml, sitemap/*, and robots.txt MUST be excluded here
+    // AND have early returns above (belt + suspenders for Google crawling)
+    '/((?!_next/static|_next/image|favicon.ico|sitemap\\.xml|sitemap/|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|json)$).*)',
   ],
 };
