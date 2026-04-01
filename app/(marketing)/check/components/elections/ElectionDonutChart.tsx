@@ -1,13 +1,10 @@
 // =============================================================================
-// HarvestFile — Build 18 Deploy 4 Fix v2: Election Donut Chart
+// HarvestFile — Build 18 Deploy 4 Final Fix: Election Donut Chart
 // app/(marketing)/check/components/elections/ElectionDonutChart.tsx
 //
-// Fixed v2:
-//   - Center label now has a dark circular background (#0C1F17) so text
-//     is always legible against the donut segments
-//   - pointer-events-none on overlay prevents tooltip interference
-//   - Tooltip z-index elevated above the center label
-//   - Percentage and program name are crisp white/colored on dark bg
+// FINAL: Removed center label entirely per Andrew's direction.
+// Clean donut ring with teal/gold segments. Tooltip on hover shows
+// program name, percentage, and acre count. No text inside the ring.
 //
 // Teal (#2DD4BF) for ARC-CO, gold (#C9A84C) for PLC.
 // startAngle=90 endAngle=-270 sweeps clockwise from 12 o'clock.
@@ -49,7 +46,6 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: Tooltip
         backdropFilter: 'blur(8px)',
         minWidth: '160px',
         zIndex: 50,
-        position: 'relative',
       }}
     >
       <div className="flex items-center gap-2 mb-1.5">
@@ -91,60 +87,51 @@ export default function ElectionDonutChart({ arccoPct, plcPct, arccoAcres, plcAc
   const dominant = arccoPct >= plcPct ? data[0] : data[1];
 
   return (
-    <div className="relative w-full h-full">
-      {/* Recharts donut — renders the teal/gold ring */}
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius="55%"
-            outerRadius="82%"
-            startAngle={90}
-            endAngle={-270}
-            paddingAngle={3}
-            strokeWidth={0}
-            animationBegin={0}
-            animationDuration={reduceMotion ? 0 : 1200}
-            animationEasing="ease-out"
-          >
-            {data.map((entry, i) => (
-              <Cell key={i} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip
-            content={<DonutTooltip />}
-            wrapperStyle={{ outline: 'none', zIndex: 50 }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="w-full h-full flex flex-col items-center justify-center">
+      {/* Donut chart — clean ring, no center text */}
+      <div className="w-full" style={{ height: 'calc(100% - 36px)' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="85%"
+              startAngle={90}
+              endAngle={-270}
+              paddingAngle={3}
+              strokeWidth={0}
+              animationBegin={0}
+              animationDuration={reduceMotion ? 0 : 1200}
+              animationEasing="ease-out"
+            >
+              {data.map((entry, i) => (
+                <Cell key={i} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              content={<DonutTooltip />}
+              wrapperStyle={{ outline: 'none', zIndex: 50 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
 
-      {/* Center label with dark background — always legible */}
-      <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-        style={{ zIndex: 10 }}
-      >
-        <div
-          className="flex flex-col items-center justify-center rounded-full"
-          style={{
-            width: '45%',
-            height: '45%',
-            maxWidth: '140px',
-            maxHeight: '140px',
-            background: '#0C1F17',
-          }}
-        >
-          <span
-            className="text-[24px] sm:text-[30px] font-extrabold tabular-nums tracking-[-0.02em] leading-none"
-            style={{ color: dominant.color, fontFamily: 'var(--font-bricolage, sans-serif)' }}
-          >
-            {dominant.value.toFixed(1)}%
+      {/* Legend below the donut — crisp and always readable */}
+      <div className="flex items-center justify-center gap-5 mt-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ background: COLORS.arcCo }} />
+          <span className="text-[12px] sm:text-[13px] font-semibold" style={{ color: COLORS.arcCo }}>
+            ARC-CO {arccoPct.toFixed(1)}%
           </span>
-          <span className="text-[11px] sm:text-[12px] text-white/50 font-semibold mt-1">
-            {dominant.name}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ background: COLORS.plc }} />
+          <span className="text-[12px] sm:text-[13px] font-semibold" style={{ color: COLORS.plc }}>
+            PLC {plcPct.toFixed(1)}%
           </span>
         </div>
       </div>
