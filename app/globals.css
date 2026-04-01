@@ -1264,3 +1264,33 @@
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #C9A84C;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   BUILD 18 DEPLOY 2: Decision Hub Skeleton Shimmer
+   Gold-tinted shimmer for "Coming Soon" tab placeholders.
+   Uses brand gold (#C9A84C) at low opacity instead of generic gray.
+   Respects prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes hf-skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.hf-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(201, 168, 76, 0.05) 25%,
+    rgba(201, 168, 76, 0.12) 50%,
+    rgba(201, 168, 76, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: hf-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-skeleton-shimmer {
+    animation: none;
+    background: rgba(201, 168, 76, 0.07);
+  }
+}

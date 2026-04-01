@@ -2,16 +2,21 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Build 15 Deploy 1: Step 3 Results Redesign — CTA Consolidation + Premium UX
+// Build 18 Deploy 2: Results Page Tab Architecture — Decision Hub
 //
-// Changes from Build 14:
-// - Step 3 results: consolidated 7 CTAs → 2 (Save My Results + View County)
-// - Winner card elevated with "Recommended" badge, subtle lift, gold border
-// - Trust signals repositioned between results and CTA for conversion boost
-// - Share button demoted to inline utility (no longer full-width CTA)
-// - Removed: separate Pro Trial CTA, Compare Plans link, email capture widget
-// - Added micro-copy beneath primary CTA for doubt removal
-// - Cleaner visual hierarchy with better spacing rhythm
+// Changes from Build 18 Deploy 1:
+// - Step 3 results now include a 5-tab navigation bar below the hero card
+// - "Comparison" tab shows existing content (hero card + chart + CTAs)
+// - 4 skeleton placeholders for: Historical, Elections, Multi-Crop, Base Acres
+// - Tab state managed via Zustand store (activeTab / setActiveTab)
+// - URL updates with &tab= parameter for deep-linkable results
+// - Hero card stays ALWAYS visible above tabs (the answer to "which pays more")
+// - Tabs appear below hero for deeper analysis exploration
+// - Zero visual regression on Comparison tab — every pixel identical
+//
+// Previous changes preserved:
+// - Build 15: CTA consolidation 7→2, winner card elevation
+// - Build 18 Deploy 1: Zustand sync bridge, URL state management
 // =============================================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -20,6 +25,9 @@ import dynamic from "next/dynamic";
 import { DarkSelect } from "./DarkSelect";
 import BenchmarkWidget from "@/components/county/BenchmarkWidget";
 import { useFarmStoreSync, useFarmUrlSync } from "@/lib/stores/use-farm-sync";
+import { useFarmStore, type ResultTab } from "@/lib/stores/farm-store";
+import TabBar from "./components/TabBar";
+import SkeletonPanel from "./components/SkeletonPanel";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
@@ -341,6 +349,9 @@ function IconTrophy() {
   );
 }
 
+// ─── Valid tab values (for URL param validation) ─────────────────────────────
+const VALID_TABS: ResultTab[] = ['comparison', 'historical', 'elections', 'optimization', 'base-acres'];
+
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
@@ -377,6 +388,11 @@ export default function CheckCalculator() {
   const [shared, setShared] = useState(false);
   const pendingUrlCalc = useRef<{ county: string; crop: string; acres: string; countyName: string } | null>(null);
 
+  // ── Tab State (Build 18 Deploy 2) ───────────────────────────────────────
+  // Read from Zustand store — this is what TabBar reads/writes
+  const activeTab = useFarmStore((s) => s.activeTab);
+  const setActiveTab = useFarmStore((s) => s.setActiveTab);
+
   // ── Farm Store Sync (Build 18 Deploy 1) ─────────────────────────────────
   // Bridges local useState to the Zustand store for cross-tool data sharing.
   // Zero visual changes — new tab components in Deploy 2+ read from the store.
@@ -393,12 +409,19 @@ export default function CheckCalculator() {
       const urlCrop = p.get("crop");
       const urlAcres = p.get("acres");
       const urlName = p.get("name");
+
+      // ── Read tab param from URL (Build 18 Deploy 2) ────────────────
+      const urlTab = p.get("tab") as ResultTab | null;
+      if (urlTab && VALID_TABS.includes(urlTab)) {
+        setActiveTab(urlTab);
+      }
+
       if (urlState && urlCounty && urlCrop && urlAcres) {
         setStateAbbr(urlState);
         pendingUrlCalc.current = { county: urlCounty, crop: urlCrop, acres: urlAcres, countyName: urlName || "" };
       }
     }
-  }, []);
+  }, [setActiveTab]);
 
   // ── Sync inputs to farm store whenever they change ────────────────────────
   useEffect(() => {
@@ -470,12 +493,32 @@ export default function CheckCalculator() {
       .catch(() => { setLoadingCounties(false); syncCounties([], false); });
   }, [stateAbbr]);
 
+  // ── Handle tab change — update URL (Build 18 Deploy 2) ─────────────────
+
+  const handleTabChange = useCallback((tab: ResultTab) => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (tab === "comparison") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    const search = params.toString();
+    const newUrl = search ? `/check?${search}` : "/check";
+    window.history.replaceState(null, "", newUrl);
+  }, []);
+
   // ── Calculate results ─────────────────────────────────────────────────────
 
   const calculate = async () => {
     const acresNum = parseInt(acres) || 0;
     setCalculating(true);
     setShared(false);
+
+    // Reset to Comparison tab on new calculation
+    setActiveTab("comparison");
+
     goTo(3);
 
     // Update URL for shareability (doesn't trigger navigation)
@@ -678,23 +721,20 @@ export default function CheckCalculator() {
                       className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
                       style={{
                         background: isComplete ? "rgba(201,168,76,0.2)" : isActive ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.04)",
-                        border: isComplete || isActive ? "1.5px solid rgba(201,168,76,0.4)" : "1.5px solid rgba(255,255,255,0.08)",
-                        color: isComplete || isActive ? "#C9A84C" : "rgba(255,255,255,0.25)",
+                        border: isComplete ? "1.5px solid rgba(201,168,76,0.4)" : isActive ? "1.5px solid rgba(201,168,76,0.25)" : "1.5px solid rgba(255,255,255,0.06)",
+                        color: isComplete ? "#C9A84C" : isActive ? "#C9A84C" : "rgba(255,255,255,0.2)",
                       }}
                     >
                       {isComplete ? (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
                       ) : stepNum}
                     </div>
                     <span
-                      className="text-[11px] font-semibold tracking-wide hidden sm:inline transition-colors duration-300"
-                      style={{ color: isComplete || isActive ? "rgba(201,168,76,0.7)" : "rgba(255,255,255,0.2)" }}
+                      className="text-[11px] sm:text-[12px] font-semibold transition-colors duration-300 hidden sm:inline"
+                      style={{ color: isActive ? "rgba(201,168,76,0.7)" : isComplete ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.15)" }}
                     >
                       {label}
                     </span>
-                    {i < stepLabels.length - 1 && (
-                      <div className="w-8 sm:w-12 h-px mx-1 sm:mx-2" style={{ background: isComplete ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.06)" }} />
-                    )}
                   </div>
                 );
               })}
@@ -847,8 +887,8 @@ export default function CheckCalculator() {
                   }}
                   placeholder="e.g. 500"
                   autoFocus={!!cropCode}
-                  className="hf-calc-input w-full p-4 rounded-[16px] text-center text-[28px] sm:text-[32px] font-bold text-white bg-white/[0.03] border border-white/[0.08] outline-none transition-all duration-300 focus:border-[#C9A84C]/40 focus:ring-1 focus:ring-[#C9A84C]/20 focus:bg-white/[0.04]"
-                  style={{ letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}
+                  className="w-full p-4 rounded-[14px] text-[16px] font-semibold text-white placeholder-white/20 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#C9A84C]/30"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
                 />
 
                 {/* Quick presets */}
@@ -903,10 +943,8 @@ export default function CheckCalculator() {
             )}
 
             {/* ════════════════════════════════════════════════════════════
-                 STEP 3: RESULTS — Build 15 Redesign
-                 CTA consolidation: 7 → 2
-                 Winner card elevated with "Recommended" badge
-                 Trust signals between results and CTA
+                 STEP 3: RESULTS — Build 18 Deploy 2: Tabbed Decision Hub
+                 Hero card always visible, tabs below for deeper analysis
                  ════════════════════════════════════════════════════════ */}
             {step === 3 && (results || calculating) && (
               <div>
@@ -924,7 +962,7 @@ export default function CheckCalculator() {
 
                 {!calculating && (
                 <>
-                {/* ── Results Hero Card ──────────────────────────────────── */}
+                {/* ── Results Hero Card (ALWAYS VISIBLE — above tabs) ──── */}
                 <div
                   className="rounded-[24px] p-7 sm:p-10 text-center mb-6"
                   style={{
@@ -1032,6 +1070,26 @@ export default function CheckCalculator() {
                     ))}
                   </div>
                 </div>
+
+                {/* ════════════════════════════════════════════════════════
+                     BUILD 18 DEPLOY 2: TAB NAVIGATION
+                     Hero card above, tabs below for deeper analysis.
+                     Default tab is "comparison" — shows existing content.
+                     Other tabs show skeleton placeholders.
+                     ════════════════════════════════════════════════════ */}
+                <TabBar onTabChange={handleTabChange} />
+
+                {/* ── Tab Content Area ──────────────────────────────────── */}
+                <div
+                  role="tabpanel"
+                  id={`panel-${activeTab}`}
+                  aria-labelledby={`tab-${activeTab}`}
+                  className="min-h-[400px]"
+                >
+
+                {/* ── COMPARISON TAB: Original Step 3 content ──────────── */}
+                {activeTab === "comparison" && (
+                  <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
 
                 {/* ── Visual Bar Chart ──────────────────────────────────── */}
                 <StaggerItem index={1}>
@@ -1204,13 +1262,43 @@ export default function CheckCalculator() {
 
                   {/* Recalculate — simple text link */}
                   <button
-                    onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); window.history.replaceState(null, "", "/check"); }}
+                    onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); setActiveTab("comparison"); window.history.replaceState(null, "", "/check"); }}
                     className="flex items-center gap-1.5 text-[12px] font-medium cursor-pointer bg-transparent border-none transition-colors duration-200 text-white/25 hover:text-white/40"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
                     New calculation
                   </button>
                 </div>
+
+                  </div>
+                )}
+                {/* ── END COMPARISON TAB ────────────────────────────────── */}
+
+                {/* ── SKELETON TABS: Historical, Elections, Optimization, Base Acres ── */}
+                {activeTab === "historical" && (
+                  <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
+                    <SkeletonPanel variant="historical" />
+                  </div>
+                )}
+                {activeTab === "elections" && (
+                  <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
+                    <SkeletonPanel variant="elections" />
+                  </div>
+                )}
+                {activeTab === "optimization" && (
+                  <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
+                    <SkeletonPanel variant="optimization" />
+                  </div>
+                )}
+                {activeTab === "base-acres" && (
+                  <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
+                    <SkeletonPanel variant="base-acres" />
+                  </div>
+                )}
+
+                </div>
+                {/* ── END TAB CONTENT AREA ──────────────────────────────── */}
+
                 </>
                 )}
               </div>
