@@ -19,6 +19,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { DarkSelect } from "./DarkSelect";
 import BenchmarkWidget from "@/components/county/BenchmarkWidget";
+import { useFarmStoreSync, useFarmUrlSync } from "@/lib/stores/use-farm-sync";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
@@ -376,6 +377,12 @@ export default function CheckCalculator() {
   const [shared, setShared] = useState(false);
   const pendingUrlCalc = useRef<{ county: string; crop: string; acres: string; countyName: string } | null>(null);
 
+  // ── Farm Store Sync (Build 18 Deploy 1) ─────────────────────────────────
+  // Bridges local useState to the Zustand store for cross-tool data sharing.
+  // Zero visual changes — new tab components in Deploy 2+ read from the store.
+  const { syncInputs, syncResults, syncStep, syncCounties } = useFarmStoreSync();
+  useFarmUrlSync();
+
   useEffect(() => {
     setMounted(true);
     // Read URL params for shared links
@@ -393,6 +400,23 @@ export default function CheckCalculator() {
     }
   }, []);
 
+  // ── Sync inputs to farm store whenever they change ────────────────────────
+  useEffect(() => {
+    syncInputs({ stateAbbr, countyFips, countyName, countySlug, cropCode, acres });
+  }, [stateAbbr, countyFips, countyName, countySlug, cropCode, acres, syncInputs]);
+
+  // ── Sync step to farm store ───────────────────────────────────────────────
+  useEffect(() => {
+    syncStep(step, calculating);
+  }, [step, calculating, syncStep]);
+
+  // ── Sync results to farm store when they arrive ───────────────────────────
+  useEffect(() => {
+    if (results) {
+      syncResults({ result: results, isCountySpecific, dataYears });
+    }
+  }, [results, isCountySpecific, dataYears, syncResults]);
+
   // ── Step transitions ──────────────────────────────────────────────────────
 
   const goTo = useCallback((nextStep: number) => {
@@ -408,8 +432,9 @@ export default function CheckCalculator() {
   // ── Fetch counties when state changes ─────────────────────────────────────
 
   useEffect(() => {
-    if (!stateAbbr) { setCounties([]); return; }
+    if (!stateAbbr) { setCounties([]); syncCounties([], false); return; }
     setLoadingCounties(true);
+    syncCounties([], true);
     setCountyFips("");
     setCountyName("");
     setCountySlug("");
@@ -420,6 +445,7 @@ export default function CheckCalculator() {
         const list = data.counties || [];
         setCounties(list);
         setLoadingCounties(false);
+        syncCounties(list, false);
         // Auto-populate from shared URL params
         if (pendingUrlCalc.current) {
           const p = pendingUrlCalc.current;
@@ -441,7 +467,7 @@ export default function CheckCalculator() {
           }
         }
       })
-      .catch(() => setLoadingCounties(false));
+      .catch(() => { setLoadingCounties(false); syncCounties([], false); });
   }, [stateAbbr]);
 
   // ── Calculate results ─────────────────────────────────────────────────────
