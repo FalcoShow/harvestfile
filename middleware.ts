@@ -1,5 +1,6 @@
 // =============================================================================
 // HarvestFile — Consolidated Middleware
+// Build 18 Deploy 4: Added county-elections API route exclusion
 // Build 18 Deploy 3: Added historical-payments + calculator API route exclusions
 // Phase 19: Added SMS webhook route exclusions
 // Build 5 Deploy 1: Added geo detection API route exclusion
@@ -40,6 +41,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/counties') ||
     pathname.startsWith('/api/calculator') ||        // Build 18: Calculator estimate API
     pathname.startsWith('/api/historical-payments') || // Build 18 Deploy 3: Historical payment data
+    pathname.startsWith('/api/county-elections') ||    // Build 18 Deploy 4: County election data
     pathname.startsWith('/api/inngest') ||
     pathname.startsWith('/api/geo') ||           // Build 5: Geo detection (public, no auth needed)
     pathname.startsWith('/api/grain-bids') ||    // Build 5: Grain bids (public)

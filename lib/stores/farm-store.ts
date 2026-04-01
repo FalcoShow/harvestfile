@@ -13,6 +13,11 @@
 //   - historicalCacheKey for fetch-on-tab-activation deduplication
 //   - historicalError for error state rendering
 //
+// Deploy 4 additions:
+//   - ElectionData type for county election enrollment data
+//   - electionData, electionsCacheKey, electionsError fields
+//   - invalidateElections action
+//
 // Architecture:
 //   - inputs: farm location, crop, acres (set by wizard Steps 1-2)
 //   - comparison: ARC vs PLC result (set by estimate API)
@@ -94,6 +99,34 @@ export interface HistoricalData {
   summary: HistoricalSummary;
   countyFips: string;
   commodityCode: string;
+}
+
+// Deploy 4: County election enrollment data
+export interface ElectionYearData {
+  programYear: number;
+  arccoAcres: number;
+  plcAcres: number;
+  totalAcres: number;
+  arccoPct: number;
+  plcPct: number;
+}
+
+export interface ElectionInsightsData {
+  dominant: 'ARC-CO' | 'PLC' | 'SPLIT';
+  dominantPct: number;
+  trendDirection: 'TOWARD_ARC' | 'TOWARD_PLC' | 'STABLE';
+  trendShift: number;
+  streak: number;
+  latestYear: number;
+}
+
+export interface ElectionData {
+  data: ElectionYearData[];
+  insights: ElectionInsightsData | null;
+  countyName: string;
+  stateName: string;
+  countyFips: string;
+  totalCrops: number;
 }
 
 export interface ElectionContextData {
@@ -182,8 +215,11 @@ interface FarmStoreState {
   historicalError: string | null;
   historicalCacheKey: string | null;  // "countyFips:commodityCode" — prevents re-fetch
 
-  elections: ElectionContextData | null;
+  // Deploy 4: County election data with caching
+  electionData: ElectionData | null;
   loadingElections: boolean;
+  electionsError: string | null;
+  electionsCacheKey: string | null;
 
   optimization: MultiCropResult[] | null;
   loadingOptimization: boolean;
@@ -219,8 +255,12 @@ interface FarmStoreState {
   setHistoricalCacheKey: (key: string | null) => void;
   invalidateHistorical: () => void;
 
-  setElections: (data: ElectionContextData | null) => void;
+  // Deploy 4: Elections actions
+  setElectionData: (data: ElectionData | null) => void;
   setLoadingElections: (v: boolean) => void;
+  setElectionsError: (error: string | null) => void;
+  setElectionsCacheKey: (key: string | null) => void;
+  invalidateElections: () => void;
 
   setOptimization: (data: MultiCropResult[] | null) => void;
   setLoadingOptimization: (v: boolean) => void;
@@ -261,8 +301,10 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
   loadingHistorical: false,
   historicalError: null,
   historicalCacheKey: null,
-  elections: null,
+  electionData: null,
   loadingElections: false,
+  electionsError: null,
+  electionsCacheKey: null,
   optimization: null,
   loadingOptimization: false,
   baseAcres: null,
@@ -308,8 +350,13 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
   invalidateHistorical: () =>
     set({ historical: null, historicalCacheKey: null, historicalError: null }),
 
-  setElections: (elections) => set({ elections }),
+  // Deploy 4: Elections actions
+  setElectionData: (electionData) => set({ electionData }),
   setLoadingElections: (loadingElections) => set({ loadingElections }),
+  setElectionsError: (electionsError) => set({ electionsError }),
+  setElectionsCacheKey: (electionsCacheKey) => set({ electionsCacheKey }),
+  invalidateElections: () =>
+    set({ electionData: null, electionsCacheKey: null, electionsError: null }),
 
   setOptimization: (optimization) => set({ optimization }),
   setLoadingOptimization: (loadingOptimization) => set({ loadingOptimization }),
@@ -327,7 +374,9 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
       historical: null,
       historicalCacheKey: null,
       historicalError: null,
-      elections: null,
+      electionData: null,
+      electionsCacheKey: null,
+      electionsError: null,
       optimization: null,
       baseAcres: null,
       activeTab: 'comparison',
@@ -348,8 +397,10 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
       loadingHistorical: false,
       historicalError: null,
       historicalCacheKey: null,
-      elections: null,
+      electionData: null,
       loadingElections: false,
+      electionsError: null,
+      electionsCacheKey: null,
       optimization: null,
       loadingOptimization: false,
       baseAcres: null,
@@ -372,7 +423,8 @@ export const selectLoadingCounties = (state: FarmStoreState) => state.loadingCou
 export const selectHistorical = (state: FarmStoreState) => state.historical;
 export const selectHistoricalError = (state: FarmStoreState) => state.historicalError;
 export const selectLoadingHistorical = (state: FarmStoreState) => state.loadingHistorical;
-export const selectElections = (state: FarmStoreState) => state.elections;
+export const selectElectionData = (state: FarmStoreState) => state.electionData;
+export const selectElectionsError = (state: FarmStoreState) => state.electionsError;
 export const selectOptimization = (state: FarmStoreState) => state.optimization;
 export const selectBaseAcres = (state: FarmStoreState) => state.baseAcres;
 

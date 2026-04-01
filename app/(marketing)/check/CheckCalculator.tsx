@@ -2,7 +2,14 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Build 18 Deploy 3: Historical Payments — Decision Hub
+// Build 18 Deploy 4: County Elections Tab — Decision Hub
+//
+// Changes from Build 18 Deploy 4:
+// - Elections tab skeleton replaced with real ElectionsPanel component
+// - ElectionsPanel fetches from /api/county-elections?county_fips=XXXXX
+// - Donut chart, trend chart, narrative insights, BenchmarkWidget bridge
+// - Cache invalidation on new calculation via invalidateElections()
+// - Multi-Crop and Base Acres tabs still show skeleton placeholders (Deploy 5)
 //
 // Changes from Build 18 Deploy 3:
 // - Historical tab skeleton replaced with real HistoricalPanel component
@@ -35,6 +42,7 @@ import { useFarmStore, type ResultTab } from "@/lib/stores/farm-store";
 import TabBar from "./components/TabBar";
 import SkeletonPanel from "./components/SkeletonPanel";
 import HistoricalPanel from "./components/historical/HistoricalPanel";
+import ElectionsPanel from "./components/elections/ElectionsPanel";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
@@ -400,6 +408,7 @@ export default function CheckCalculator() {
   const activeTab = useFarmStore((s) => s.activeTab);
   const setActiveTab = useFarmStore((s) => s.setActiveTab);
   const invalidateHistorical = useFarmStore((s) => s.invalidateHistorical);
+  const invalidateElections = useFarmStore((s) => s.invalidateElections);
 
   // ── Farm Store Sync (Build 18 Deploy 1) ─────────────────────────────────
   // Bridges local useState to the Zustand store for cross-tool data sharing.
@@ -527,6 +536,7 @@ export default function CheckCalculator() {
     // Reset to Comparison tab on new calculation
     setActiveTab("comparison");
     invalidateHistorical(); // Deploy 3: clear cached historical data for new county/crop
+    invalidateElections(); // Deploy 4: clear cached election data for new county
 
     goTo(3);
 
@@ -1296,7 +1306,12 @@ export default function CheckCalculator() {
                 )}
                 {activeTab === "elections" && (
                   <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
-                    <SkeletonPanel variant="elections" />
+                    <ElectionsPanel
+                      countyFips={countyFips}
+                      countyName={countyName}
+                      stateAbbr={stateAbbr}
+                      isActive={activeTab === "elections"}
+                    />
                   </div>
                 )}
                 {activeTab === "optimization" && (
