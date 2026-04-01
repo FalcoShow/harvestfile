@@ -1,11 +1,17 @@
 // =============================================================================
-// HarvestFile — Build 18 Deploy 1: Shared Farm Data Store
+// HarvestFile — Build 18 Deploy 3: Shared Farm Data Store
 // lib/stores/farm-store.ts
 //
 // THE FOUNDATION. This Zustand store holds all farm input state and computed
 // results for all 5 merged tools (Calculator, Election Map, Optimizer,
 // Payment Scanner, Base Acre Analyzer). Every tool reads from this store.
 // Every calculation writes to it. The URL syncs with it.
+//
+// Deploy 3 additions:
+//   - HistoricalPaymentYear type updated with dataStatus + context fields
+//   - HistoricalSummary type for aggregate stats
+//   - historicalCacheKey for fetch-on-tab-activation deduplication
+//   - historicalError for error state rendering
 //
 // Architecture:
 //   - inputs: farm location, crop, acres (set by wizard Steps 1-2)
@@ -58,13 +64,36 @@ export interface ComparisonResult {
   projectedYears?: number;
 }
 
+// Deploy 3: Updated historical payment types
 export interface HistoricalPaymentYear {
   cropYear: number;
-  arcPayment: number;
-  plcPayment: number;
   arcPerAcre: number;
   plcPerAcre: number;
-  winner: 'ARC-CO' | 'PLC';
+  winner: 'ARC-CO' | 'PLC' | 'TIE';
+  dataStatus: 'final' | 'estimated';
+  // Context data for tooltips
+  myaPrice: number;
+  countyYield: number;
+  benchmarkYield: number;
+}
+
+export interface HistoricalSummary {
+  years: number;
+  arcWins: number;
+  plcWins: number;
+  ties: number;
+  totalArcPerAcre: number;
+  totalPlcPerAcre: number;
+  avgArcPerAcre: number;
+  avgPlcPerAcre: number;
+  overallWinner: 'ARC-CO' | 'PLC' | 'TIE';
+}
+
+export interface HistoricalData {
+  data: HistoricalPaymentYear[];
+  summary: HistoricalSummary;
+  countyFips: string;
+  commodityCode: string;
 }
 
 export interface ElectionContextData {
@@ -147,8 +176,11 @@ interface FarmStoreState {
   isCountySpecific: boolean;
   dataYears: number;
 
-  historical: HistoricalPaymentYear[] | null;
+  // Deploy 3: Historical payment data with caching
+  historical: HistoricalData | null;
   loadingHistorical: boolean;
+  historicalError: string | null;
+  historicalCacheKey: string | null;  // "countyFips:commodityCode" — prevents re-fetch
 
   elections: ElectionContextData | null;
   loadingElections: boolean;
@@ -180,8 +212,12 @@ interface FarmStoreState {
   setIsCountySpecific: (v: boolean) => void;
   setDataYears: (v: number) => void;
 
-  setHistorical: (data: HistoricalPaymentYear[] | null) => void;
+  // Deploy 3: Historical actions
+  setHistorical: (data: HistoricalData | null) => void;
   setLoadingHistorical: (v: boolean) => void;
+  setHistoricalError: (error: string | null) => void;
+  setHistoricalCacheKey: (key: string | null) => void;
+  invalidateHistorical: () => void;
 
   setElections: (data: ElectionContextData | null) => void;
   setLoadingElections: (v: boolean) => void;
@@ -223,6 +259,8 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
   dataYears: 0,
   historical: null,
   loadingHistorical: false,
+  historicalError: null,
+  historicalCacheKey: null,
   elections: null,
   loadingElections: false,
   optimization: null,
@@ -262,8 +300,13 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
   setIsCountySpecific: (isCountySpecific) => set({ isCountySpecific }),
   setDataYears: (dataYears) => set({ dataYears }),
 
+  // Deploy 3: Historical actions
   setHistorical: (historical) => set({ historical }),
   setLoadingHistorical: (loadingHistorical) => set({ loadingHistorical }),
+  setHistoricalError: (historicalError) => set({ historicalError }),
+  setHistoricalCacheKey: (historicalCacheKey) => set({ historicalCacheKey }),
+  invalidateHistorical: () =>
+    set({ historical: null, historicalCacheKey: null, historicalError: null }),
 
   setElections: (elections) => set({ elections }),
   setLoadingElections: (loadingElections) => set({ loadingElections }),
@@ -282,6 +325,8 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
       isCountySpecific: false,
       dataYears: 0,
       historical: null,
+      historicalCacheKey: null,
+      historicalError: null,
       elections: null,
       optimization: null,
       baseAcres: null,
@@ -301,6 +346,8 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
       dataYears: 0,
       historical: null,
       loadingHistorical: false,
+      historicalError: null,
+      historicalCacheKey: null,
       elections: null,
       loadingElections: false,
       optimization: null,
@@ -323,6 +370,8 @@ export const selectCalculating = (state: FarmStoreState) => state.calculating;
 export const selectCounties = (state: FarmStoreState) => state.counties;
 export const selectLoadingCounties = (state: FarmStoreState) => state.loadingCounties;
 export const selectHistorical = (state: FarmStoreState) => state.historical;
+export const selectHistoricalError = (state: FarmStoreState) => state.historicalError;
+export const selectLoadingHistorical = (state: FarmStoreState) => state.loadingHistorical;
 export const selectElections = (state: FarmStoreState) => state.elections;
 export const selectOptimization = (state: FarmStoreState) => state.optimization;
 export const selectBaseAcres = (state: FarmStoreState) => state.baseAcres;

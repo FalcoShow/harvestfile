@@ -2,9 +2,15 @@
 
 // =============================================================================
 // HarvestFile — ARC/PLC Calculator Wizard
-// Build 18 Deploy 2: Results Page Tab Architecture — Decision Hub
+// Build 18 Deploy 3: Historical Payments — Decision Hub
 //
-// Changes from Build 18 Deploy 1:
+// Changes from Build 18 Deploy 3:
+// - Historical tab skeleton replaced with real HistoricalPanel component
+// - HistoricalPanel fetches from /api/historical-payments/[fips]/[crop]
+// - Cache invalidation on new calculation via invalidateHistorical()
+// - All other tabs still show skeleton placeholders (Deploys 4-5)
+//
+// Changes from Build 18 Deploy 2:
 // - Step 3 results now include a 5-tab navigation bar below the hero card
 // - "Comparison" tab shows existing content (hero card + chart + CTAs)
 // - 4 skeleton placeholders for: Historical, Elections, Multi-Crop, Base Acres
@@ -28,6 +34,7 @@ import { useFarmStoreSync, useFarmUrlSync } from "@/lib/stores/use-farm-sync";
 import { useFarmStore, type ResultTab } from "@/lib/stores/farm-store";
 import TabBar from "./components/TabBar";
 import SkeletonPanel from "./components/SkeletonPanel";
+import HistoricalPanel from "./components/historical/HistoricalPanel";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
@@ -392,6 +399,7 @@ export default function CheckCalculator() {
   // Read from Zustand store — this is what TabBar reads/writes
   const activeTab = useFarmStore((s) => s.activeTab);
   const setActiveTab = useFarmStore((s) => s.setActiveTab);
+  const invalidateHistorical = useFarmStore((s) => s.invalidateHistorical);
 
   // ── Farm Store Sync (Build 18 Deploy 1) ─────────────────────────────────
   // Bridges local useState to the Zustand store for cross-tool data sharing.
@@ -518,6 +526,7 @@ export default function CheckCalculator() {
 
     // Reset to Comparison tab on new calculation
     setActiveTab("comparison");
+    invalidateHistorical(); // Deploy 3: clear cached historical data for new county/crop
 
     goTo(3);
 
@@ -1277,7 +1286,12 @@ export default function CheckCalculator() {
                 {/* ── SKELETON TABS: Historical, Elections, Optimization, Base Acres ── */}
                 {activeTab === "historical" && (
                   <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
-                    <SkeletonPanel variant="historical" />
+                    <HistoricalPanel
+                      countyFips={countyFips}
+                      commodityCode={cropCode}
+                      countyName={countyName}
+                      isActive={activeTab === "historical"}
+                    />
                   </div>
                 )}
                 {activeTab === "elections" && (
