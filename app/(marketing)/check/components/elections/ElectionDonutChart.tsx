@@ -1,13 +1,13 @@
 // =============================================================================
-// HarvestFile — Build 18 Deploy 4: Election Donut Chart
+// HarvestFile — Build 18 Deploy 4 Fix: Election Donut Chart
 // app/(marketing)/check/components/elections/ElectionDonutChart.tsx
 //
-// Recharts donut chart showing ARC-CO vs PLC election split for the
-// most recent year. Teal (#2DD4BF) for ARC-CO, gold (#C9A84C) for PLC.
+// Fixed: Center label uses HTML overlay instead of Recharts <Label> to
+// prevent text truncation. The SVG Label position="center" was computing
+// incorrect coordinates, causing "ARC-CO" to clip outside the viewBox.
 //
-// Design: Center label shows dominant percentage + program name.
+// Teal (#2DD4BF) for ARC-CO, gold (#C9A84C) for PLC.
 // startAngle=90 endAngle=-270 sweeps clockwise from 12 o'clock.
-// paddingAngle=3 creates visible gap between segments on dark bg.
 // =============================================================================
 
 'use client';
@@ -19,38 +19,12 @@ import {
   Cell,
   Tooltip,
   ResponsiveContainer,
-  Label,
 } from 'recharts';
 
 const COLORS = {
   arcCo: '#2DD4BF',
   plc: '#C9A84C',
 };
-
-// ─── Center Label ────────────────────────────────────────────────────────────
-
-interface CenterLabelProps {
-  viewBox?: { cx?: number; cy?: number };
-  pct: string;
-  label: string;
-  color: string;
-}
-
-function CenterLabel({ viewBox, pct, label, color }: CenterLabelProps) {
-  const { cx = 0, cy = 0 } = viewBox ?? {};
-  return (
-    <g>
-      <text x={cx} y={cy - 8} textAnchor="middle" dominantBaseline="middle"
-        fill={color} fontSize="32" fontWeight="800" fontFamily="var(--font-bricolage, sans-serif)">
-        {pct}
-      </text>
-      <text x={cx} y={cy + 20} textAnchor="middle" dominantBaseline="middle"
-        fill="rgba(255,255,255,0.4)" fontSize="13" fontWeight="600">
-        {label}
-      </text>
-    </g>
-  );
-}
 
 // ─── Custom Tooltip ──────────────────────────────────────────────────────────
 
@@ -107,40 +81,46 @@ export default function ElectionDonutChart({ arccoPct, plcPct, arccoAcres, plcAc
   const dominant = arccoPct >= plcPct ? data[0] : data[1];
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          innerRadius="55%"
-          outerRadius="82%"
-          startAngle={90}
-          endAngle={-270}
-          paddingAngle={3}
-          strokeWidth={0}
-          animationBegin={0}
-          animationDuration={reduceMotion ? 0 : 1200}
-          animationEasing="ease-out"
+    <div className="relative w-full h-full">
+      {/* Recharts donut */}
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius="55%"
+            outerRadius="82%"
+            startAngle={90}
+            endAngle={-270}
+            paddingAngle={3}
+            strokeWidth={0}
+            animationBegin={0}
+            animationDuration={reduceMotion ? 0 : 1200}
+            animationEasing="ease-out"
+          >
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip content={<DonutTooltip />} wrapperStyle={{ outline: 'none' }} />
+        </PieChart>
+      </ResponsiveContainer>
+
+      {/* HTML center label overlay — bulletproof positioning */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span
+          className="text-[26px] sm:text-[32px] font-extrabold tabular-nums tracking-[-0.02em]"
+          style={{ color: dominant.color, fontFamily: 'var(--font-bricolage, sans-serif)' }}
         >
-          {data.map((entry, i) => (
-            <Cell key={i} fill={entry.color} />
-          ))}
-          <Label
-            content={
-              <CenterLabel
-                pct={`${dominant.value.toFixed(1)}%`}
-                label={dominant.name}
-                color={dominant.color}
-              />
-            }
-            position="center"
-          />
-        </Pie>
-        <Tooltip content={<DonutTooltip />} wrapperStyle={{ outline: 'none' }} />
-      </PieChart>
-    </ResponsiveContainer>
+          {dominant.value.toFixed(1)}%
+        </span>
+        <span className="text-[12px] sm:text-[13px] text-white/40 font-semibold mt-0.5">
+          {dominant.name}
+        </span>
+      </div>
+    </div>
   );
 }
