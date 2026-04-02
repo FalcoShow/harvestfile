@@ -1,19 +1,24 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// THE GREAT CONSOLIDATION — Build 1
+// Build 18 Deploy 6: Tool Consolidation
 //
-// FROM: "The farmer's Bloomberg Terminal. 17 free tools..."
-// TO:   "The free farm financial co-pilot for every farm decision."
+// Changes from previous version:
+//   - SDRP Checker REMOVED (dairy RPP serves different audience)
+//   - Election Map link → /check?tab=elections (absorbed into Decision Hub)
+//   - Election Optimizer → /check?tab=optimization (absorbed)
+//   - Payment Scanner → /check?tab=historical (absorbed)
+//   - Base Acre Analyzer → /check?tab=base-acres (absorbed)
+//   - Internal links use direct /check?tab=... paths (no redirect hop)
+//   - External/bookmarked links still get 301'd via next.config.js
 //
-// Footer reorganized to reflect the platform architecture:
-//   - Platform (the 4 core surfaces)
-//   - Tools (remaining tools — still important for SEO crawling)
+// Footer reorganized to reflect the 4-surface architecture:
+//   - Platform (the 4 core surfaces + key features)
+//   - Tools (remaining tools — important for SEO crawling)
 //   - Learn (educational content)
 //   - Top Counties (SEO internal links)
 //   - Company
 //
-// All existing tool links preserved for SEO. Every URL stays alive.
-// The 50-state grid stays — it's a massive SEO asset.
+// The 50-state grid stays — massive SEO asset.
 // =============================================================================
 
 import Link from "next/link";
@@ -22,10 +27,10 @@ import { Logo } from "./logo";
 const footerLinks = {
   Platform: [
     { label: "ARC/PLC Calculator", href: "/check" },
-    { label: "Commodity Markets", href: "/markets" },
     { label: "Morning Dashboard", href: "/morning" },
+    { label: "Commodity Markets", href: "/markets" },
     { label: "AI Farm Advisor", href: "/advisor" },
-    { label: "Election Map", href: "/elections" },
+    { label: "Election Map", href: "/check?tab=elections" },
     { label: "USDA Programs", href: "/navigator" },
   ],
   Tools: [
@@ -34,12 +39,11 @@ const footerLinks = {
     { label: "Farm Score", href: "/farm-score" },
     { label: "Breakeven Calculator", href: "/breakeven" },
     { label: "Crop Insurance", href: "/insurance" },
-    { label: "Election Optimizer", href: "/optimize" },
+    { label: "Election Optimizer", href: "/check?tab=optimization" },
     { label: "Ag Weather", href: "/weather" },
     { label: "Spray Window", href: "/spray-window" },
-    { label: "Payment Scanner", href: "/payments" },
-    { label: "Base Acre Analyzer", href: "/fba" },
-    { label: "SDRP Checker", href: "/sdrp" },
+    { label: "Payment Scanner", href: "/check?tab=historical" },
+    { label: "Base Acre Analyzer", href: "/check?tab=base-acres" },
     { label: "Policy Calendar", href: "/calendar" },
   ],
   Learn: [
@@ -124,7 +128,7 @@ const STATES = [
 
 export function MarketingFooter() {
   return (
-    <footer className="relative overflow-hidden bg-harvest-forest-950 text-white">
+    <footer className="relative overflow-hidden bg-harvest-forest-950 text-white print:hidden">
       <div className="hf-noise-subtle" />
 
       <div className="relative z-10 mx-auto max-w-[1200px] px-6 pt-16 pb-8">

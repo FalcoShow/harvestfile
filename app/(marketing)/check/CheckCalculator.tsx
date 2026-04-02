@@ -45,6 +45,7 @@ import HistoricalPanel from "./components/historical/HistoricalPanel";
 import ElectionsPanel from "./components/elections/ElectionsPanel";
 import MultiCropPanel from "./components/multi-crop/MultiCropPanel";
 import BaseAcresPanel from "./components/base-acres/BaseAcresPanel";
+import EmailCapture from "./components/EmailCapture";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
@@ -1200,56 +1201,25 @@ export default function CheckCalculator() {
                 </StaggerItem>
 
                 {/* ══════════════════════════════════════════════════════════
-                     CONVERSION ZONE — 2 CTAs only (consolidated from 7)
+                     CONVERSION ZONE — Build 18 Deploy 6: Email Capture
+                     Replaces Link-to-/signup with inline email form.
+                     EmailCapture handles its own state + API call.
                      ══════════════════════════════════════════════════════ */}
-
-                {/* ── PRIMARY CTA: Save My Results ──────────────────────── */}
                 <StaggerItem index={6}>
-                  <Link
-                    href="/signup"
-                    className="flex items-center justify-center gap-2.5 w-full p-4 sm:p-[18px] rounded-[14px] text-[15px] sm:text-base font-bold border-none cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(201,168,76,0.3)] active:scale-[0.98] active:duration-75 no-underline"
-                    style={{
-                      background: "linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)",
-                      color: "#0C1F17",
-                      boxShadow: "0 6px 28px rgba(201,168,76,0.2), 0 0 0 0.5px rgba(201,168,76,0.3)",
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                      <polyline points="17 21 17 13 7 13 7 21" />
-                      <polyline points="7 3 7 8 15 8" />
-                    </svg>
-                    Save My Results
-                  </Link>
-                  {/* Doubt-removal micro-copy */}
-                  <div className="flex items-center justify-center gap-1.5 mt-2.5 mb-5">
-                    <span className="text-[11px] text-white/20">Free</span>
-                    <span className="text-white/10">·</span>
-                    <span className="text-[11px] text-white/20">No credit card required</span>
-                    <span className="text-white/10">·</span>
-                    <span className="text-[11px] text-white/20">Your data stays private</span>
-                  </div>
+                  <EmailCapture
+                    countyFips={countyFips}
+                    countyName={countyName}
+                    stateAbbr={stateAbbr}
+                    cropCode={cropCode}
+                    acres={acres}
+                    activeTab={activeTab}
+                    recommendation={results?.best}
+                    arcPerAcre={results?.arcPerAcre}
+                    plcPerAcre={results?.plcPerAcre}
+                    countySlug={countySlug}
+                    stateSlug={stateSlug}
+                  />
                 </StaggerItem>
-
-                {/* ── SECONDARY CTA: View County Analysis ──────────────── */}
-                {countySlug && stateSlug && (
-                  <StaggerItem index={7}>
-                    <Link
-                      href={`/${stateSlug}/${countySlug}/arc-plc`}
-                      className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[13px] sm:text-[14px] font-semibold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] hover:border-white/[0.12] active:scale-[0.98] active:duration-75 mb-5 no-underline"
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        color: "rgba(255,255,255,0.5)",
-                      }}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                        <circle cx="12" cy="10" r="3" />
-                      </svg>
-                      View Full {countyName} Analysis →
-                    </Link>
-                  </StaggerItem>
-                )}
 
                 {/* ── Utility Actions (share + recalculate) ─────────────── */}
                 <div className="flex items-center justify-center gap-4 mt-2" style={{ opacity: 0, animation: "qc-enter 0.4s cubic-bezier(0.16,1,0.3,1) 0.7s forwards" }}>

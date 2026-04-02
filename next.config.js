@@ -67,6 +67,41 @@ const nextConfig = {
         permanent: true,
       },
 
+      // ═══════════════════════════════════════════════════════════════════
+      // Build 18 Deploy 6: Tool Consolidation Redirects
+      // Surface 1 (Decision Hub) absorbed these standalone tools into
+      // /check tabs. 308 permanent (Next.js default for permanent: true)
+      // is treated identically to 301 by Google for SEO purposes.
+      // Keep these redirects active for minimum 1 year per Google guidance.
+      // ═══════════════════════════════════════════════════════════════════
+      {
+        source: '/elections',
+        destination: '/check?tab=elections',
+        permanent: true,
+      },
+      {
+        source: '/optimize',
+        destination: '/check?tab=optimization',
+        permanent: true,
+      },
+      {
+        source: '/payments',
+        destination: '/check?tab=historical',
+        permanent: true,
+      },
+      {
+        source: '/fba',
+        destination: '/check?tab=base-acres',
+        permanent: true,
+      },
+      // SDRP Checker sunset — dairy revenue protection serves a different
+      // audience and dilutes focus. Redirect to the main calculator.
+      {
+        source: '/sdrp',
+        destination: '/check',
+        permanent: true,
+      },
+
       // ── Trailing slash removal ────────────────────────────────────────
       {
         source: '/:path+/',
