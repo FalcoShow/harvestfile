@@ -43,6 +43,8 @@ import TabBar from "./components/TabBar";
 import SkeletonPanel from "./components/SkeletonPanel";
 import HistoricalPanel from "./components/historical/HistoricalPanel";
 import ElectionsPanel from "./components/elections/ElectionsPanel";
+import MultiCropPanel from "./components/multi-crop/MultiCropPanel";
+import BaseAcresPanel from "./components/base-acres/BaseAcresPanel";
 
 // Lazy-load Recharts to keep initial bundle small
 const LazyChart = dynamic(() => import("./ResultChart"), { ssr: false, loading: () => null });
@@ -409,6 +411,8 @@ export default function CheckCalculator() {
   const setActiveTab = useFarmStore((s) => s.setActiveTab);
   const invalidateHistorical = useFarmStore((s) => s.invalidateHistorical);
   const invalidateElections = useFarmStore((s) => s.invalidateElections);
+  const invalidateOptimization = useFarmStore((s) => s.invalidateOptimization);
+  const invalidateBaseAcres = useFarmStore((s) => s.invalidateBaseAcres);
 
   // ── Farm Store Sync (Build 18 Deploy 1) ─────────────────────────────────
   // Bridges local useState to the Zustand store for cross-tool data sharing.
@@ -1281,7 +1285,7 @@ export default function CheckCalculator() {
 
                   {/* Recalculate — simple text link */}
                   <button
-                    onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); setActiveTab("comparison"); window.history.replaceState(null, "", "/check"); }}
+                    onClick={() => { setStep(1); setResults(null); setCropCode(""); setAcres(""); setShowEmailCapture(false); setEmailSaved(false); setIsCountySpecific(false); setDataYears(0); setActiveTab("comparison"); invalidateOptimization(); invalidateBaseAcres(); window.history.replaceState(null, "", "/check"); }}
                     className="flex items-center gap-1.5 text-[12px] font-medium cursor-pointer bg-transparent border-none transition-colors duration-200 text-white/25 hover:text-white/40"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
@@ -1316,12 +1320,22 @@ export default function CheckCalculator() {
                 )}
                 {activeTab === "optimization" && (
                   <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
-                    <SkeletonPanel variant="optimization" />
+                    <MultiCropPanel
+                      countyFips={countyFips}
+                      countyName={countyName}
+                      stateAbbr={stateAbbr}
+                      isActive={activeTab === "optimization"}
+                    />
                   </div>
                 )}
                 {activeTab === "base-acres" && (
                   <div style={{ animation: "qc-enter 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
-                    <SkeletonPanel variant="base-acres" />
+                    <BaseAcresPanel
+                      countyFips={countyFips}
+                      countyName={countyName}
+                      stateAbbr={stateAbbr}
+                      isActive={activeTab === "base-acres"}
+                    />
                   </div>
                 )}
 

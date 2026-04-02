@@ -1,5 +1,5 @@
 // =============================================================================
-// HarvestFile — Build 18 Deploy 3: Shared Farm Data Store
+// HarvestFile — Build 18 Deploy 5: Shared Farm Data Store
 // lib/stores/farm-store.ts
 //
 // THE FOUNDATION. This Zustand store holds all farm input state and computed
@@ -7,16 +7,24 @@
 // Payment Scanner, Base Acre Analyzer). Every tool reads from this store.
 // Every calculation writes to it. The URL syncs with it.
 //
-// Deploy 3 additions:
-//   - HistoricalPaymentYear type updated with dataStatus + context fields
-//   - HistoricalSummary type for aggregate stats
-//   - historicalCacheKey for fetch-on-tab-activation deduplication
-//   - historicalError for error state rendering
+// Deploy 5 additions:
+//   - multiCropEntries: dynamic crop input rows for Multi-Crop tab
+//   - optimizationCacheKey + optimizationError for fetch dedup + error state
+//   - baseAcreEntries: base acre input rows for Base Acres tab
+//   - baseAcresError for error state rendering
+//   - OBBBA reference price constants
+//   - Helper selectors for total payments + payment limit warnings
 //
 // Deploy 4 additions:
 //   - ElectionData type for county election enrollment data
 //   - electionData, electionsCacheKey, electionsError fields
 //   - invalidateElections action
+//
+// Deploy 3 additions:
+//   - HistoricalPaymentYear type updated with dataStatus + context fields
+//   - HistoricalSummary type for aggregate stats
+//   - historicalCacheKey for fetch-on-tab-activation deduplication
+//   - historicalError for error state rendering
 //
 // Architecture:
 //   - inputs: farm location, crop, acres (set by wizard Steps 1-2)
@@ -166,16 +174,43 @@ export interface MultiCropResult {
   recommended: 'ARC-CO' | 'PLC';
   arcPerAcre: number;
   plcPerAcre: number;
-  confidence: number; // 0-100
+  arcTotal: number;
+  plcTotal: number;
+  advantage: number;         // absolute dollar advantage of recommended
+  advantagePerAcre: number;
+  confidence: number;        // 0-100
+  hasCountyData: boolean;
+  dataYears: number;
+}
+
+// Deploy 5: Multi-crop input entry
+export interface MultiCropEntry {
+  id: string;                // unique ID for React key + removal
+  cropCode: string;
+  cropName: string;
+  acres: string;             // string for input formatting
 }
 
 export interface BaseAcreData {
   cropCode: string;
   cropName: string;
   baseAcres: number;
-  currentYield: number;
-  historicalYield: number;
-  paymentRate: number;
+  paymentAcres: number;      // baseAcres × 0.85
+  plcYield: number;
+  estimatedArcPayment: number;
+  estimatedPlcPayment: number;
+  recommended: 'ARC-CO' | 'PLC';
+  advantage: number;
+}
+
+// Deploy 5: Base acre input entry
+export interface BaseAcreEntry {
+  id: string;
+  cropCode: string;
+  cropName: string;
+  baseAcres: string;         // string for input formatting
+  plcYield: string;          // string for input formatting
+  plantedAcres: string;      // 2019-2023 avg for OBBBA calc
 }
 
 export type ResultTab =
@@ -184,6 +219,34 @@ export type ResultTab =
   | 'elections'
   | 'optimization'
   | 'base-acres';
+
+// ─── OBBBA Reference Prices (Pub. L. 119-21, effective 2025-2030) ───────────
+
+export const OBBBA_REFERENCE_PRICES: Record<string, { price: number; unit: string }> = {
+  CORN:     { price: 4.10,  unit: '$/bu' },
+  SOYBEANS: { price: 10.00, unit: '$/bu' },
+  WHEAT:    { price: 6.35,  unit: '$/bu' },
+  SORGHUM:  { price: 4.40,  unit: '$/bu' },
+  BARLEY:   { price: 5.45,  unit: '$/bu' },
+  OATS:     { price: 2.65,  unit: '$/bu' },
+  RICE:     { price: 16.90, unit: '$/cwt' },
+  PEANUTS:  { price: 630,   unit: '$/ton' },
+  COTTON:   { price: 0.42,  unit: '$/lb' },
+};
+
+// ─── Crop Display Names ─────────────────────────────────────────────────────
+
+export const CROP_NAMES: Record<string, string> = {
+  CORN: 'Corn',
+  SOYBEANS: 'Soybeans',
+  WHEAT: 'Wheat',
+  SORGHUM: 'Sorghum',
+  BARLEY: 'Barley',
+  OATS: 'Oats',
+  RICE: 'Rice',
+  PEANUTS: 'Peanuts',
+  COTTON: 'Cotton',
+};
 
 // ─── Store Shape ─────────────────────────────────────────────────────────────
 
@@ -221,11 +284,18 @@ interface FarmStoreState {
   electionsError: string | null;
   electionsCacheKey: string | null;
 
+  // Deploy 5: Multi-crop optimization
+  multiCropEntries: MultiCropEntry[];
   optimization: MultiCropResult[] | null;
   loadingOptimization: boolean;
+  optimizationError: string | null;
+  optimizationCacheKey: string | null;
 
+  // Deploy 5: Base acre analysis
+  baseAcreEntries: BaseAcreEntry[];
   baseAcres: BaseAcreData[] | null;
   loadingBaseAcres: boolean;
+  baseAcresError: string | null;
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -262,11 +332,26 @@ interface FarmStoreState {
   setElectionsCacheKey: (key: string | null) => void;
   invalidateElections: () => void;
 
+  // Deploy 5: Multi-crop actions
+  setMultiCropEntries: (entries: MultiCropEntry[]) => void;
+  addMultiCropEntry: (entry: MultiCropEntry) => void;
+  removeMultiCropEntry: (id: string) => void;
+  updateMultiCropEntry: (id: string, partial: Partial<MultiCropEntry>) => void;
   setOptimization: (data: MultiCropResult[] | null) => void;
   setLoadingOptimization: (v: boolean) => void;
+  setOptimizationError: (error: string | null) => void;
+  setOptimizationCacheKey: (key: string | null) => void;
+  invalidateOptimization: () => void;
 
+  // Deploy 5: Base acre actions
+  setBaseAcreEntries: (entries: BaseAcreEntry[]) => void;
+  addBaseAcreEntry: (entry: BaseAcreEntry) => void;
+  removeBaseAcreEntry: (id: string) => void;
+  updateBaseAcreEntry: (id: string, partial: Partial<BaseAcreEntry>) => void;
   setBaseAcres: (data: BaseAcreData[] | null) => void;
   setLoadingBaseAcres: (v: boolean) => void;
+  setBaseAcresError: (error: string | null) => void;
+  invalidateBaseAcres: () => void;
 
   // Compound actions
   resetResults: () => void;
@@ -305,10 +390,15 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
   loadingElections: false,
   electionsError: null,
   electionsCacheKey: null,
+  multiCropEntries: [],
   optimization: null,
   loadingOptimization: false,
+  optimizationError: null,
+  optimizationCacheKey: null,
+  baseAcreEntries: [],
   baseAcres: null,
   loadingBaseAcres: false,
+  baseAcresError: null,
 
   // ── Input Actions ────────────────────────────────────────────────────────
 
@@ -358,11 +448,50 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
   invalidateElections: () =>
     set({ electionData: null, electionsCacheKey: null, electionsError: null }),
 
+  // Deploy 5: Multi-crop actions
+  setMultiCropEntries: (multiCropEntries) => set({ multiCropEntries }),
+  addMultiCropEntry: (entry) =>
+    set((state) => ({
+      multiCropEntries: [...state.multiCropEntries, entry],
+    })),
+  removeMultiCropEntry: (id) =>
+    set((state) => ({
+      multiCropEntries: state.multiCropEntries.filter((e) => e.id !== id),
+    })),
+  updateMultiCropEntry: (id, partial) =>
+    set((state) => ({
+      multiCropEntries: state.multiCropEntries.map((e) =>
+        e.id === id ? { ...e, ...partial } : e
+      ),
+    })),
   setOptimization: (optimization) => set({ optimization }),
   setLoadingOptimization: (loadingOptimization) => set({ loadingOptimization }),
+  setOptimizationError: (optimizationError) => set({ optimizationError }),
+  setOptimizationCacheKey: (optimizationCacheKey) => set({ optimizationCacheKey }),
+  invalidateOptimization: () =>
+    set({ optimization: null, optimizationCacheKey: null, optimizationError: null }),
 
+  // Deploy 5: Base acre actions
+  setBaseAcreEntries: (baseAcreEntries) => set({ baseAcreEntries }),
+  addBaseAcreEntry: (entry) =>
+    set((state) => ({
+      baseAcreEntries: [...state.baseAcreEntries, entry],
+    })),
+  removeBaseAcreEntry: (id) =>
+    set((state) => ({
+      baseAcreEntries: state.baseAcreEntries.filter((e) => e.id !== id),
+    })),
+  updateBaseAcreEntry: (id, partial) =>
+    set((state) => ({
+      baseAcreEntries: state.baseAcreEntries.map((e) =>
+        e.id === id ? { ...e, ...partial } : e
+      ),
+    })),
   setBaseAcres: (baseAcres) => set({ baseAcres }),
   setLoadingBaseAcres: (loadingBaseAcres) => set({ loadingBaseAcres }),
+  setBaseAcresError: (baseAcresError) => set({ baseAcresError }),
+  invalidateBaseAcres: () =>
+    set({ baseAcres: null, baseAcresError: null }),
 
   // ── Compound Actions ─────────────────────────────────────────────────────
 
@@ -378,7 +507,10 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
       electionsCacheKey: null,
       electionsError: null,
       optimization: null,
+      optimizationCacheKey: null,
+      optimizationError: null,
       baseAcres: null,
+      baseAcresError: null,
       activeTab: 'comparison',
     }),
 
@@ -401,10 +533,15 @@ export const useFarmStore = create<FarmStoreState>((set) => ({
       loadingElections: false,
       electionsError: null,
       electionsCacheKey: null,
+      multiCropEntries: [],
       optimization: null,
       loadingOptimization: false,
+      optimizationError: null,
+      optimizationCacheKey: null,
+      baseAcreEntries: [],
       baseAcres: null,
       loadingBaseAcres: false,
+      baseAcresError: null,
     }),
 }));
 
@@ -425,11 +562,53 @@ export const selectHistoricalError = (state: FarmStoreState) => state.historical
 export const selectLoadingHistorical = (state: FarmStoreState) => state.loadingHistorical;
 export const selectElectionData = (state: FarmStoreState) => state.electionData;
 export const selectElectionsError = (state: FarmStoreState) => state.electionsError;
+export const selectMultiCropEntries = (state: FarmStoreState) => state.multiCropEntries;
 export const selectOptimization = (state: FarmStoreState) => state.optimization;
+export const selectLoadingOptimization = (state: FarmStoreState) => state.loadingOptimization;
+export const selectOptimizationError = (state: FarmStoreState) => state.optimizationError;
+export const selectBaseAcreEntries = (state: FarmStoreState) => state.baseAcreEntries;
 export const selectBaseAcres = (state: FarmStoreState) => state.baseAcres;
+export const selectLoadingBaseAcres = (state: FarmStoreState) => state.loadingBaseAcres;
+export const selectBaseAcresError = (state: FarmStoreState) => state.baseAcresError;
 
 // ─── Helper: Get parsed acres as number ──────────────────────────────────────
 
 export function getParsedAcres(state: FarmStoreState): number {
   return parseInt(state.inputs.acres.replace(/,/g, '')) || 0;
+}
+
+// ─── Helper: Compute total multi-crop payments ──────────────────────────────
+
+export function getMultiCropTotals(results: MultiCropResult[]) {
+  let totalArc = 0;
+  let totalPlc = 0;
+  let totalOptimal = 0;
+
+  for (const r of results) {
+    totalArc += r.arcTotal;
+    totalPlc += r.plcTotal;
+    totalOptimal += r.recommended === 'ARC-CO' ? r.arcTotal : r.plcTotal;
+  }
+
+  const PAYMENT_LIMIT = 155000; // OBBBA payment limit per person/entity
+  const approachingLimit = totalOptimal > PAYMENT_LIMIT * 0.75;
+  const exceedsLimit = totalOptimal > PAYMENT_LIMIT;
+
+  return {
+    totalArc,
+    totalPlc,
+    totalOptimal,
+    savings: totalOptimal - Math.min(totalArc, totalPlc),
+    approachingLimit,
+    exceedsLimit,
+    paymentLimit: PAYMENT_LIMIT,
+  };
+}
+
+// ─── Helper: Generate unique entry ID ────────────────────────────────────────
+
+let _entryCounter = 0;
+export function generateEntryId(): string {
+  _entryCounter += 1;
+  return `entry-${Date.now()}-${_entryCounter}`;
 }
