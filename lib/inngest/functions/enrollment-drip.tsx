@@ -1,10 +1,10 @@
 // =============================================================================
 // HarvestFile — Inngest Enrollment Drip Campaign
-// lib/inngest/functions/enrollment-drip.ts
+// lib/inngest/functions/enrollment-drip.tsx
 //
-// Build 18 Deploy 6B: 4-email nurture sequence triggered by email capture
-// on /check. Uses step.sleep() for Day 0/3/7/14 timing. Each step.run()
-// is independently retried and memoized. No compute cost during sleep.
+// Build 18 Deploy 6B (FIXED): Uses render() to convert React Email components
+// to HTML strings, then passes `html` to Resend instead of `react`.
+// This avoids the "t is not a function" serverless bundling error.
 //
 // Sequence:
 //   Email 1 (Day 0):  Welcome + analysis saved confirmation
@@ -12,18 +12,13 @@
 //   Email 3 (Day 7):  Enrollment preparation checklist
 //   Email 4 (Day 14): Morning Dashboard invitation (skipped if converted)
 //
-// CAN-SPAM compliance:
-//   - Physical address in footer (PO Box, Tallmadge OH)
-//   - One-click unsubscribe via RFC 8058 headers
-//   - Honor opt-out within 48 hours
-//   - Accurate sender identification
-//
 // Triggered by: 'leads/analysis.saved' event from /api/leads/capture
 // =============================================================================
 
 import { inngest } from '../client';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { render } from '@react-email/render';
 import WelcomeEmail from '@/components/emails/drip/WelcomeEmail';
 import ARCPLCGuideEmail from '@/components/emails/drip/ARCPLCGuideEmail';
 import ChecklistEmail from '@/components/emails/drip/ChecklistEmail';
@@ -61,7 +56,7 @@ export const enrollmentDripCampaign = inngest.createFunction(
   {
     id: 'enrollment-drip-campaign',
     retries: 3,
-  concurrency: [{ limit: 5 }],
+    concurrency: [{ limit: 5 }],
   },
   { event: 'leads/analysis.saved' },
   async ({ event, step }) => {
@@ -82,12 +77,9 @@ export const enrollmentDripCampaign = inngest.createFunction(
 
     // ── Email 1: Welcome (Day 0, immediate) ──────────────────────────────
     await step.run('email-1-welcome', async () => {
-      const { error } = await resend.emails.send({
-        from: 'HarvestFile <hello@harvestfile.com>',
-        to: [email],
-        subject: 'Your ARC/PLC Analysis Is Saved',
-        headers: getUnsubscribeHeaders(unsubscribeToken),
-        react: WelcomeEmail({
+      // Render React Email component to HTML string (avoids serverless bundling issues)
+      const html = await render(
+        WelcomeEmail({
           countyName: countyName || 'your county',
           stateAbbr: stateAbbr || '',
           cropName,
@@ -96,7 +88,15 @@ export const enrollmentDripCampaign = inngest.createFunction(
           arcPerAcre: arcPerAcre || 0,
           plcPerAcre: plcPerAcre || 0,
           unsubscribeToken,
-        }),
+        })
+      );
+
+      const { error } = await resend.emails.send({
+        from: 'HarvestFile <hello@harvestfile.com>',
+        to: [email],
+        subject: 'Your ARC/PLC Analysis Is Saved',
+        headers: getUnsubscribeHeaders(unsubscribeToken),
+        html,
       });
       if (error) throw new Error(`Welcome email failed: ${JSON.stringify(error)}`);
 
@@ -123,17 +123,21 @@ export const enrollmentDripCampaign = inngest.createFunction(
 
     // ── Email 2: ARC vs PLC Guide (Day 3) ────────────────────────────────
     await step.run('email-2-guide', async () => {
+      const html = await render(
+        ARCPLCGuideEmail({
+          countyName: countyName || 'your county',
+          stateAbbr: stateAbbr || '',
+          cropName,
+          unsubscribeToken,
+        })
+      );
+
       const { error } = await resend.emails.send({
         from: 'HarvestFile <hello@harvestfile.com>',
         to: [email],
         subject: `ARC vs PLC: A Plain-Language Guide for ${countyName || 'Your County'} Farmers`,
         headers: getUnsubscribeHeaders(unsubscribeToken),
-        react: ARCPLCGuideEmail({
-          countyName: countyName || 'your county',
-          stateAbbr: stateAbbr || '',
-          cropName,
-          unsubscribeToken,
-        }),
+        html,
       });
       if (error) throw new Error(`Guide email failed: ${JSON.stringify(error)}`);
 
@@ -162,16 +166,20 @@ export const enrollmentDripCampaign = inngest.createFunction(
 
     // ── Email 3: Enrollment Checklist (Day 7) ────────────────────────────
     await step.run('email-3-checklist', async () => {
+      const html = await render(
+        ChecklistEmail({
+          countyName: countyName || 'your county',
+          stateAbbr: stateAbbr || '',
+          unsubscribeToken,
+        })
+      );
+
       const { error } = await resend.emails.send({
         from: 'HarvestFile <hello@harvestfile.com>',
         to: [email],
         subject: 'Your 2026 Enrollment Checklist — 7 Steps Before You Visit FSA',
         headers: getUnsubscribeHeaders(unsubscribeToken),
-        react: ChecklistEmail({
-          countyName: countyName || 'your county',
-          stateAbbr: stateAbbr || '',
-          unsubscribeToken,
-        }),
+        html,
       });
       if (error) throw new Error(`Checklist email failed: ${JSON.stringify(error)}`);
 
@@ -201,17 +209,21 @@ export const enrollmentDripCampaign = inngest.createFunction(
 
     // ── Email 4: Morning Dashboard Invitation (Day 14) ───────────────────
     await step.run('email-4-upgrade', async () => {
+      const html = await render(
+        UpgradeOfferEmail({
+          countyName: countyName || 'your county',
+          stateAbbr: stateAbbr || '',
+          cropName,
+          unsubscribeToken,
+        })
+      );
+
       const { error } = await resend.emails.send({
         from: 'HarvestFile <hello@harvestfile.com>',
         to: [email],
         subject: `See ${countyName || 'Your County'}'s Latest Numbers Every Morning`,
         headers: getUnsubscribeHeaders(unsubscribeToken),
-        react: UpgradeOfferEmail({
-          countyName: countyName || 'your county',
-          stateAbbr: stateAbbr || '',
-          cropName,
-          unsubscribeToken,
-        }),
+        html,
       });
       if (error) throw new Error(`Upgrade email failed: ${JSON.stringify(error)}`);
 
