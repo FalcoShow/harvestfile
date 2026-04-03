@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // ── External packages for server components ───────────────────────────
+  // Prevents Vercel from misbundling React Email in serverless functions.
+  // Required for Inngest drip campaign email rendering.
+  experimental: {
+    serverComponentsExternalPackages: ['@react-email/components', '@react-email/render'],
+  },
+
   // ── Image optimization ────────────────────────────────────────────────
   images: {
     formats: ['image/avif', 'image/webp'],
