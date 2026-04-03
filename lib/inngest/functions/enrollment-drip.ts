@@ -61,7 +61,7 @@ export const enrollmentDripCampaign = inngest.createFunction(
   {
     id: 'enrollment-drip-campaign',
     retries: 3,
-    concurrency: [{ limit: 10 }],
+  concurrency: [{ limit: 5 }],
   },
   { event: 'leads/analysis.saved' },
   async ({ event, step }) => {
