@@ -5,9 +5,22 @@ const nextConfig = {
   // ── External packages for server components / Inngest functions ────────
   // @react-email/components needs to be externalized so Vercel's bundler
   // doesn't misbundle it in serverless functions (fixes "t is not a function")
+  // @react-pdf/renderer needs externalization to prevent "PDFDocument is not
+  // a constructor" errors in API routes (Deploy 6B-final)
   experimental: {
-    serverComponentsExternalPackages: ['@react-email/components', '@react-email/tailwind', '@react-email/render'],
+    serverComponentsExternalPackages: [
+      '@react-email/components',
+      '@react-email/tailwind',
+      '@react-email/render',
+      '@react-pdf/renderer',
+      '@react-pdf/layout',
+      '@react-pdf/pdfkit',
+    ],
   },
+
+  // NOTE: outputFileTracingIncludes is a Next.js 15+ feature.
+  // On Next.js 14.2.21, font files in public/ are automatically included
+  // in Vercel deployments — no extra config needed.
 
   // ── Image optimization ────────────────────────────────────────────────
   images: {

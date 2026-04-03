@@ -2,6 +2,10 @@
 // HarvestFile — Drip Email 1: Welcome + Analysis Saved
 // components/emails/drip/WelcomeEmail.tsx
 //
+// Deploy 6B-final: FIXED — "View My Full Analysis" button now includes query
+// parameters for deep-linking back to the results page with pre-populated
+// calculator state (state, county, crop, acres, tab).
+//
 // Build 18 Deploy 6B: Sent immediately after email capture on /check.
 // Purpose: Confirm the save, show what they calculated, set expectations.
 //
@@ -27,6 +31,9 @@ interface WelcomeEmailProps {
   arcPerAcre: number;
   plcPerAcre: number;
   unsubscribeToken: string;
+  // Deploy 6B-final: Deep-link params
+  countyFips?: string;
+  cropCode?: string;
 }
 
 const BASE_URL = 'https://www.harvestfile.com';
@@ -40,10 +47,22 @@ export default function WelcomeEmail({
   arcPerAcre = 42.18,
   plcPerAcre = 28.50,
   unsubscribeToken = 'preview-token',
+  countyFips = '',
+  cropCode = 'CORN',
 }: WelcomeEmailProps) {
   const winnerAmount = recommendation === 'PLC' ? plcPerAcre : arcPerAcre;
   const loserAmount = recommendation === 'PLC' ? arcPerAcre : plcPerAcre;
   const winnerLabel = recommendation === 'Similar' ? 'Both programs' : recommendation;
+
+  // Deploy 6B-final: Build deep-link URL with query params
+  // This takes the farmer back to their exact results, not the blank calculator
+  const deepLinkParams = new URLSearchParams();
+  if (stateAbbr) deepLinkParams.set('state', stateAbbr);
+  if (countyFips) deepLinkParams.set('county', countyFips);
+  if (cropCode) deepLinkParams.set('crop', cropCode);
+  if (acres) deepLinkParams.set('acres', acres);
+  deepLinkParams.set('tab', 'comparison');
+  const analysisUrl = `${BASE_URL}/check?${deepLinkParams.toString()}`;
 
   return (
     <EmailLayout
@@ -88,7 +107,7 @@ export default function WelcomeEmail({
       </Text>
 
       <Section style={ctaContainerStyle}>
-        <Button href={`${BASE_URL}/check`} style={ctaButtonStyle}>
+        <Button href={analysisUrl} style={ctaButtonStyle}>
           View My Full Analysis
         </Button>
       </Section>

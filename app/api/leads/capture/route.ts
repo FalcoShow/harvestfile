@@ -1,11 +1,15 @@
 // =============================================================================
-// HarvestFile — Build 18 Deploy 6B: Lead Capture API
+// HarvestFile — Deploy 6B-final: Lead Capture API (Updated)
 // app/api/leads/capture/route.ts
 //
+// Deploy 6B-final changes:
+//   - JWT download token generation via `jose` library
+//   - Returns `downloadToken` in response for gated PDF download
+//   - Token expires in 24 hours (HS256 signed)
+//
 // Deploy 6B changes:
-//   - Inngest drip campaign trigger ACTIVATED (was TODO comment)
+//   - Inngest drip campaign trigger ACTIVATED
 //   - Sends 'leads/analysis.saved' event with full calculator context
-//   - Event triggers enrollment-drip-campaign Inngest function
 //
 // Captures email addresses from the ARC/PLC calculator results page.
 // Stores in the `leads` table with calculator context for personalized
@@ -14,7 +18,7 @@
 // Security:
 //   - Service role key (server-side only, never exposed to client)
 //   - Email validation + normalization
-//   - Rate limiting via simple timestamp check (upgrade to Redis later)
+//   - JWT token for PDF download gating
 //   - No authentication required (this is the pre-signup capture)
 //
 // Called from: app/(marketing)/check/components/EmailCapture.tsx
@@ -22,12 +26,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { SignJWT } from 'jose';
 import { inngest } from '@/lib/inngest/client';
 
 // Service role client — bypasses RLS for server-side lead management
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// JWT secret — must match the one in /api/generate-pdf/route.ts
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.LEAD_JWT_SECRET || 'harvestfile-dev-secret-change-in-production-2026'
 );
 
 // Simple email regex — catches most invalid formats without being overly strict
@@ -77,6 +87,12 @@ export async function POST(request: NextRequest) {
       if (context.recommendation) captureContext.recommendation = String(context.recommendation);
       if (context.arcPerAcre) captureContext.arcPerAcre = Number(context.arcPerAcre);
       if (context.plcPerAcre) captureContext.plcPerAcre = Number(context.plcPerAcre);
+      // Deploy 6B-final: Extended context for richer PDF reports
+      if (context.benchmarkYield) captureContext.benchmarkYield = Number(context.benchmarkYield);
+      if (context.benchmarkPrice) captureContext.benchmarkPrice = Number(context.benchmarkPrice);
+      if (context.effectiveRefPrice) captureContext.effectiveRefPrice = Number(context.effectiveRefPrice);
+      if (context.projectedMYA) captureContext.projectedMYA = Number(context.projectedMYA);
+      if (context.projectedYield) captureContext.projectedYield = Number(context.projectedYield);
     }
 
     // ── Extract UTM params from referrer/context ──────────────────────────
@@ -116,6 +132,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── Deploy 6B-final: Generate JWT download token (24-hour expiry) ────
+    let downloadToken = '';
+    try {
+      downloadToken = await new SignJWT({ leadId: data.id, email: normalizedEmail })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setIssuedAt()
+        .setExpirationTime('24h')
+        .sign(JWT_SECRET);
+    } catch (jwtError) {
+      console.error('[Leads] JWT generation error (non-blocking):', jwtError);
+      // Continue without download token — email capture is more important
+    }
+
     // ── Deploy 6B: Trigger Inngest enrollment drip campaign ──────────────
     try {
       await inngest.send({
@@ -125,6 +154,7 @@ export async function POST(request: NextRequest) {
           email: normalizedEmail,
           countyName: context?.countyName || null,
           stateAbbr: context?.stateAbbr || null,
+          countyFips: context?.countyFips || null,  // Deploy 6B-final: for email deep-linking
           cropCode: context?.cropCode || null,
           acres: context?.acres || null,
           recommendation: context?.recommendation || null,
@@ -142,6 +172,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Analysis saved! Check your email.',
       leadId: data.id,
+      downloadToken: downloadToken || undefined,
     });
   } catch (err) {
     console.error('[Leads] Unexpected error:', err);

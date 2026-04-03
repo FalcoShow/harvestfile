@@ -2,6 +2,10 @@
 // HarvestFile — Inngest Enrollment Drip Campaign
 // lib/inngest/functions/enrollment-drip.tsx
 //
+// Deploy 6B-final: WelcomeEmail now receives countyFips and cropCode for
+// deep-linking — the "View My Full Analysis" button takes farmers back to
+// their exact results instead of the blank /check page.
+//
 // Build 18 Deploy 6B (FIXED): Uses render() to convert React Email components
 // to HTML strings, then passes `html` to Resend instead of `react`.
 // This avoids the "t is not a function" serverless bundling error.
@@ -70,6 +74,7 @@ export const enrollmentDripCampaign = inngest.createFunction(
       recommendation,
       arcPerAcre,
       plcPerAcre,
+      countyFips,        // Deploy 6B-final: for deep-linking
     } = event.data;
 
     const cropName = CROP_NAMES[cropCode] || cropCode || 'your crop';
@@ -88,6 +93,8 @@ export const enrollmentDripCampaign = inngest.createFunction(
           arcPerAcre: arcPerAcre || 0,
           plcPerAcre: plcPerAcre || 0,
           unsubscribeToken,
+          countyFips: countyFips || '',   // Deploy 6B-final: deep-link param
+          cropCode: cropCode || 'CORN',   // Deploy 6B-final: deep-link param
         })
       );
 
