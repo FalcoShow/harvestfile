@@ -109,7 +109,7 @@ export function ElectionMapTeaser() {
               </div>
 
               <Link
-                href="/elections"
+                href="/check?tab=elections"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
                   bg-white/[0.06] border border-white/[0.1] text-[14px] font-semibold text-white/70
                   hover:bg-white/[0.1] hover:text-white transition-all duration-200"

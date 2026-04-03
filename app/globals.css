@@ -12,7 +12,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 /* ── Override dark variant to use data-theme attribute ───────────────────── */
-@custom-variant dark (&:is([data-theme="dark"] *));
+@custom-variant dark (&:is(:not(print) [data-theme="dark"] *));
 
 /* ── Design Tokens → Tailwind Utilities (runtime-resolved) ──────────────── */
 @theme inline {
@@ -1295,22 +1295,32 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   BUILD 18 DEPLOY 6B: Exit Intent Popup Animations
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 /* =============================================================================
-   HarvestFile — Build 18 Deploy 6: Print Styles
+   HarvestFile — Build 18 Deploy 6B: Print Styles (FIXED)
    
-   APPEND THIS TO THE END OF globals.css
-   Do NOT replace the entire file — just paste this block at the bottom.
+   THE BUG: The old [style*="background"] selector forced white backgrounds
+   on parent elements but did NOT force dark text on nested children.
+   Tailwind utility classes (text-white, text-emerald-400, text-white/40)
+   set explicit color on each element, blocking CSS inheritance.
+   Result: invisible white text on white backgrounds in print preview.
    
-   Provides clean, printable ARC/PLC analysis for farmers to take to FSA offices.
-   Triggered by the "Print for FSA Office" button or Ctrl+P / Cmd+P.
-   
-   Design principles for print:
-     - White background (save ink)
-     - Black text (maximum readability)
-     - No navigation, footer, popups, or interactive elements
-     - HarvestFile branding header with generation date
-     - Data sources disclaimer at bottom
-     - Page breaks between major sections
+   THE FIX: H5BP universal * reset — forces color: #000 and 
+   background: transparent on EVERY element. Same pattern used by
+   Bootstrap, Drupal, and HTML5 Boilerplate.
    ============================================================================= */
 
 @media print {
@@ -1319,16 +1329,27 @@
     margin: 0.75in;
   }
 
+  /* ── THE FIX: Universal reset (H5BP pattern) ─────────────────────────── */
+  *,
+  *::before,
+  *::after {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Restore white page background on html/body only */
+  html,
   body {
     background: white !important;
-    color: black !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     font-size: 12pt;
     line-height: 1.5;
   }
 
-  /* Hide non-essential elements */
+  /* ── Hide non-essential elements ─────────────────────────────────────── */
   header,
   footer,
   nav,
@@ -1336,10 +1357,15 @@
     display: none !important;
   }
 
-  /* Hide noise overlays */
+  /* Hide noise/glow overlays */
   .hf-noise-subtle,
   .hf-noise-heavy,
-  .hf-noise {
+  .hf-noise,
+  .hf-grain,
+  .hf-cream-noise,
+  .hf-glow-gold,
+  .hf-glow-warm,
+  .hf-glow-emerald {
     display: none !important;
   }
 
@@ -1348,51 +1374,35 @@
     display: none !important;
   }
 
-  /* Override dark backgrounds to white */
-  [style*="background"] {
-    background: white !important;
+  /* Hide interactive-only elements */
+  input,
+  select,
+  textarea {
+    display: none !important;
   }
 
-  .bg-harvest-forest-950 {
-    background: white !important;
-  }
-
-  /* Override white/translucent text to black */
-  [style*="color: rgba(255"],
-  [style*="color: rgb(255"],
-  .text-white {
-    color: #1a1a1a !important;
-  }
-
-  /* Glass cards → bordered white cards */
-  [style*="rgba(255,255,255,0.03)"],
-  [style*="rgba(255,255,255,0.04)"],
-  [style*="rgba(255,255,255,0.06)"] {
-    background: white !important;
-    border: 1px solid #ddd !important;
-  }
+  /* ── Selective color overrides for informational value ────────────────── */
 
   /* Gold text → dark gold for print */
   .text-harvest-gold,
-  [style*="color: #C9A84C"],
-  [style*="color: rgb(201, 168, 76)"] {
+  [data-print-color="gold"] {
     color: #8B6914 !important;
   }
 
   /* Emerald text → dark green for print */
   .text-emerald-400,
-  .text-emerald-500 {
+  .text-emerald-500,
+  [data-print-color="emerald"] {
     color: #166534 !important;
   }
 
-  /* Links: show URL in parentheses */
-  a[href^="http"]::after {
-    content: " (" attr(href) ")";
-    font-size: 9pt;
-    color: #666;
+  /* Red text → dark red for print */
+  .text-red-400,
+  .text-red-500 {
+    color: #991B1B !important;
   }
 
-  /* Tables: clean borders */
+  /* ── Table styling ───────────────────────────────────────────────────── */
   table {
     border-collapse: collapse;
     break-inside: avoid;
@@ -1410,12 +1420,39 @@
     font-weight: 700;
   }
 
-  /* Charts: preserve layout */
+  /* ── Glass cards → bordered white cards ──────────────────────────────── */
+  [class*="rounded-"] {
+    border: 1px solid #ddd !important;
+    background: white !important;
+  }
+
+  /* ── Links: show URL in parentheses ──────────────────────────────────── */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #666 !important;
+  }
+
+  /* ── Charts: preserve layout ─────────────────────────────────────────── */
   .recharts-wrapper {
     break-inside: avoid;
   }
 
-  /* Page breaks */
+  .recharts-wrapper text {
+    fill: #333 !important;
+    color: #333 !important;
+  }
+
+  .recharts-wrapper line,
+  .recharts-wrapper path.recharts-cartesian-axis-line {
+    stroke: #ccc !important;
+  }
+
+  .recharts-bar-rectangle path[fill] {
+    opacity: 0.85 !important;
+  }
+
+  /* ── Page break utilities ────────────────────────────────────────────── */
   .break-before-page {
     break-before: page;
   }
@@ -1428,7 +1465,16 @@
     break-inside: avoid;
   }
 
-  /* Width: use full page */
+  p, h1, h2, h3, h4 {
+    orphans: 3;
+    widows: 3;
+  }
+
+  h1, h2, h3, h4 {
+    break-after: avoid;
+  }
+
+  /* ── Width: use full page ────────────────────────────────────────────── */
   .max-w-2xl,
   .max-w-3xl,
   .max-w-4xl,

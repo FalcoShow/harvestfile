@@ -1,5 +1,8 @@
 // =============================================================================
 // HarvestFile — Inngest Client
+// lib/inngest/client.ts
+//
+// Build 18 Deploy 6B: Added leads/analysis.saved event for enrollment drip
 // Phase 19: Added SMS alert event types
 // =============================================================================
 
@@ -65,6 +68,21 @@ export type HarvestFileEvents = {
     data: {
       daysUntil: number;
       deadlineDate: string;
+    };
+  };
+
+  // ── Deploy 6B: Lead capture → enrollment drip ───────────────────────────
+  'leads/analysis.saved': {
+    data: {
+      leadId: string;
+      email: string;
+      countyName: string | null;
+      stateAbbr: string | null;
+      cropCode: string | null;
+      acres: string | null;
+      recommendation: string | null;
+      arcPerAcre: number;
+      plcPerAcre: number;
     };
   };
 };

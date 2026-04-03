@@ -1,5 +1,6 @@
 // =============================================================================
 // HarvestFile — Consolidated Middleware
+// Build 18 Deploy 6B: Added /api/unsubscribe route exclusion for email unsub
 // Build 18 Deploy 6: Added /api/leads route exclusion for email capture
 // Build 18 Deploy 4: Added county-elections API route exclusion
 // Build 18 Deploy 3: Added historical-payments + calculator API route exclusions
@@ -44,6 +45,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/historical-payments') || // Build 18 Deploy 3: Historical payment data
     pathname.startsWith('/api/county-elections') ||    // Build 18 Deploy 4: County election data
     pathname.startsWith('/api/leads') ||               // Build 18 Deploy 6: Email capture (pre-auth)
+    pathname.startsWith('/api/unsubscribe') ||         // Deploy 6B: Email unsubscribe (RFC 8058)
     pathname.startsWith('/api/inngest') ||
     pathname.startsWith('/api/geo') ||           // Build 5: Geo detection (public, no auth needed)
     pathname.startsWith('/api/grain-bids') ||    // Build 5: Grain bids (public)

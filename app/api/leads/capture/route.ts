@@ -1,6 +1,11 @@
 // =============================================================================
-// HarvestFile — Build 18 Deploy 6: Lead Capture API
+// HarvestFile — Build 18 Deploy 6B: Lead Capture API
 // app/api/leads/capture/route.ts
+//
+// Deploy 6B changes:
+//   - Inngest drip campaign trigger ACTIVATED (was TODO comment)
+//   - Sends 'leads/analysis.saved' event with full calculator context
+//   - Event triggers enrollment-drip-campaign Inngest function
 //
 // Captures email addresses from the ARC/PLC calculator results page.
 // Stores in the `leads` table with calculator context for personalized
@@ -17,6 +22,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { inngest } from '@/lib/inngest/client';
 
 // Service role client — bypasses RLS for server-side lead management
 const supabase = createClient(
@@ -110,11 +116,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── TODO (Deploy 6B): Trigger Inngest drip campaign ──────────────────
-    // await inngest.send({
-    //   name: 'subscriber/enrollment.signup',
-    //   data: { subscriber_id: data.id, email: normalizedEmail, capture_context: captureContext },
-    // });
+    // ── Deploy 6B: Trigger Inngest enrollment drip campaign ──────────────
+    try {
+      await inngest.send({
+        name: 'leads/analysis.saved',
+        data: {
+          leadId: data.id,
+          email: normalizedEmail,
+          countyName: context?.countyName || null,
+          stateAbbr: context?.stateAbbr || null,
+          cropCode: context?.cropCode || null,
+          acres: context?.acres || null,
+          recommendation: context?.recommendation || null,
+          arcPerAcre: context?.arcPerAcre ? Number(context.arcPerAcre) : 0,
+          plcPerAcre: context?.plcPerAcre ? Number(context.plcPerAcre) : 0,
+        },
+      });
+    } catch (inngestError) {
+      // Log but don't fail the request — email capture is more important
+      // than the drip campaign starting. Inngest will retry on its own.
+      console.error('[Leads] Inngest send error (non-blocking):', inngestError);
+    }
 
     return NextResponse.json({
       success: true,
