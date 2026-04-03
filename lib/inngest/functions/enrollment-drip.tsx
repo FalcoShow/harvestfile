@@ -92,7 +92,7 @@ export const enrollmentDripCampaign = inngest.createFunction(
       );
 
       const { error } = await resend.emails.send({
-        from: 'HarvestFile <hello@harvestfile.com>',
+        from: 'HarvestFile <hello@mail.harvestfile.com>',
         to: [email],
         subject: 'Your ARC/PLC Analysis Is Saved',
         headers: getUnsubscribeHeaders(unsubscribeToken),
@@ -133,7 +133,7 @@ export const enrollmentDripCampaign = inngest.createFunction(
       );
 
       const { error } = await resend.emails.send({
-        from: 'HarvestFile <hello@harvestfile.com>',
+        from: 'HarvestFile <hello@mail.harvestfile.com>',
         to: [email],
         subject: `ARC vs PLC: A Plain-Language Guide for ${countyName || 'Your County'} Farmers`,
         headers: getUnsubscribeHeaders(unsubscribeToken),
@@ -175,7 +175,7 @@ export const enrollmentDripCampaign = inngest.createFunction(
       );
 
       const { error } = await resend.emails.send({
-        from: 'HarvestFile <hello@harvestfile.com>',
+        from: 'HarvestFile <hello@mail.harvestfile.com>',
         to: [email],
         subject: 'Your 2026 Enrollment Checklist — 7 Steps Before You Visit FSA',
         headers: getUnsubscribeHeaders(unsubscribeToken),
@@ -219,7 +219,7 @@ export const enrollmentDripCampaign = inngest.createFunction(
       );
 
       const { error } = await resend.emails.send({
-        from: 'HarvestFile <hello@harvestfile.com>',
+        from: 'HarvestFile <hello@mail.harvestfile.com>',
         to: [email],
         subject: `See ${countyName || 'Your County'}'s Latest Numbers Every Morning`,
         headers: getUnsubscribeHeaders(unsubscribeToken),
