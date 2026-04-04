@@ -1,15 +1,14 @@
 // =============================================================================
 // app/(marketing)/morning/page.tsx
-// HarvestFile — Build 17 Deploy 5: Bento Grid Layout Architecture
+// HarvestFile — Surface 2 Deploy 2: Farm Command Center
 //
 // SERVER COMPONENT — renders static sections (zero JS), wraps interactive
 // data sections in client boundary.
 //
-// Deploy 5 changes:
-//   - Container expanded to max-w-7xl (1280px) matching client component
-//   - USDA Calendar and CTA use wider grid
-//   - Calendar + CTA arranged in responsive 2-column on large screens
-//   - Skeleton updated for bento grid layout
+// Deploy 2 changes:
+//   - Skeleton updated for expanded bento grid (spray hero, forecast, soil)
+//   - Container stays max-w-7xl (1280px)
+//   - Calendar + CTA side-by-side on large screens (unchanged)
 // =============================================================================
 
 import { Suspense } from 'react';
@@ -133,7 +132,7 @@ function SectionEyebrow({ label }: { label: string }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LOADING SKELETON — Deploy 5: Bento grid skeleton
+// LOADING SKELETON — Deploy 2: Expanded for Farm Command Center
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MorningSkeleton() {
@@ -147,6 +146,8 @@ function MorningSkeleton() {
         </div>
       </section>
       <div className="mx-auto max-w-7xl px-4 lg:px-6 -mt-3 space-y-6">
+        {/* Spray hero skeleton */}
+        <div className="h-[160px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
         {/* Stat cards skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[1,2,3].map(i => <div key={i} className="h-[100px] rounded-2xl bg-[#0f2518] border border-white/[0.08] animate-pulse" />)}
@@ -160,6 +161,13 @@ function MorningSkeleton() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="h-[320px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
           <div className="h-[320px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
+        </div>
+        {/* Forecast skeleton */}
+        <div className="h-[300px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
+        {/* Soil + Planting skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-[240px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
+          <div className="h-[240px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
         </div>
       </div>
     </>
@@ -194,10 +202,9 @@ export default function MorningPage() {
           <MorningDashboardClient />
         </Suspense>
 
-        {/* Server-rendered sections — wider container */}
+        {/* Server-rendered sections */}
         <div className="mx-auto max-w-7xl px-4 lg:px-6 pb-20 space-y-6">
-
-          {/* USDA Calendar + Bottom CTA — side-by-side on large screens */}
+          {/* USDA Calendar + Bottom CTA */}
           <div>
             <SectionEyebrow label="Upcoming & Actions" />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -209,7 +216,8 @@ export default function MorningPage() {
           {/* Data freshness note */}
           <p className="text-center text-[10px] text-white/15 px-4 mt-4">
             Futures: CME settlement prices via Nasdaq Data Link, updated daily after 1:15 PM CT.
-            Weather: Open-Meteo, updated hourly. Market data provided by Barchart. Data for educational purposes only.
+            Weather: Open-Meteo, updated every 30 minutes. Soil data: Open-Meteo ERA5 Land model.
+            Market data provided by Barchart. Data for educational purposes only.
           </p>
         </div>
       </div>

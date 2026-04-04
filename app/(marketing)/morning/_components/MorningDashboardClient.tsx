@@ -1,34 +1,46 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
-// HarvestFile — Build 17 Deploy 5: Bento Grid Layout Architecture
+// HarvestFile — Surface 2 Deploy 2: Farm Command Center
 //
-// CLIENT COMPONENT — handles all interactive/data-driven sections.
+// COMPLETE REWRITE — replaces 691-line useState/useCallback implementation
+// with TanStack Query for all data fetching + Zustand for UI state.
 //
-// Deploy 5 changes (Bento Grid Layout):
-//   1. Container expanded from 680px to max-w-7xl (1280px)
-//   2. Compact stat card row — 3 commodity prices at a glance
-//   3. Insight line in header — "Corn +0.8% overnight • Rain Thu"
-//   4. Payment Estimate + Grain Bids side-by-side (4/3 split on lg)
-//   5. Weather + Commodity Detail side-by-side (1/2 + 1/2 on md)
-//   6. Quick actions moved below data sections (info first, actions second)
-//   7. Responsive collapse: lg → md → sm → mobile single-column
+// Deploy 2 changes:
+//   - useWeather() replaces manual fetchWeather/useState
+//   - useMarketPrices() replaces manual fetchPrices/useState
+//   - useLocationStore() replaces useGeolocation() hook
+//   - NEW: SprayStatusHero — go/no-go spray decision card
+//   - NEW: ForecastGrid — 7/14-day expandable agricultural forecast
+//   - NEW: SoilConditions — multi-depth soil temp + moisture
+//   - NEW: PlantingWindows — crop-specific readiness scorecards
+//   - Bento grid expanded: spray → stats → payments/grain → weather/markets → forecast → soil/planting → actions
+//   - All animations preserved from Deploy 5 (stagger, flash, count-up)
 //
-// Preserves all Deploy 4 features: count-up, freshness dots, price flash,
-// category-colored quick actions, atmospheric weather tint, stagger animations.
+// Data architecture:
+//   - TanStack Query manages all server data (weather, prices, grain bids)
+//   - Zustand morning-store manages UI state (sections, preferences)
+//   - Zustand location-store provides shared coordinates from /check
+//   - Zero useState for server data — only for ephemeral UI state
 // =============================================================================
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import { useMemo, useRef, useEffect, useState, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { GrainBidCard } from '@/components/grain/GrainBidCard';
 import { PaymentEstimateCard } from '@/components/morning/PaymentEstimateCard';
-import { useGeolocation } from '@/lib/hooks/useGeolocation';
+import { useLocationStore } from '@/lib/stores/location-store';
+import { useMarketPrices } from '@/lib/hooks/morning/use-market-prices';
+import { useWeather } from '@/lib/hooks/morning/use-weather';
+import SprayStatusHero from './SprayStatusHero';
+import ForecastGrid from './ForecastGrid';
+import SoilConditions from './SoilConditions';
+import PlantingWindows from './PlantingWindows';
 
 const LazySparkline = lazy(() => import('./SparklineChart'));
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SCROLL ANIMATION
+// SCROLL ANIMATION (preserved from Deploy 5)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function useScrollAnimation() {
@@ -74,11 +86,11 @@ function SectionEyebrow({ label }: { label: string }) {
 // DATA FRESHNESS TIMESTAMP
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function FreshnessTimestamp({ fetchedAt }: { fetchedAt: number | null }) {
+function FreshnessTimestamp({ dataUpdatedAt }: { dataUpdatedAt: number }) {
   const [, forceUpdate] = useState(0);
-  useEffect(() => { const t = setInterval(() => forceUpdate((n) => n + 1), 30000); return () => clearInterval(t); }, []);
-  if (!fetchedAt) return null;
-  const seconds = Math.floor((Date.now() - fetchedAt) / 1000);
+  useEffect(() => { const t = setInterval(() => forceUpdate(n => n + 1), 30000); return () => clearInterval(t); }, []);
+  if (!dataUpdatedAt) return null;
+  const seconds = Math.floor((Date.now() - dataUpdatedAt) / 1000);
   const label = seconds < 60 ? 'Just now' : seconds < 3600 ? `${Math.floor(seconds / 60)} min ago` : `${Math.floor(seconds / 3600)}h ago`;
   return (
     <div className="flex items-center gap-1.5">
@@ -95,13 +107,13 @@ function FreshnessTimestamp({ fetchedAt }: { fetchedAt: number | null }) {
 interface CommodityConfig {
   code: string; name: string; unit: string; unitLabel: string;
   effectiveRefPrice: number; loanRate: number; color: string;
-  nationalAvgYield: number; marketingYear: string;
+  nationalAvgYield: number;
 }
 
 const COMMODITIES: Record<string, CommodityConfig> = {
-  CORN: { code: 'CORN', name: 'Corn', unit: '$/bu', unitLabel: 'bu', effectiveRefPrice: 4.42, loanRate: 2.20, color: '#F59E0B', nationalAvgYield: 177, marketingYear: 'Sep–Aug' },
-  SOYBEANS: { code: 'SOYBEANS', name: 'Soybeans', unit: '$/bu', unitLabel: 'bu', effectiveRefPrice: 10.71, loanRate: 6.20, color: '#059669', nationalAvgYield: 51, marketingYear: 'Sep–Aug' },
-  WHEAT: { code: 'WHEAT', name: 'Wheat', unit: '$/bu', unitLabel: 'bu', effectiveRefPrice: 6.35, loanRate: 3.38, color: '#D97706', nationalAvgYield: 52, marketingYear: 'Jun–May' },
+  CORN: { code: 'CORN', name: 'Corn', unit: '$/bu', unitLabel: 'bu', effectiveRefPrice: 4.42, loanRate: 2.20, color: '#F59E0B', nationalAvgYield: 177 },
+  SOYBEANS: { code: 'SOYBEANS', name: 'Soybeans', unit: '$/bu', unitLabel: 'bu', effectiveRefPrice: 10.71, loanRate: 6.20, color: '#059669', nationalAvgYield: 51 },
+  WHEAT: { code: 'WHEAT', name: 'Wheat', unit: '$/bu', unitLabel: 'bu', effectiveRefPrice: 6.35, loanRate: 3.38, color: '#D97706', nationalAvgYield: 52 },
 };
 
 const COMMODITY_ORDER = ['CORN', 'SOYBEANS', 'WHEAT'];
@@ -163,13 +175,12 @@ function formatDateHeader(): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// INSIGHT LINE — Deploy 5: Smart summary of overnight changes
+// INSIGHT LINE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function InsightLine({ prices, weather }: { prices: Record<string, PriceData>; weather: WeatherData | null }) {
+function InsightLine({ prices, weatherData }: { prices: Record<string, any>; weatherData: any }) {
   const insights: string[] = [];
 
-  // Find biggest mover
   let biggestMove = { code: '', pct: 0 };
   for (const code of COMMODITY_ORDER) {
     const d = prices[code];
@@ -185,7 +196,6 @@ function InsightLine({ prices, weather }: { prices: Record<string, PriceData>; w
     insights.push(`${cfg.name} ${dir}${biggestMove.pct.toFixed(1)}% overnight`);
   }
 
-  // Check for near-reference prices
   for (const code of COMMODITY_ORDER) {
     const d = prices[code];
     const cfg = COMMODITIES[code];
@@ -198,13 +208,12 @@ function InsightLine({ prices, weather }: { prices: Record<string, PriceData>; w
     }
   }
 
-  // Weather insight
-  if (weather) {
-    const rainDay = weather.daily.find((d, i) => i > 0 && d.precipProb > 50);
+  if (weatherData?.forecast?.daily) {
+    const daily = weatherData.forecast.daily;
+    const rainDay = daily.find((d: any, i: number) => i > 0 && (d.precipitation_probability ?? 0) > 50);
     if (rainDay) {
-      insights.push(`Rain likely ${rainDay.dayName}`);
-    } else if (weather.current.windSpeed > 15) {
-      insights.push(`High winds ${weather.current.windSpeed} mph`);
+      const dayName = new Date(rainDay.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+      insights.push(`Rain likely ${dayName}`);
     }
   }
 
@@ -229,10 +238,10 @@ function InsightLine({ prices, weather }: { prices: Record<string, PriceData>; w
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPACT STAT CARD — Deploy 5: At-a-glance commodity price
+// COMPACT STAT CARD (preserved from Deploy 5)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function CommodityStatCard({ code, data, flash }: { code: string; data: PriceData | undefined; flash: 'up' | 'down' | null }) {
+function CommodityStatCard({ code, data, flash }: { code: string; data: any; flash: 'up' | 'down' | null }) {
   const cfg = COMMODITIES[code];
   if (!cfg || !data?.latestSettle) {
     return (
@@ -276,7 +285,7 @@ function CommodityStatCard({ code, data, flash }: { code: string; data: PriceDat
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHIMMER + SKELETONS
+// SKELETONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function Shimmer({ className = '' }: { className?: string }) {
@@ -286,8 +295,8 @@ function Shimmer({ className = '' }: { className?: string }) {
 function WeatherSkeleton() {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-5 sm:p-6 h-full">
-      <div className="flex items-center gap-2 mb-4"><Shimmer className="w-5 h-5 rounded" /><Shimmer className="w-36 h-4" /><div className="flex-1" /><Shimmer className="w-24 h-6 rounded-full" /></div>
-      <div className="flex items-start gap-4 mb-5"><Shimmer className="w-14 h-14 rounded-xl flex-shrink-0" /><div className="flex-1 space-y-2"><Shimmer className="w-20 h-8" /><Shimmer className="w-36 h-4" /><Shimmer className="w-48 h-3" /></div></div>
+      <div className="flex items-center gap-2 mb-4"><Shimmer className="w-5 h-5 rounded" /><Shimmer className="w-36 h-4" /></div>
+      <div className="flex items-start gap-4 mb-5"><Shimmer className="w-14 h-14 rounded-xl flex-shrink-0" /><div className="flex-1 space-y-2"><Shimmer className="w-20 h-8" /><Shimmer className="w-36 h-4" /></div></div>
       <div className="grid grid-cols-5 gap-2">{[1,2,3,4,5].map(i => <div key={i} className="rounded-xl bg-white/[0.03] p-2.5"><Shimmer className="w-full h-3 mb-2" /><Shimmer className="w-full h-4" /></div>)}</div>
     </div>
   );
@@ -297,62 +306,47 @@ function MarketsSkeleton() {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] overflow-hidden h-full">
       <div className="p-5 sm:p-6">
-        <div className="flex items-center justify-between mb-4"><div className="flex items-center gap-2"><Shimmer className="w-5 h-5 rounded" /><Shimmer className="w-36 h-4" /></div><Shimmer className="w-24 h-6 rounded-full" /></div>
+        <div className="flex items-center justify-between mb-4"><div className="flex items-center gap-2"><Shimmer className="w-5 h-5 rounded" /><Shimmer className="w-36 h-4" /></div></div>
         {[1,2,3].map(i => <div key={i} className="flex items-center justify-between py-3 border-b border-white/[0.04] last:border-0"><div className="flex items-center gap-3"><Shimmer className="w-8 h-8 rounded-lg" /><div className="space-y-1.5"><Shimmer className="w-20 h-4" /><Shimmer className="w-32 h-3" /></div></div><div className="text-right space-y-1.5"><Shimmer className="w-16 h-5 ml-auto" /><Shimmer className="w-20 h-3 ml-auto" /></div></div>)}
       </div>
     </div>
   );
 }
 
+function SpraySkeleton() {
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-5 sm:p-6 animate-pulse">
+      <Shimmer className="w-32 h-4 mb-4" />
+      <div className="flex items-center gap-4 mb-4">
+        <Shimmer className="w-14 h-14 rounded-xl flex-shrink-0" />
+        <div className="space-y-2 flex-1"><Shimmer className="w-40 h-7" /><Shimmer className="w-56 h-3" /></div>
+      </div>
+      <div className="grid grid-cols-4 gap-2">{[1,2,3,4].map(i => <Shimmer key={i} className="h-[56px] rounded-xl" />)}</div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// WEATHER ICONS
+// WEATHER CARD (compact — preserved from Deploy 5, adapted for TanStack Query)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function WeatherIcon({ code, size = 32 }: { code: number; size?: number }) {
   if (code === 0) return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="6" fill="#F59E0B" />{[0,45,90,135,180,225,270,315].map(a => <line key={a} x1="16" y1="4" x2="16" y2="7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" transform={`rotate(${a} 16 16)`} />)}</svg>);
   if (code <= 3) return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none"><circle cx="12" cy="12" r="5" fill="#F59E0B" />{[0,60,120,180,240,300].map(a => <line key={a} x1="12" y1="4" x2="12" y2="6" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" transform={`rotate(${a} 12 12)`} />)}<path d="M10 20a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 25 21a4 4 0 0 1-4 4H12a4 4 0 0 1-2-7Z" fill="#94A3B8" /></svg>);
-  if (code <= 48) return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none"><path d="M6 14h20M8 18h16M6 22h20" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" /><path d="M10 10a4 4 0 0 1 3.9-3 3 3 0 0 1 5.5.8A3.5 3.5 0 0 1 22 11a3.5 3.5 0 0 1-3.5 3h-7A3.5 3.5 0 0 1 8 11" fill="#CBD5E1" /></svg>);
+  if (code <= 48) return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none"><path d="M10 10a4 4 0 0 1 3.9-3 3 3 0 0 1 5.5.8A3.5 3.5 0 0 1 22 11a3.5 3.5 0 0 1-3.5 3h-7A3.5 3.5 0 0 1 8 11" fill="#CBD5E1" /></svg>);
   if (code <= 65) return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none"><path d="M8 16a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 17a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#94A3B8" /><line x1="12" y1="24" x2="11" y2="28" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" /><line x1="17" y1="24" x2="16" y2="28" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" /><line x1="22" y1="24" x2="21" y2="27" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" /></svg>);
   if (code <= 77) return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none"><path d="M8 16a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 17a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#94A3B8" /><circle cx="12" cy="26" r="1.2" fill="#93C5FD" /><circle cx="17" cy="25" r="1.2" fill="#93C5FD" /><circle cx="22" cy="27" r="1.2" fill="#93C5FD" /></svg>);
   return (<svg width={size} height={size} viewBox="0 0 32 32" fill="none"><path d="M8 14a5 5 0 0 1 4.9-4 3.5 3.5 0 0 1 6.6 1A4 4 0 0 1 23 15a4 4 0 0 1-4 4H10a4 4 0 0 1-2-5Z" fill="#64748B" /><path d="M17 22l-2 4h4l-2 4" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><line x1="12" y1="22" x2="11" y2="26" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" /></svg>);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// WEATHER DATA TYPES + PARSING
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface WeatherData {
-  current: { temp: number; feelsLike: number; humidity: number; windSpeed: number; windDir: string; weatherCode: number; description: string; precip: number; };
-  daily: Array<{ date: string; dayName: string; high: number; low: number; weatherCode: number; precipProb: number; precipSum: number; windMax: number; gdd: number; }>;
-  soil: { temp2in: number; temp6in: number; moisture: number; } | null;
-  alerts: Array<{ headline: string; severity: string }>;
-  sprayOk: boolean;
-}
-
-function parseWeatherResponse(data: any): WeatherData | null {
-  if (!data?.data?.forecast?.daily) return null;
-  const daily = data.data.forecast.daily;
-  const today = daily[0];
-  if (!today) return null;
-  const windDirections = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-  const current = {
-    temp: Math.round(today.temp_max_f ?? today.temp_max ?? today.temperature_2m_max ?? 72),
-    feelsLike: Math.round(today.apparent_temperature_max ?? today.temp_max_f ?? today.temp_max ?? 72),
-    humidity: Math.round(today.humidity_mean ?? today.relative_humidity_2m_mean ?? 65),
-    windSpeed: Math.round(today.wind_speed_max_mph ?? today.wind_speed_10m_max ?? today.windspeed_10m_max ?? 8),
-    windDir: windDirections[Math.round((today.wind_direction_10m_dominant ?? 0) / 22.5) % 16],
-    weatherCode: today.weather_code ?? today.weathercode ?? 0,
-    description: today.conditions || getWeatherDescription(today.weather_code ?? today.weathercode ?? 0),
-    precip: today.precipitation_mm ?? today.precipitation_sum ?? 0,
-  };
-  const parsedDaily = daily.slice(0, 5).map((d: any, i: number) => {
-    const date = new Date(d.date || d.time);
-    return { date: d.date || d.time, dayName: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' }), high: Math.round(d.temp_max_f ?? d.temp_max ?? d.temperature_2m_max ?? 72), low: Math.round(d.temp_min_f ?? d.temp_min ?? d.temperature_2m_min ?? 55), weatherCode: d.weather_code ?? d.weathercode ?? 0, precipProb: Math.round(d.precipitation_probability ?? d.precipitation_probability_max ?? d.precip_probability ?? 0), precipSum: d.precipitation_mm ?? d.precipitation_sum ?? 0, windMax: Math.round(d.wind_speed_max_mph ?? d.wind_speed_10m_max ?? d.windspeed_10m_max ?? 8), gdd: Math.round(d.gdd_base50 ?? 0) };
-  });
-  const soil = data.data.soil ? { temp2in: Math.round((data.data.soil.temperature_0cm ?? data.data.soil.soil_temperature_0_to_7cm ?? 55) * 10) / 10, temp6in: Math.round((data.data.soil.temperature_18cm ?? data.data.soil.soil_temperature_7_to_28cm ?? 52) * 10) / 10, moisture: Math.round((data.data.soil.moisture_1_3cm ?? data.data.soil.soil_moisture_0_to_7cm ?? 0.3) * 100) } : null;
-  const alerts = (data.data.alerts || []).map((a: any) => ({ headline: a.headline || a.event || 'Weather Alert', severity: a.severity || 'moderate' }));
-  const sprayOk = current.windSpeed < 10 && current.precip < 0.1 && (parsedDaily[0]?.precipProb ?? 0) < 40;
-  return { current, daily: parsedDaily, soil, alerts, sprayOk };
+function getAtmosphericTint(code: number): string {
+  if (code === 0) return 'rgba(245,158,11,0.03)';
+  if (code <= 3) return 'rgba(148,163,184,0.02)';
+  if (code <= 48) return 'rgba(148,163,184,0.03)';
+  if (code <= 65) return 'rgba(59,130,246,0.03)';
+  if (code <= 77) return 'rgba(203,213,225,0.03)';
+  if (code <= 99) return 'rgba(139,92,246,0.03)';
+  return 'transparent';
 }
 
 function getWeatherDescription(code: number): string {
@@ -362,19 +356,24 @@ function getWeatherDescription(code: number): string {
   return 'Unknown';
 }
 
-function getAtmosphericTint(code: number): string {
-  if (code === 0) return 'rgba(245,158,11,0.03)'; if (code <= 3) return 'rgba(148,163,184,0.02)';
-  if (code <= 48) return 'rgba(148,163,184,0.03)'; if (code <= 65) return 'rgba(59,130,246,0.03)';
-  if (code <= 77) return 'rgba(203,213,225,0.03)'; if (code <= 99) return 'rgba(139,92,246,0.03)';
-  return 'transparent';
-}
+function CurrentWeatherCard({ weatherData, dataUpdatedAt }: { weatherData: any; dataUpdatedAt: number }) {
+  const today = weatherData?.forecast?.daily?.[0];
+  if (!today) return null;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// WEATHER CARD — with h-full for grid alignment
-// ═══════════════════════════════════════════════════════════════════════════════
+  const weatherCode = today.weather_code ?? today.weathercode ?? today.condition_code ?? 0;
+  const tint = getAtmosphericTint(weatherCode);
+  const temp = Math.round(today.temp_max_f ?? 72);
+  const feelsLike = Math.round(today.apparent_temperature_max ?? today.temp_max_f ?? 72);
+  const wind = Math.round(today.wind_speed_max_mph ?? 8);
+  const humidity = Math.round(today.humidity_mean ?? today.humidity_avg ?? 65);
+  const description = today.conditions || getWeatherDescription(weatherCode);
 
-function WeatherCard({ data, fetchedAt }: { data: WeatherData; fetchedAt: number | null }) {
-  const tint = getAtmosphericTint(data.current.weatherCode);
+  const windDirections = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  const windDir = windDirections[Math.round((today.wind_direction_10m_dominant ?? today.wind_direction_dominant ?? 0) / 22.5) % 16];
+
+  // 5-day mini forecast
+  const fiveDays = (weatherData?.forecast?.daily || []).slice(0, 5);
+
   return (
     <div className="rounded-2xl border border-white/[0.06] overflow-hidden h-full flex flex-col" style={{ background: `linear-gradient(135deg, ${tint}, rgba(27,67,50,0.30))` }}>
       <div className="p-5 sm:p-6 flex-1">
@@ -382,79 +381,52 @@ function WeatherCard({ data, fetchedAt }: { data: WeatherData; fetchedAt: number
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg>
             <h2 className="text-sm font-semibold text-white/90 tracking-tight">Agricultural Weather</h2>
-            <FreshnessTimestamp fetchedAt={fetchedAt} />
+            <FreshnessTimestamp dataUpdatedAt={dataUpdatedAt} />
           </div>
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${data.sprayOk ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${data.sprayOk ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            Spray: {data.sprayOk ? 'GO' : 'HOLD'}
-          </span>
         </div>
         <div className="flex items-start gap-4 mb-5">
           <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-white/[0.06] flex items-center justify-center border border-white/[0.06]">
-            <WeatherIcon code={data.current.weatherCode} size={36} />
+            <WeatherIcon code={weatherCode} size={36} />
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-[36px] font-bold text-white leading-none tracking-tight tabular-nums">{data.current.temp}°</span>
+              <span className="text-[36px] font-bold text-white leading-none tracking-tight tabular-nums">{temp}°</span>
               <span className="text-sm text-white/30 font-medium">F</span>
             </div>
-            <p className="text-sm text-white/60 font-medium mt-0.5">{data.current.description}</p>
+            <p className="text-sm text-white/60 font-medium mt-0.5">{description}</p>
             <p className="text-xs text-white/30 mt-0.5">
-              Feels {data.current.feelsLike}°<span className="mx-1.5 text-white/10">·</span>Wind {data.current.windSpeed} mph {data.current.windDir}<span className="mx-1.5 text-white/10">·</span>{data.current.humidity}% humid
+              Feels {feelsLike}°<span className="mx-1.5 text-white/10">·</span>Wind {wind} mph {windDir}<span className="mx-1.5 text-white/10">·</span>{humidity}% humid
             </p>
           </div>
         </div>
+        {/* 5-day mini row */}
         <div className="grid grid-cols-5 gap-1.5">
-          {data.daily.map((d, i) => (
-            <div key={d.date} className={`rounded-xl p-2 text-center ${i === 0 ? 'bg-emerald-500/[0.08] border border-emerald-500/15' : 'bg-white/[0.03] border border-white/[0.04]'}`}>
-              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${i === 0 ? 'text-emerald-400' : 'text-white/30'}`}>{d.dayName}</div>
-              <div className="flex justify-center mb-1"><WeatherIcon code={d.weatherCode} size={18} /></div>
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-xs font-bold text-white/90 tabular-nums">{d.high}°</span>
-                <span className="text-[10px] text-white/30 tabular-nums">{d.low}°</span>
+          {fiveDays.map((d: any, i: number) => {
+            const dayCode = d.weather_code ?? d.weathercode ?? d.condition_code ?? 0;
+            const dayName = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+            return (
+              <div key={d.date} className={`rounded-xl p-2 text-center ${i === 0 ? 'bg-emerald-500/[0.08] border border-emerald-500/15' : 'bg-white/[0.03] border border-white/[0.04]'}`}>
+                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${i === 0 ? 'text-emerald-400' : 'text-white/30'}`}>{dayName}</div>
+                <div className="flex justify-center mb-1"><WeatherIcon code={dayCode} size={18} /></div>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-xs font-bold text-white/90 tabular-nums">{Math.round(d.temp_max_f)}°</span>
+                  <span className="text-[10px] text-white/30 tabular-nums">{Math.round(d.temp_min_f)}°</span>
+                </div>
+                {(d.precipitation_probability ?? 0) > 0 && <div className="text-[10px] text-blue-400 font-semibold mt-0.5 tabular-nums">{d.precipitation_probability}%</div>}
               </div>
-              {d.precipProb > 0 && <div className="text-[10px] text-blue-400 font-semibold mt-0.5 tabular-nums">{d.precipProb}%</div>}
-            </div>
-          ))}
+            );
+          })}
         </div>
-        {(data.soil || (data.daily[0]?.gdd ?? 0) > 0) && (
-          <div className="grid grid-cols-3 gap-2 mt-4">
-            {data.soil && (
-              <div className="rounded-xl bg-amber-500/[0.06] border border-amber-500/10 p-3">
-                <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Soil Temp</div>
-                <div className="text-lg font-bold text-amber-300 mt-0.5 tabular-nums">{data.soil.temp2in}°<span className="text-[10px] font-medium text-amber-500/60 ml-0.5">2&quot;</span></div>
-                {data.soil.temp2in >= 50 && <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">Corn: plantable</div>}
-              </div>
-            )}
-            {(data.daily[0]?.gdd ?? 0) > 0 && (
-              <div className="rounded-xl bg-emerald-500/[0.06] border border-emerald-500/10 p-3">
-                <div className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Today GDD</div>
-                <div className="text-lg font-bold text-emerald-300 mt-0.5 tabular-nums">{data.daily[0].gdd}<span className="text-[10px] font-medium text-emerald-500/60 ml-0.5">base 50</span></div>
-              </div>
-            )}
-            <div className="rounded-xl bg-blue-500/[0.06] border border-blue-500/10 p-3">
-              <div className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Max Wind</div>
-              <div className="text-lg font-bold text-blue-300 mt-0.5 tabular-nums">{data.daily[0]?.windMax ?? data.current.windSpeed}<span className="text-[10px] font-medium text-blue-500/60 ml-0.5">mph</span></div>
-              {(data.daily[0]?.windMax ?? data.current.windSpeed) > 10 && <div className="text-[10px] text-amber-400 font-semibold mt-0.5">Drift risk</div>}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MARKETS CARD — with h-full for grid alignment
+// MARKETS CARD (preserved from Deploy 5, adapted for TanStack Query)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-interface PriceData {
-  latestSettle: number | null; previousSettle: number | null;
-  change: number | null; changePct: number | null;
-  prices: Array<{ date: string; settle: number | null }>;
-}
-
-function MarketsCard({ data, status, fetchedAt, flashStates }: { data: Record<string, PriceData>; status: MarketStatus; fetchedAt: number | null; flashStates: Record<string, 'up' | 'down' | null> }) {
+function MarketsCard({ data, status, dataUpdatedAt, flashStates }: { data: Record<string, any>; status: MarketStatus; dataUpdatedAt: number; flashStates: Record<string, 'up' | 'down' | null> }) {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] overflow-hidden h-full flex flex-col">
       <div className="p-5 sm:p-6 flex-1">
@@ -462,7 +434,7 @@ function MarketsCard({ data, status, fetchedAt, flashStates }: { data: Record<st
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" /></svg>
             <h2 className="text-sm font-semibold text-white/90 tracking-tight">Commodity Prices</h2>
-            <FreshnessTimestamp fetchedAt={fetchedAt} />
+            <FreshnessTimestamp dataUpdatedAt={dataUpdatedAt} />
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.06]">
             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: status.color, boxShadow: status.isLive ? `0 0 6px ${status.color}` : 'none', animation: status.isLive ? 'hf-pulse 2s ease-in-out infinite' : 'none' }} />
@@ -476,7 +448,7 @@ function MarketsCard({ data, status, fetchedAt, flashStates }: { data: Record<st
             const price = d?.latestSettle ?? null; const change = d?.change ?? null;
             const isUp = change !== null && change >= 0;
             const plc = price ? calcPLC(price, cfg) : null;
-            const priceHistory = (d?.prices || []).filter(p => p.settle !== null);
+            const priceHistory = (d?.prices || []).filter((p: any) => p.settle !== null);
             const flash = flashStates[code];
             return (
               <div key={code}>
@@ -502,7 +474,7 @@ function MarketsCard({ data, status, fetchedAt, flashStates }: { data: Record<st
         </div>
       </div>
       <div className="border-t border-white/[0.04] px-5 sm:px-6 py-3 flex items-center justify-between bg-white/[0.02]">
-        <Link href="/markets" className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1">Full market dashboard<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg></Link>
+        <span className="text-xs text-white/25">CME settlement · 30-day trend</span>
         <Link href="/check" className="text-xs font-semibold text-[#C9A84C] hover:text-[#E2C366] transition-colors">Calculate your payment →</Link>
       </div>
     </div>
@@ -510,15 +482,38 @@ function MarketsCard({ data, status, fetchedAt, flashStates }: { data: Record<st
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// QUICK ACTIONS — category-colored dots
+// NWS ALERT BANNER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function AlertBanner({ alerts }: { alerts: any[] }) {
+  if (!alerts || alerts.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      {alerts.slice(0, 3).map((a, i) => (
+        <div key={i} className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-3.5 flex items-start gap-3">
+          <span className="text-amber-400 mt-0.5 flex-shrink-0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-amber-300">{a.event}</div>
+            <div className="text-xs text-white/40 mt-0.5 line-clamp-2">{a.headline}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QUICK ACTIONS (preserved from Deploy 5)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuickActions() {
   const actions = [
     { href: '/check', label: 'ARC/PLC Calculator', dotColor: '#C9A84C', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg> },
-    { href: '/farm-score', label: 'Farm Score', dotColor: '#34D399', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" /></svg> },
-    { href: '/weather', label: 'Full Weather', dotColor: '#60A5FA', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg> },
-    { href: '/markets', label: 'All Markets', dotColor: '#F59E0B', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" /></svg> },
+    { href: '/advisor', label: 'AI Farm Advisor', dotColor: '#34D399', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></svg> },
+    { href: '/signup', label: 'Create Account', dotColor: '#60A5FA', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg> },
+    { href: '/founding-farmer', label: 'Founding Farmer', dotColor: '#F59E0B', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z" /></svg> },
   ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -534,74 +529,68 @@ function QuickActions() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN CLIENT COMPONENT — Deploy 5: Bento Grid Layout
+// MAIN CLIENT COMPONENT — Deploy 2: Farm Command Center
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function MorningDashboardClient() {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [prices, setPrices] = useState<Record<string, PriceData>>({});
-  const [weatherLoading, setWeatherLoading] = useState(true);
-  const [pricesLoading, setPricesLoading] = useState(true);
-  const [weatherError, setWeatherError] = useState('');
-  const [pricesError, setPricesError] = useState('');
-  const [weatherFetchedAt, setWeatherFetchedAt] = useState<number | null>(null);
-  const [pricesFetchedAt, setPricesFetchedAt] = useState<number | null>(null);
-  const [flashStates, setFlashStates] = useState<Record<string, 'up' | 'down' | null>>({});
+  // ── Location from shared store (replaces useGeolocation) ──
+  const locationStore = useLocationStore();
+  const lat = locationStore.lat;
+  const lng = locationStore.lng;
+  const locationName = locationStore.locationName;
+  const isDefaultLocation = locationStore.isDefault;
+
+  // ── TanStack Query: Weather (replaces manual fetchWeather) ──
+  const {
+    data: weatherData,
+    isLoading: weatherLoading,
+    error: weatherError,
+    dataUpdatedAt: weatherUpdatedAt,
+    refetch: refetchWeather,
+  } = useWeather({ lat, lng, crops: ['CORN', 'SOYBEANS', 'WHEAT'], enabled: true });
+
+  // ── TanStack Query: Market Prices (replaces manual fetchPrices) ──
+  const {
+    data: pricesResponse,
+    isLoading: pricesLoading,
+    error: pricesError,
+    dataUpdatedAt: pricesUpdatedAt,
+  } = useMarketPrices({ commodities: ['CORN', 'SOYBEANS', 'WHEAT'], days: 30, enabled: true });
+
+  const prices = pricesResponse?.data || {};
+
+  // ── Price flash detection ──
   const prevPricesRef = useRef<Record<string, number | null>>({});
-  const geo = useGeolocation();
-  const marketStatus = useMemo(() => getMarketStatus(), []);
+  const [flashStates, setFlashStates] = useState<Record<string, 'up' | 'down' | null>>({});
 
-  const fetchWeather = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/weather?lat=${geo.lat}&lng=${geo.lng}&crops=CORN,SOYBEANS,WHEAT`);
-      if (!res.ok) throw new Error('Weather fetch failed');
-      const json = await res.json();
-      const parsed = parseWeatherResponse(json);
-      if (parsed) { setWeather(parsed); setWeatherFetchedAt(Date.now()); }
-      else throw new Error('Invalid weather data');
-    } catch (err: any) { setWeatherError(err.message || 'Unable to load weather'); }
-    finally { setWeatherLoading(false); }
-  }, [geo.lat, geo.lng]);
-
-  const fetchPrices = useCallback(async () => {
-    try {
-      const codes = COMMODITY_ORDER.join(',');
-      const res = await fetch(`/api/prices/futures?commodities=${codes}&days=30`);
-      if (!res.ok) throw new Error('Price fetch failed');
-      const json = await res.json();
-      if (json.success && json.data) {
-        const newFlash: Record<string, 'up' | 'down' | null> = {};
-        for (const code of COMMODITY_ORDER) {
-          const newPrice = json.data[code]?.latestSettle ?? null;
-          const oldPrice = prevPricesRef.current[code] ?? null;
-          if (oldPrice !== null && newPrice !== null && oldPrice !== newPrice) newFlash[code] = newPrice > oldPrice ? 'up' : 'down';
-          else newFlash[code] = null;
-          prevPricesRef.current[code] = newPrice;
-        }
-        const hadPrevious = Object.values(prevPricesRef.current).some(v => v !== null);
-        if (hadPrevious && Object.values(newFlash).some(v => v !== null)) {
-          setFlashStates(newFlash);
-          setTimeout(() => setFlashStates({}), 700);
-        }
-        setPrices(json.data); setPricesFetchedAt(Date.now());
-      } else throw new Error(json.error || 'No price data');
-    } catch (err: any) { setPricesError(err.message || 'Unable to load prices'); }
-    finally { setPricesLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchWeather(); fetchPrices(); }, [fetchWeather, fetchPrices]);
   useEffect(() => {
-    const interval = marketStatus.isLive ? 5 * 60 * 1000 : 30 * 60 * 1000;
-    const timer = setInterval(fetchPrices, interval);
-    return () => clearInterval(timer);
-  }, [marketStatus.isLive, fetchPrices]);
+    if (!pricesResponse?.data) return;
+    const newFlash: Record<string, 'up' | 'down' | null> = {};
+    for (const code of COMMODITY_ORDER) {
+      const newPrice = pricesResponse.data[code]?.latestSettle ?? null;
+      const oldPrice = prevPricesRef.current[code] ?? null;
+      if (oldPrice !== null && newPrice !== null && oldPrice !== newPrice) {
+        newFlash[code] = newPrice > oldPrice ? 'up' : 'down';
+      } else {
+        newFlash[code] = null;
+      }
+      prevPricesRef.current[code] = newPrice;
+    }
+    const hadPrevious = Object.values(prevPricesRef.current).some(v => v !== null);
+    if (hadPrevious && Object.values(newFlash).some(v => v !== null)) {
+      setFlashStates(newFlash);
+      setTimeout(() => setFlashStates({}), 700);
+    }
+  }, [pricesResponse]);
+
+  const marketStatus = useMemo(() => getMarketStatus(), []);
 
   let staggerIdx = 0;
   const nextStagger = () => (staggerIdx++) * 60;
 
   return (
     <>
-      {/* ═══ MORNING HEADER — full-width, expanded inner container ═══ */}
+      {/* ═══ MORNING HEADER ═══ */}
       <section className="relative bg-gradient-to-br from-[#0C1F17] via-[#1B4332] to-[#0f2b1e] pt-24 pb-8 sm:pt-28 sm:pb-10 overflow-hidden">
         <div className="hf-noise-subtle" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 lg:px-6">
@@ -610,12 +599,11 @@ export default function MorningDashboardClient() {
           </div>
           <p className="text-white/40 text-sm font-medium">
             {formatDateHeader()}
-            {!geo.isDefault && geo.locationName && (
-              <span className="text-white/25 ml-2">· {geo.locationName}</span>
+            {!isDefaultLocation && locationName && (
+              <span className="text-white/25 ml-2">· {locationName}</span>
             )}
           </p>
-          {/* Deploy 5: Insight Line */}
-          {!pricesLoading && <InsightLine prices={prices} weather={weather} />}
+          {!pricesLoading && <InsightLine prices={prices} weatherData={weatherData} />}
           <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] backdrop-blur-sm mt-4">
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: marketStatus.color, boxShadow: marketStatus.isLive ? `0 0 8px ${marketStatus.color}` : 'none', animation: marketStatus.isLive ? 'hf-pulse 2s ease-in-out infinite' : 'none' }} />
             <span className="text-xs font-semibold text-white/80">{marketStatus.label}</span>
@@ -624,10 +612,27 @@ export default function MorningDashboardClient() {
         </div>
       </section>
 
-      {/* ═══ BENTO GRID DASHBOARD — Deploy 5 ═══ */}
+      {/* ═══ BENTO GRID DASHBOARD — Deploy 2: Farm Command Center ═══ */}
       <div className="mx-auto max-w-7xl px-4 lg:px-6 -mt-3 pb-4 space-y-6">
 
-        {/* ─── ROW 1: Compact Stat Cards — 3 commodities at a glance ─── */}
+        {/* ─── NWS ALERT BANNER (conditional, full-width) ─── */}
+        {weatherData?.alerts && weatherData.alerts.length > 0 && (
+          <AnimateIn delay={nextStagger()}>
+            <AlertBanner alerts={weatherData.alerts} />
+          </AnimateIn>
+        )}
+
+        {/* ─── ROW 1: Spray Status Hero (full-width) ─── */}
+        <AnimateIn delay={nextStagger()}>
+          {weatherLoading ? <SpraySkeleton /> : weatherError ? (
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
+              <p className="text-sm text-red-400 font-medium">Unable to load spray conditions</p>
+              <button onClick={() => refetchWeather()} className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors">Retry</button>
+            </div>
+          ) : weatherData ? <SprayStatusHero weather={weatherData} /> : null}
+        </AnimateIn>
+
+        {/* ─── ROW 2: Compact Stat Cards — 3 commodities at a glance ─── */}
         <AnimateIn delay={nextStagger()}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {COMMODITY_ORDER.map(code => (
@@ -636,7 +641,7 @@ export default function MorningDashboardClient() {
           </div>
         </AnimateIn>
 
-        {/* ─── ROW 2: Payment Estimate + Grain Bids — 4/3 split ─── */}
+        {/* ─── ROW 3: Payment Estimate + Grain Bids — 4/3 split ─── */}
         <div>
           <AnimateIn delay={nextStagger()}>
             <SectionEyebrow label="Farm Financials" />
@@ -647,15 +652,15 @@ export default function MorningDashboardClient() {
             </AnimateIn>
             <AnimateIn delay={nextStagger()} className="lg:col-span-3">
               <GrainBidCard
-                lat={geo.lat} lng={geo.lng} compact={true} darkMode={true}
-                countyName={geo.isDefault ? 'Summit County' : geo.locationName.split(',')[0] || 'Your Area'}
-                stateAbbr={geo.isDefault ? 'OH' : geo.locationName.split(',')[1]?.trim() || 'US'}
+                lat={lat} lng={lng} compact={true} darkMode={true}
+                countyName={isDefaultLocation ? 'Summit County' : locationName.split(',')[0] || 'Your Area'}
+                stateAbbr={isDefaultLocation ? 'OH' : locationName.split(',')[1]?.trim() || 'US'}
               />
             </AnimateIn>
           </div>
         </div>
 
-        {/* ─── ROW 3: Weather + Commodity Prices — 1/2 + 1/2 ─── */}
+        {/* ─── ROW 4: Weather + Markets — 1/2 + 1/2 ─── */}
         <div>
           <AnimateIn delay={nextStagger()}>
             <SectionEyebrow label="Intelligence" />
@@ -664,23 +669,53 @@ export default function MorningDashboardClient() {
             <AnimateIn delay={nextStagger()}>
               {weatherLoading ? <WeatherSkeleton /> : weatherError ? (
                 <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center h-full flex items-center justify-center">
-                  <div><p className="text-sm text-red-400 font-medium">{weatherError}</p>
-                  <button onClick={() => { setWeatherLoading(true); setWeatherError(''); fetchWeather(); }} className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors">Retry</button></div>
+                  <div>
+                    <p className="text-sm text-red-400 font-medium">Weather unavailable</p>
+                    <button onClick={() => refetchWeather()} className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors">Retry</button>
+                  </div>
                 </div>
-              ) : weather ? <WeatherCard data={weather} fetchedAt={weatherFetchedAt} /> : null}
+              ) : weatherData ? <CurrentWeatherCard weatherData={weatherData} dataUpdatedAt={weatherUpdatedAt} /> : null}
             </AnimateIn>
             <AnimateIn delay={nextStagger()}>
               {pricesLoading ? <MarketsSkeleton /> : pricesError ? (
                 <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center h-full flex items-center justify-center">
-                  <div><p className="text-sm text-red-400 font-medium">{pricesError}</p>
-                  <button onClick={() => { setPricesLoading(true); setPricesError(''); fetchPrices(); }} className="mt-2 text-xs font-semibold text-red-300 underline hover:text-red-200 transition-colors">Retry</button></div>
+                  <div><p className="text-sm text-red-400 font-medium">Markets unavailable</p></div>
                 </div>
-              ) : <MarketsCard data={prices} status={marketStatus} fetchedAt={pricesFetchedAt} flashStates={flashStates} />}
+              ) : <MarketsCard data={prices} status={marketStatus} dataUpdatedAt={pricesUpdatedAt} flashStates={flashStates} />}
             </AnimateIn>
           </div>
         </div>
 
-        {/* ─── ROW 4: Quick Actions — info first, actions second ─── */}
+        {/* ─── ROW 5: 14-Day Forecast (full-width) ─── */}
+        {weatherData?.forecast?.daily && weatherData.forecast.daily.length > 0 && (
+          <AnimateIn delay={nextStagger()}>
+            <SectionEyebrow label="Extended Forecast" />
+            <ForecastGrid daily={weatherData.forecast.daily} />
+          </AnimateIn>
+        )}
+
+        {/* ─── ROW 6: Soil + Planting Windows — 1/2 + 1/2 ─── */}
+        {weatherData && (weatherData.soil || weatherData.planting_windows) && (
+          <div>
+            <AnimateIn delay={nextStagger()}>
+              <SectionEyebrow label="Field Conditions" />
+            </AnimateIn>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {weatherData.soil && (
+                <AnimateIn delay={nextStagger()}>
+                  <SoilConditions soil={weatherData.soil as any} />
+                </AnimateIn>
+              )}
+              {weatherData.planting_windows && (
+                <AnimateIn delay={nextStagger()}>
+                  <PlantingWindows windows={weatherData.planting_windows as any} />
+                </AnimateIn>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── ROW 7: Quick Actions ─── */}
         <AnimateIn delay={nextStagger()}>
           <QuickActions />
         </AnimateIn>
