@@ -1,20 +1,23 @@
 // =============================================================================
-// HarvestFile — Build 18 Deploy 6: Inline Email Capture
+// HarvestFile — Build 18 Deploy 6B-final: Inline Email Capture + PDF Download
 // app/(marketing)/check/components/EmailCapture.tsx
 //
-// THE CONVERSION ENGINE. This component replaces the old Link-to-/signup CTA
-// with an inline email capture form that:
+// THE CONVERSION ENGINE. This component:
 //   1. Captures email WITHOUT requiring full account creation
 //   2. Auto-opts-in to enrollment deadline notifications
 //   3. Stores calculator context for personalized follow-up emails
-//   4. Shows a "Print Report" button (Phase 1: print CSS, Phase 2: PDF)
+//   4. Returns a downloadToken from /api/leads/capture
+//   5. Wires "Download FSA Report" button → /api/generate-pdf?token=xxx
+//   6. Keeps "Print for FSA Office" as secondary action (browser print)
 //
-// Self-contained: manages its own state, makes its own API call.
-// The only change needed in CheckCalculator.tsx is importing this
-// component and replacing the old <Link href="/signup"> block.
+// PDF Download Flow:
+//   EmailCapture → POST /api/leads/capture → { success, downloadToken }
+//   → "Download FSA Report" button opens /api/generate-pdf?token=xxx
+//   → Server validates JWT (HS256, 24h expiry), generates branded PDF
+//   → Content-Disposition: attachment triggers browser download
 //
-// Design: matches the dark forest-green theme, gold accents,
-// glassmorphism cards. 48px min touch targets. 18px input text.
+// Design: dark forest-green theme, gold accents, glassmorphism cards.
+// 48px min touch targets. 18px input text.
 // =============================================================================
 
 'use client';
@@ -53,6 +56,8 @@ export default function EmailCapture({
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [notifyEnrollment, setNotifyEnrollment] = useState(true);
+  const [downloadToken, setDownloadToken] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -94,6 +99,10 @@ export default function EmailCapture({
 
       if (data.success) {
         setStatus('success');
+        // Store the download token for PDF generation
+        if (data.downloadToken) {
+          setDownloadToken(data.downloadToken);
+        }
       } else {
         setStatus('error');
         setErrorMessage(data.error || 'Something went wrong. Please try again.');
@@ -106,6 +115,20 @@ export default function EmailCapture({
 
   function handlePrint() {
     window.print();
+  }
+
+  function handleDownloadPDF() {
+    if (!downloadToken) return;
+    setDownloading(true);
+
+    // Open in new tab — server responds with Content-Disposition: attachment
+    // which triggers download. This works reliably on Mobile Safari, Chrome,
+    // and all desktop browsers. No blob URL manipulation needed.
+    const url = `/api/generate-pdf?token=${encodeURIComponent(downloadToken)}`;
+    window.open(url, '_blank');
+
+    // Reset downloading state after a brief delay (the download starts in the new tab)
+    setTimeout(() => setDownloading(false), 2000);
   }
 
   // ── SUCCESS STATE ─────────────────────────────────────────────────────
@@ -142,7 +165,59 @@ export default function EmailCapture({
 
         {/* Post-save actions */}
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* Print Report */}
+          {/* PRIMARY: Download FSA Report (branded PDF) */}
+          {downloadToken ? (
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="flex-1 flex items-center justify-center gap-2 p-3.5 rounded-[14px] text-[13px] sm:text-[14px] font-bold cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 disabled:opacity-60 disabled:hover:translate-y-0 print:hidden"
+              style={{
+                background: 'linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)',
+                color: '#0C1F17',
+                boxShadow: '0 4px 20px rgba(201,168,76,0.15)',
+                border: 'none',
+              }}
+            >
+              {downloading ? (
+                <>
+                  <svg className="animate-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                  </svg>
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download FSA Report
+                </>
+              )}
+            </button>
+          ) : (
+            // Fallback: if no downloadToken, show Create Account as primary
+            <Link
+              href="/signup"
+              className="flex-1 flex items-center justify-center gap-2 p-3.5 rounded-[14px] text-[13px] sm:text-[14px] font-bold cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 no-underline print:hidden"
+              style={{
+                background: 'linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)',
+                color: '#0C1F17',
+                boxShadow: '0 4px 20px rgba(201,168,76,0.15)',
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <line x1="20" y1="8" x2="20" y2="14" />
+                <line x1="23" y1="11" x2="17" y2="11" />
+              </svg>
+              Create Free Account
+            </Link>
+          )}
+
+          {/* SECONDARY: Print for FSA Office (browser print) */}
           <button
             onClick={handlePrint}
             className="flex-1 flex items-center justify-center gap-2 p-3.5 rounded-[14px] text-[13px] sm:text-[14px] font-semibold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] hover:border-white/[0.12] active:scale-[0.98] active:duration-75 print:hidden"
@@ -159,15 +234,17 @@ export default function EmailCapture({
             </svg>
             Print for FSA Office
           </button>
+        </div>
 
-          {/* Create Full Account */}
+        {/* Create Account CTA (shown below when downloadToken exists) */}
+        {downloadToken && (
           <Link
             href="/signup"
-            className="flex-1 flex items-center justify-center gap-2 p-3.5 rounded-[14px] text-[13px] sm:text-[14px] font-semibold cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] active:duration-75 no-underline print:hidden"
+            className="flex items-center justify-center gap-2 w-full p-3.5 rounded-[14px] text-[13px] sm:text-[14px] font-semibold cursor-pointer transition-all duration-200 hover:bg-white/[0.04] hover:border-white/[0.12] active:scale-[0.98] active:duration-75 no-underline print:hidden"
             style={{
-              background: 'linear-gradient(135deg, #E2C366, #C9A84C, #9E7E30)',
-              color: '#0C1F17',
-              boxShadow: '0 4px 20px rgba(201,168,76,0.15)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.4)',
+              background: 'transparent',
             }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -178,30 +255,27 @@ export default function EmailCapture({
             </svg>
             Create Free Account
           </Link>
-        </div>
+        )}
 
         {/* County page link */}
         {countySlug && stateSlug && (
           <Link
             href={`/${stateSlug}/${countySlug}/arc-plc`}
-            className="flex items-center justify-center gap-2 w-full p-3 rounded-[14px] text-[12px] sm:text-[13px] font-medium cursor-pointer transition-all duration-200 hover:bg-white/[0.04] hover:border-white/[0.12] active:scale-[0.98] active:duration-75 no-underline print:hidden"
-            style={{
-              border: '1px solid rgba(255,255,255,0.06)',
-              color: 'rgba(255,255,255,0.3)',
-            }}
+            className="flex items-center justify-center gap-2 p-3 rounded-[12px] text-[12px] sm:text-[13px] font-medium transition-all duration-200 hover:bg-white/[0.03] no-underline print:hidden"
+            style={{ color: 'rgba(255,255,255,0.3)' }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
-            View Full {countyName} Analysis →
+            View {countyName} County Page →
           </Link>
         )}
       </div>
     );
   }
 
-  // ── IDLE / LOADING / ERROR STATE ──────────────────────────────────────
+  // ── DEFAULT STATE (form) ──────────────────────────────────────────────
   return (
     <div className="space-y-4">
       {/* Primary CTA: Save My Analysis */}
