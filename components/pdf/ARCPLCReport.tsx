@@ -6,14 +6,18 @@
 // Uses Yoga flexbox layout, automatic page breaks, native SVG charts.
 //
 // Layout: US Letter (612 × 792pt), 1" margins (72pt), B&W-safe design.
-// Font: Bricolage Grotesque (bundled static TTFs in public/fonts/).
+// Font: Bricolage Grotesque (loaded via HTTPS from production CDN).
+//
+// CRITICAL: Fonts must be loaded via URL, NOT filesystem path.
+// On Vercel serverless, public/ files are served by the CDN — they are
+// NOT on the function's filesystem. process.cwd() + '/public/...' FAILS.
 //
 // Sections:
 //   Page 1: Header, farm info, recommendation box, comparison matrix
 //   Page 2: Historical payments bar chart, county election context
 //   Page 3: Methodology, FSA office info, legal disclaimer
 //
-// Called from: app/api/generate-pdf/route.ts via renderToBuffer()
+// Called from: app/api/generate-pdf/route.tsx via renderToBuffer()
 // =============================================================================
 
 import React from 'react';
@@ -31,15 +35,21 @@ import {
 } from '@react-pdf/renderer';
 
 // ── Font Registration ─────────────────────────────────────────────────────────
-// Bundled static TTFs from Google Fonts (SIL Open Font License 1.1)
-// Variable fonts do NOT work with @react-pdf/renderer — must use static instances
+// Load static TTFs via HTTPS from the production domain CDN.
+// Variable fonts do NOT work with @react-pdf/renderer — must use static instances.
+//
+// These files live in public/fonts/ and are served by Vercel's CDN at
+// https://harvestfile.com/fonts/... — this works in all environments
+// (local dev, Vercel preview deploys, production).
+const FONT_BASE = 'https://harvestfile.com/fonts';
+
 Font.register({
   family: 'Bricolage',
   fonts: [
-    { src: process.cwd() + '/public/fonts/BricolageGrotesque-Regular.ttf', fontWeight: 400 },
-    { src: process.cwd() + '/public/fonts/BricolageGrotesque-SemiBold.ttf', fontWeight: 600 },
-    { src: process.cwd() + '/public/fonts/BricolageGrotesque-Bold.ttf', fontWeight: 700 },
-    { src: process.cwd() + '/public/fonts/BricolageGrotesque-ExtraBold.ttf', fontWeight: 800 },
+    { src: `${FONT_BASE}/BricolageGrotesque-Regular.ttf`, fontWeight: 400 },
+    { src: `${FONT_BASE}/BricolageGrotesque-SemiBold.ttf`, fontWeight: 600 },
+    { src: `${FONT_BASE}/BricolageGrotesque-Bold.ttf`, fontWeight: 700 },
+    { src: `${FONT_BASE}/BricolageGrotesque-ExtraBold.ttf`, fontWeight: 800 },
   ],
 });
 
@@ -113,7 +123,7 @@ const s = StyleSheet.create({
     color: C.text,
     paddingTop: 72,
     paddingBottom: 72,
-    paddingHorizontal: 54, // Slightly narrower side margins for more content width
+    paddingHorizontal: 54,
   },
   // ── Header ──────────────────────────────────────────────────────────────
   headerBar: {
@@ -417,7 +427,6 @@ function PaymentBarChart({ data }: { data: Array<{ year: number; arcPayment: num
       {/* Y-axis labels */}
       {[0, 0.5, 1].map((frac) => {
         const y = chartH - frac * chartH;
-        const val = Math.round(frac * maxVal);
         return (
           <React.Fragment key={`ylab-${frac}`}>
             {/* @ts-ignore — react-pdf Text inside Svg */}
@@ -594,41 +603,33 @@ export function ARCPLCReport({ data }: { data: ReportData }) {
               <Text style={[s.tableHeaderText, { width: '50%' }]}>Parameter</Text>
               <Text style={[s.tableHeaderText, { width: '50%' }]}>Value</Text>
             </View>
-            {benchmarkYield != null && (
+            {benchmarkYield && (
               <View style={s.tableRow}>
-                <Text style={[s.tableCell, { width: '50%' }]}>ARC-CO Benchmark Yield</Text>
+                <Text style={[s.tableCell, { width: '50%' }]}>Benchmark Yield (Olympic Avg)</Text>
                 <Text style={[s.tableCellBold, { width: '50%' }]}>{fmt(benchmarkYield, 1)} bu/acre</Text>
               </View>
             )}
-            {effectiveRefPrice != null && (
+            {effectiveRefPrice && (
               <View style={s.tableRowAlt}>
                 <Text style={[s.tableCell, { width: '50%' }]}>Effective Reference Price</Text>
-                <Text style={[s.tableCellBold, { width: '50%' }]}>${fmt(effectiveRefPrice, 2)}/bu</Text>
+                <Text style={[s.tableCellBold, { width: '50%' }]}>${fmt(effectiveRefPrice)}/bu</Text>
               </View>
             )}
-            {projectedMYA != null && (
+            {projectedMYA && (
               <View style={s.tableRow}>
                 <Text style={[s.tableCell, { width: '50%' }]}>Projected MYA Price</Text>
-                <Text style={[s.tableCellBold, { width: '50%' }]}>${fmt(projectedMYA, 2)}/bu</Text>
+                <Text style={[s.tableCellBold, { width: '50%' }]}>${fmt(projectedMYA)}/bu</Text>
               </View>
             )}
             <View style={s.tableRowAlt}>
-              <Text style={[s.tableCell, { width: '50%' }]}>ARC-CO Guarantee (90%)</Text>
-              <Text style={[s.tableCellBold, { width: '50%' }]}>
-                {benchmarkYield && effectiveRefPrice
-                  ? `$${fmt(benchmarkYield * effectiveRefPrice * 0.90, 2)}/acre`
-                  : 'See harvestfile.com/check'}
-              </Text>
-            </View>
-            <View style={s.tableRow}>
               <Text style={[s.tableCell, { width: '50%' }]}>Payment Acres</Text>
               <Text style={[s.tableCellBold, { width: '50%' }]}>85% of base acres ({acresNum > 0 ? fmt(acresNum * 0.85, 0) : '—'} acres)</Text>
             </View>
-            <View style={s.tableRowAlt}>
+            <View style={s.tableRow}>
               <Text style={[s.tableCell, { width: '50%' }]}>ARC-CO Payment Cap</Text>
               <Text style={[s.tableCellBold, { width: '50%' }]}>12% of benchmark revenue</Text>
             </View>
-            <View style={s.tableRow}>
+            <View style={s.tableRowAlt}>
               <Text style={[s.tableCell, { width: '50%' }]}>PLC Payment Limit</Text>
               <Text style={[s.tableCellBold, { width: '50%' }]}>$155,000 per person</Text>
             </View>

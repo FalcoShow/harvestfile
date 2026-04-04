@@ -1,6 +1,6 @@
 // =============================================================================
 // HarvestFile — Deploy 6B-final: PDF Report Generation API
-// app/api/generate-pdf/route.ts
+// app/api/generate-pdf/route.tsx
 //
 // Generates an FSA-ready ARC/PLC analysis PDF using @react-pdf/renderer.
 // Gated behind a signed JWT token (24-hour expiry) issued at email capture.
@@ -13,6 +13,10 @@
 //
 // Security: JWT signed with HMAC-SHA256 using LEAD_JWT_SECRET env var.
 // Uses `jose` library (Edge Runtime compatible, unlike jsonwebtoken).
+//
+// CRITICAL: export const dynamic = 'force-dynamic' prevents Next.js from
+// attempting static analysis of this route during build. Without it, the
+// build logs show a "Dynamic server usage" error (non-blocking but noisy).
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,6 +24,9 @@ import { jwtVerify } from 'jose';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { ARCPLCReport } from '@/components/pdf/ARCPLCReport';
 import { createClient } from '@supabase/supabase-js';
+
+// Tell Next.js this route is always dynamic — never attempt static rendering
+export const dynamic = 'force-dynamic';
 
 // Vercel serverless: allow up to 60s for PDF generation
 export const maxDuration = 60;
@@ -72,7 +79,8 @@ export async function GET(request: NextRequest) {
     try {
       const result = await jwtVerify(token, JWT_SECRET);
       payload = result.payload as Record<string, unknown>;
-    } catch {
+    } catch (jwtErr) {
+      console.error('[PDF] JWT verification failed:', jwtErr);
       return NextResponse.json(
         { error: 'Download link has expired or is invalid. Please save your analysis again to get a new link.' },
         { status: 401 }
@@ -87,6 +95,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log('[PDF] Generating report for lead:', leadId);
+
     // ── Fetch lead data from Supabase ───────────────────────────────────────
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -95,6 +105,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (leadError || !lead) {
+      console.error('[PDF] Lead not found:', leadId, leadError);
       return NextResponse.json(
         { error: 'Analysis not found. Please run the calculator again.' },
         { status: 404 }
@@ -112,6 +123,8 @@ export async function GET(request: NextRequest) {
     const arcPerAcre = Number(ctx.arcPerAcre) || 0;
     const plcPerAcre = Number(ctx.plcPerAcre) || 0;
 
+    console.log('[PDF] Report context:', { countyName, stateAbbr, cropCode, acres, recommendation });
+
     // ── Try to fetch historical payments from the API ────────────────────────
     let historicalPayments: Array<{ year: number; arcPayment: number; plcPayment: number }> | undefined;
     try {
@@ -120,8 +133,10 @@ export async function GET(request: NextRequest) {
         const baseUrl = process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : 'https://www.harvestfile.com';
+
+        // Route pattern: /api/historical-payments/[county_fips]/[commodity_code]
         const histRes = await fetch(
-          `${baseUrl}/api/historical-payments?fips=${countyFips}&crop=${cropCode}`,
+          `${baseUrl}/api/historical-payments/${countyFips}/${cropCode}`,
           { next: { revalidate: 3600 } }
         );
         if (histRes.ok) {
@@ -133,11 +148,13 @@ export async function GET(request: NextRequest) {
               plcPayment: p.plcPayment ?? p.plc_payment ?? 0,
             }));
           }
+        } else {
+          console.warn('[PDF] Historical payments fetch returned:', histRes.status);
         }
       }
-    } catch {
+    } catch (histErr) {
       // Historical data is optional — continue without it
-      console.warn('[PDF] Could not fetch historical payments');
+      console.warn('[PDF] Could not fetch historical payments:', histErr);
     }
 
     // ── Build report data ───────────────────────────────────────────────────
@@ -167,13 +184,12 @@ export async function GET(request: NextRequest) {
     };
 
     // ── Render PDF ──────────────────────────────────────────────────────────
-    // Cast required: ARCPLCReport wraps <Document> but TypeScript expects
-    // DocumentProps directly. The cast is safe — renderToBuffer handles
-    // any component that returns a <Document> at its root.
+    console.log('[PDF] Starting renderToBuffer...');
     const element = <ARCPLCReport data={reportData} />;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfBuffer = await renderToBuffer(element as any);
     const responseBody = new Uint8Array(pdfBuffer);
+    console.log('[PDF] PDF generated successfully, size:', responseBody.length, 'bytes');
 
     // ── Build filename ──────────────────────────────────────────────────────
     const safeCounty = countyName.replace(/[^a-zA-Z0-9]/g, '-');
@@ -187,7 +203,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
+    // Log the FULL error — this is critical for debugging
     console.error('[PDF] Generation error:', err);
+    console.error('[PDF] Error stack:', err instanceof Error ? err.stack : 'no stack');
+    console.error('[PDF] Error message:', err instanceof Error ? err.message : String(err));
     return NextResponse.json(
       { error: 'Failed to generate report. Please try again.' },
       { status: 500 }
