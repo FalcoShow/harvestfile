@@ -1,15 +1,15 @@
 // =============================================================================
 // HarvestFile — GrainBidCard (Client Component)
-// Build 17 Deploy 3: Dark Mode Support for Morning Dashboard
+// Build 17 Deploy 3 → Deploy 2B: Dark Mode + Broken Link Fix
 //
 // Self-contained component that fetches and displays local grain elevator bids.
 // Used on TWO surfaces:
 //   1. County ARC/PLC pages (full mode — filters, 10 elevators, expandable)
 //   2. Morning Dashboard (compact mode — 3 elevators, no filters, DARK THEME)
 //
-// Build 17 Deploy 3: Added darkMode prop for full dark theme integration.
-// When darkMode=true: dark card backgrounds, light text, dark borders.
-// Default (darkMode=false): original light theme preserved for county pages.
+// Deploy 2B fix: "All bids →" link pointed to /grain which 301-redirected
+// back to /morning (broken loop). Now uses inline expand toggle — tapping
+// "All bids" shows all elevators without navigating away from /morning.
 //
 // Data: /api/grain-bids (server-side Barchart proxy with caching)
 // =============================================================================
@@ -165,6 +165,8 @@ export function GrainBidCard({
   const [selectedCommodity, setSelectedCommodity] = useState('all');
   const [expandedElevator, setExpandedElevator] = useState<string | null>(null);
   const [attribution, setAttribution] = useState('');
+  // Deploy 2B: Inline expand toggle replaces broken /grain navigation
+  const [showAllBids, setShowAllBids] = useState(false);
 
   const dark = darkMode;
 
@@ -231,8 +233,8 @@ export function GrainBidCard({
     return best;
   }, [filteredElevators]);
 
-  // ── Display limits ────────────────────────────────────────────────
-  const displayLimit = compact ? 3 : 10;
+  // ── Display limits — Deploy 2B: respects showAllBids toggle ───────
+  const displayLimit = compact ? (showAllBids ? filteredElevators.length : 3) : 10;
   const displayElevators = filteredElevators.slice(0, displayLimit);
 
   // ── Loading State ─────────────────────────────────────────────────
@@ -400,8 +402,8 @@ export function GrainBidCard({
             return (
               <div key={elevator.id} className="py-3 first:pt-0 last:pb-0">
                 <button
-                  onClick={() => !compact && setExpandedElevator(isExpanded ? null : elevator.id)}
-                  className={`w-full text-left ${!compact ? 'cursor-pointer' : 'cursor-default'}`}
+                  onClick={() => setExpandedElevator(isExpanded ? null : elevator.id)}
+                  className="w-full text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     {/* Distance badge */}
@@ -454,8 +456,8 @@ export function GrainBidCard({
                       </div>
                     </div>
 
-                    {/* Expand chevron (full mode) */}
-                    {!compact && topBids.length > 0 && (
+                    {/* Expand chevron */}
+                    {topBids.length > 0 && (
                       <svg
                         width="14"
                         height="14"
@@ -475,8 +477,8 @@ export function GrainBidCard({
                   </div>
                 </button>
 
-                {/* Expanded details (full mode only) */}
-                {!compact && isExpanded && (
+                {/* Expanded details */}
+                {isExpanded && (
                   <div className="mt-3 ml-14 space-y-2">
                     {topBids.map((bid) => (
                       <div
@@ -525,8 +527,34 @@ export function GrainBidCard({
           })}
         </div>
 
-        {/* Show more indicator */}
-        {filteredElevators.length > displayLimit && (
+        {/* Show more indicator — Deploy 2B: compact mode gets expand toggle */}
+        {compact && filteredElevators.length > 3 && !showAllBids && (
+          <button
+            onClick={() => setShowAllBids(true)}
+            className={`mt-3 w-full text-center py-2 rounded-lg transition-colors ${
+              dark
+                ? 'bg-white/[0.04] hover:bg-white/[0.08] text-white/30 hover:text-white/50'
+                : 'bg-gray-50 hover:bg-gray-100 text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <span className="text-xs font-medium">
+              +{filteredElevators.length - 3} more elevators nearby
+            </span>
+          </button>
+        )}
+        {compact && showAllBids && filteredElevators.length > 3 && (
+          <button
+            onClick={() => setShowAllBids(false)}
+            className={`mt-3 w-full text-center py-2 rounded-lg transition-colors ${
+              dark
+                ? 'bg-white/[0.04] hover:bg-white/[0.08] text-white/30 hover:text-white/50'
+                : 'bg-gray-50 hover:bg-gray-100 text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <span className="text-xs font-medium">Show fewer</span>
+          </button>
+        )}
+        {!compact && filteredElevators.length > displayLimit && (
           <div className="mt-3 text-center">
             <span className={`text-xs font-medium ${dark ? 'text-white/25' : 'text-gray-400'}`}>
               +{filteredElevators.length - displayLimit} more elevators nearby
@@ -535,7 +563,7 @@ export function GrainBidCard({
         )}
       </div>
 
-      {/* Footer: Attribution + CTA */}
+      {/* Footer: Attribution */}
       <div className={`border-t px-5 sm:px-6 py-3 flex items-center justify-between ${
         dark
           ? 'border-white/[0.04] bg-white/[0.02]'
@@ -546,14 +574,14 @@ export function GrainBidCard({
         </span>
         {compact && (
           <Link
-            href="/grain"
+            href="/check"
             className={`text-xs font-semibold transition-colors flex items-center gap-1 ${
               dark
-                ? 'text-emerald-400 hover:text-emerald-300'
+                ? 'text-[#C9A84C] hover:text-[#E2C366]'
                 : 'text-[#1B4332] hover:text-emerald-600'
             }`}
           >
-            All bids
+            Calculate payment
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="m9 18 6-6-6-6" />
             </svg>

@@ -1,9 +1,17 @@
 // =============================================================================
 // app/api/weather/route.ts
-// HarvestFile — Phase 26 Build 2: Agricultural Weather API
+// HarvestFile — Surface 2 Deploy 2B: Agricultural Weather API
 //
 // GET /api/weather?lat=40.12&lng=-84.56&crops=CORN,SOYBEANS
-// Returns comprehensive ag weather: forecast, soil, GDD, planting windows, alerts
+// Returns comprehensive ag weather: current conditions, forecast, soil, GDD,
+// planting windows, hourly arrays, Delta T, spray safety, and NWS alerts.
+//
+// Deploy 2B changes:
+//   - Returns current conditions block (real-time 15-minute data)
+//   - Returns hourly array for mini chart rendering (next 24h)
+//   - All values in Fahrenheit/mph/inches (no conversion needed on client)
+//   - Delta T and spray_safe computed server-side
+//   - Cache: 15 minutes (matches Open-Meteo current block interval)
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -35,13 +43,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all weather data in parallel
-    const [forecast, plantingWindows, alerts] = await Promise.all([
+    const [forecast, plantingWindows] = await Promise.all([
       weatherService.getAgForecast(lat, lng),
       weatherService.analyzePlantingWindows({ lat, lng, crops }),
-      weatherService.getNWSAlerts(lat, lng),
     ]);
 
-    // Calculate cumulative GDD from forecast data
+    // Calculate cumulative GDD from daily data
     let cumulativeGDD = 0;
     const gddByDay = forecast.daily.map(d => {
       cumulativeGDD += d.gdd_base50;
@@ -52,26 +59,74 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Extract next 24 hours of hourly data for mini chart
+    const now = new Date();
+    const next24h = forecast.hourly.filter(h => {
+      const hTime = new Date(h.time);
+      return hTime >= now && hTime <= new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    });
+
+    // Find next spray window from hourly data
+    let nextSprayWindow: { start: string; end: string; duration_hours: number } | null = null;
+    let windowStart: string | null = null;
+    let windowHours = 0;
+
+    for (const h of forecast.hourly) {
+      const hTime = new Date(h.time);
+      if (hTime < now) continue; // Skip past hours
+
+      if (h.spray_safe) {
+        if (!windowStart) windowStart = h.time;
+        windowHours++;
+      } else {
+        if (windowStart && windowHours >= 2) {
+          // Found a window of at least 2 hours
+          nextSprayWindow = {
+            start: windowStart,
+            end: h.time,
+            duration_hours: windowHours,
+          };
+          break;
+        }
+        windowStart = null;
+        windowHours = 0;
+      }
+    }
+    // Check if window extends to end of forecast
+    if (windowStart && windowHours >= 2 && !nextSprayWindow) {
+      const lastHour = forecast.hourly[forecast.hourly.length - 1];
+      nextSprayWindow = {
+        start: windowStart,
+        end: lastHour?.time || windowStart,
+        duration_hours: windowHours,
+      };
+    }
+
     return NextResponse.json({
       success: true,
       data: {
-        location: { lat, lng },
+        location: { lat, lng, elevation: forecast.location.elevation },
         generated_at: new Date().toISOString(),
+        current: forecast.current,
         forecast: {
           daily: forecast.daily,
           summary: forecast.hourly_summary,
         },
+        hourly: next24h,
         soil: forecast.soil,
         gdd: {
-          total_14day: Math.round(cumulativeGDD),
+          total_7day: Math.round(cumulativeGDD),
           by_day: gddByDay,
         },
         planting_windows: plantingWindows,
-        alerts: alerts || [],
+        alerts: forecast.alerts || [],
+        spray: {
+          next_window: nextSprayWindow,
+        },
       },
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+        'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=1800',
       },
     });
   } catch (error: any) {
