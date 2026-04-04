@@ -1,20 +1,25 @@
 // =============================================================================
 // app/(marketing)/morning/_components/SprayStatusHero.tsx
-// HarvestFile — Surface 2 Deploy 2: Spray Go/No-Go Hero Card
+// HarvestFile — Surface 2 Deploy 2B-P2: Spray Go/No-Go Hero Card
+//
+// DEPLOY 2B-P2 REWRITE:
+//   - Derives spray from weatherData.current block (real wind/humidity/Delta T)
+//     instead of daily forecast maximums — accurate real-time decisions
+//   - Wind direction with drift arrow SVG
+//   - Shows spray.next_window from API (e.g. "Next: Wed 7PM, 4h window")
+//   - Delta T factor added (THE most important spray safety metric)
+//   - Falls back gracefully to daily data if current block unavailable
 //
 // THE card that earns the 6 AM daily open. Shows spray status in under
 // 1 second — triple-encoded with color + icon + text. Displays the
 // limiting factor when conditions are bad, and the next available
 // spray window timestamp (the single most valuable data point per DTN).
-//
-// Derives spray conditions from useWeather() data + Zustand spray slice.
-// No additional API calls — pure client-side derivation.
 // =============================================================================
 
 'use client';
 
 import { useMemo } from 'react';
-import type { WeatherData, DailyForecast } from '@/lib/hooks/morning';
+import type { WeatherData } from '@/lib/hooks/morning';
 import { useMorningStore } from '@/lib/stores/morning-store';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -36,25 +41,34 @@ interface SprayResult {
   limitingFactor: SprayCondition | null;
   nextWindowLabel: string | null;
   windowRemaining: string | null;
+  windDirection: string | null;
+  windDeg: number | null;
 }
 
-// ─── Spray Logic ─────────────────────────────────────────────────────────────
+// ─── Spray Logic — NOW USES CURRENT BLOCK ────────────────────────────────────
 
 function evaluateSprayConditions(
   weather: WeatherData,
   thresholds: { windThresholdMph: number; tempMinF: number; tempMaxF: number; humidityMaxPct: number; inversionAlert: boolean }
 ): SprayResult {
+  // Prefer current block (real-time 15-min data) over daily forecast
+  const current = (weather as any).current;
   const today = weather.forecast?.daily?.[0];
-  if (!today) {
-    return { status: 'NO_GO', conditions: [], limitingFactor: null, nextWindowLabel: null, windowRemaining: null };
+  const hasCurrent = !!current;
+
+  if (!hasCurrent && !today) {
+    return { status: 'NO_GO', conditions: [], limitingFactor: null, nextWindowLabel: null, windowRemaining: null, windDirection: null, windDeg: null };
   }
 
-  const windSpeed = today.wind_speed_max_mph ?? 0;
-  const tempMax = today.temp_max_f ?? 72;
-  const tempMin = today.temp_min_f ?? 50;
-  const humidity = today.humidity_avg ?? 65;
-  const precipProb = today.precipitation_probability ?? 0;
-  const precipMm = today.precipitation_mm ?? 0;
+  // Extract values — current block takes priority
+  const windSpeed = hasCurrent ? (current.wind_speed_mph ?? 0) : (today?.wind_speed_max_mph ?? 0);
+  const windGusts = hasCurrent ? (current.wind_gusts_mph ?? 0) : (today?.wind_gusts_mph ?? 0);
+  const temp = hasCurrent ? (current.temp_f ?? 72) : ((today?.temp_max_f ?? 72 + (today?.temp_min_f ?? 50)) / 2);
+  const humidity = hasCurrent ? (current.humidity ?? 65) : (today?.humidity_avg ?? today?.humidity_mean ?? 65);
+  const precipProb = hasCurrent ? (current.precipitation_probability ?? 0) : (today?.precipitation_probability ?? 0);
+  const deltaT = hasCurrent ? (current.delta_t_f ?? null) : null;
+  const windDir = hasCurrent ? (current.wind_direction_cardinal ?? null) : null;
+  const windDeg = hasCurrent ? (current.wind_direction_deg ?? null) : null;
 
   const conditions: SprayCondition[] = [];
 
@@ -73,18 +87,17 @@ function evaluateSprayConditions(
     threshold: `3–${thresholds.windThresholdMph} mph`,
   });
 
-  // Temperature check
-  const tempCurrent = Math.round((tempMax + tempMin) / 2);
+  // Temperature check — using actual current temp, not daily max
   const tempStatus: 'safe' | 'marginal' | 'unsafe' =
-    tempMax > thresholds.tempMaxF || tempMin < thresholds.tempMinF ? 'unsafe' :
-    tempMax > thresholds.tempMaxF * 0.95 ? 'marginal' : 'safe';
+    temp > thresholds.tempMaxF || temp < thresholds.tempMinF ? 'unsafe' :
+    temp > thresholds.tempMaxF * 0.95 || temp < thresholds.tempMinF * 1.1 ? 'marginal' : 'safe';
 
   conditions.push({
     factor: 'Temp',
-    value: tempCurrent,
+    value: Math.round(temp),
     unit: '°F',
     status: tempStatus,
-    label: tempMax > thresholds.tempMaxF ? 'Too hot — volatilization risk' : tempMin < thresholds.tempMinF ? 'Too cold' : 'In range',
+    label: temp > thresholds.tempMaxF ? 'Too hot — volatilization risk' : temp < thresholds.tempMinF ? 'Too cold' : 'In range',
     threshold: `${thresholds.tempMinF}–${thresholds.tempMaxF}°F`,
   });
 
@@ -103,19 +116,35 @@ function evaluateSprayConditions(
     threshold: `50–${thresholds.humidityMaxPct}%`,
   });
 
-  // Rain check — need 4h rain-free minimum
-  const rainStatus: 'safe' | 'marginal' | 'unsafe' =
-    precipProb > 70 || precipMm > 5 ? 'unsafe' :
-    precipProb > 40 ? 'marginal' : 'safe';
+  // Delta T check — THE critical spray metric (only from current block)
+  if (deltaT !== null) {
+    const deltaTStatus: 'safe' | 'marginal' | 'unsafe' =
+      deltaT >= 3.6 && deltaT <= 14.4 ? 'safe' :
+      (deltaT > 14.4 && deltaT <= 18) || (deltaT < 3.6 && deltaT >= 1.8) ? 'marginal' : 'unsafe';
 
-  conditions.push({
-    factor: 'Rain',
-    value: Math.round(precipProb),
-    unit: '% chance',
-    status: rainStatus,
-    label: precipProb > 70 ? 'Rain likely — washoff risk' : precipProb > 40 ? 'Monitor closely' : 'Low risk',
-    threshold: '< 40% preferred',
-  });
+    conditions.push({
+      factor: 'Delta T',
+      value: Math.round(deltaT * 10) / 10,
+      unit: '°F',
+      status: deltaTStatus,
+      label: deltaT < 1.8 ? 'Inversion risk' : deltaT > 18 ? 'Rapid evaporation' : deltaTStatus === 'safe' ? 'Ideal range' : 'Monitor',
+      threshold: '3.6–14.4°F',
+    });
+  } else {
+    // Fallback: Rain check when Delta T unavailable
+    const rainStatus: 'safe' | 'marginal' | 'unsafe' =
+      precipProb > 70 ? 'unsafe' :
+      precipProb > 40 ? 'marginal' : 'safe';
+
+    conditions.push({
+      factor: 'Rain',
+      value: Math.round(precipProb),
+      unit: '% chance',
+      status: rainStatus,
+      label: precipProb > 70 ? 'Rain likely — washoff risk' : precipProb > 40 ? 'Monitor closely' : 'Low risk',
+      threshold: '< 40% preferred',
+    });
+  }
 
   // Determine overall status
   const hasUnsafe = conditions.some(c => c.status === 'unsafe');
@@ -125,22 +154,17 @@ function evaluateSprayConditions(
   // Find worst factor
   const limitingFactor = conditions.find(c => c.status === 'unsafe') || conditions.find(c => c.status === 'marginal') || null;
 
-  // Estimate next window (simple: check next few days)
+  // Use spray.next_window from API (computed server-side from hourly data)
   let nextWindowLabel: string | null = null;
-  if (status === 'NO_GO' && weather.forecast?.daily) {
-    const daily = weather.forecast.daily;
-    for (let i = 1; i < Math.min(daily.length, 5); i++) {
-      const d = daily[i];
-      const w = d.wind_speed_max_mph ?? 0;
-      const p = d.precipitation_probability ?? 0;
-      const tMax = d.temp_max_f ?? 72;
-      if (w >= 3 && w <= thresholds.windThresholdMph && p < 40 && tMax <= thresholds.tempMaxF) {
-        const dayDate = new Date(d.date + 'T12:00:00');
-        const dayName = i === 1 ? 'Tomorrow' : dayDate.toLocaleDateString('en-US', { weekday: 'short' });
-        nextWindowLabel = `${dayName} 6:00 AM`;
-        break;
-      }
-    }
+  const sprayWindow = (weather as any).spray?.next_window;
+  if (sprayWindow && status !== 'GO') {
+    const start = new Date(sprayWindow.start);
+    const now = new Date();
+    const isToday = start.toDateString() === now.toDateString();
+    const isTomorrow = start.toDateString() === new Date(now.getTime() + 86400000).toDateString();
+    const dayLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : start.toLocaleDateString('en-US', { weekday: 'short' });
+    const timeLabel = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    nextWindowLabel = `${dayLabel} ${timeLabel} · ${sprayWindow.duration_hours}h window`;
   }
 
   // Estimate remaining window if GO
@@ -148,14 +172,13 @@ function evaluateSprayConditions(
   if (status === 'GO') {
     const now = new Date();
     const h = now.getHours();
-    // Assume spray window closes at ~2 PM (wind typically picks up)
     const hoursLeft = Math.max(0, 14 - h);
     if (hoursLeft > 0) {
       windowRemaining = `${hoursLeft}h remaining`;
     }
   }
 
-  return { status, conditions, limitingFactor, nextWindowLabel, windowRemaining };
+  return { status, conditions, limitingFactor, nextWindowLabel, windowRemaining, windDirection: windDir, windDeg };
 }
 
 // ─── Status Config ───────────────────────────────────────────────────────────
@@ -168,7 +191,7 @@ const STATUS_CONFIG = {
     iconColor: 'text-emerald-400',
     textColor: 'text-emerald-300',
     label: 'SAFE TO SPRAY',
-    sublabel: 'Conditions within thresholds',
+    sublabel: 'All conditions within thresholds',
     dotColor: '#22C55E',
   },
   CAUTION: {
@@ -219,6 +242,19 @@ function XIcon({ size = 32 }: { size?: number }) {
   );
 }
 
+// ─── Wind Direction Arrow ────────────────────────────────────────────────────
+
+function WindArrow({ deg, size = 20 }: { deg: number; size?: number }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 24 24" fill="none"
+      style={{ transform: `rotate(${deg}deg)` }}
+    >
+      <path d="M12 2L8 10h3v12h2V10h3L12 2z" fill="rgba(255,255,255,0.4)" />
+    </svg>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface SprayStatusHeroProps {
@@ -251,6 +287,9 @@ export default function SprayStatusHero({ weather }: SprayStatusHeroProps) {
             <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" /><path d="M9.6 4.6A2 2 0 1 1 11 8H2" /><path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
           </svg>
           <span className="text-[11px] font-semibold text-white/40 uppercase tracking-[0.1em]">Spray Conditions</span>
+          {(weather as any).current && (
+            <span className="text-[10px] text-white/20 ml-auto">Live conditions</span>
+          )}
         </div>
 
         {/* Hero status */}
@@ -264,16 +303,27 @@ export default function SprayStatusHero({ weather }: SprayStatusHeroProps) {
             </div>
             <div className="text-xs text-white/30 mt-0.5">{cfg.sublabel}</div>
           </div>
-          {/* Window info */}
-          <div className="flex-shrink-0 text-right hidden sm:block">
-            {result.windowRemaining && (
-              <div className="text-sm font-bold text-emerald-400 tabular-nums">{result.windowRemaining}</div>
-            )}
-            {result.nextWindowLabel && (
-              <div className="text-[11px] text-white/30">
-                Next window: <span className="text-white/60 font-semibold">{result.nextWindowLabel}</span>
+          {/* Wind direction + window info */}
+          <div className="flex-shrink-0 text-right hidden sm:flex items-center gap-3">
+            {result.windDeg !== null && result.windDirection && (
+              <div className="flex items-center gap-1.5">
+                <WindArrow deg={result.windDeg} size={18} />
+                <div>
+                  <div className="text-xs font-bold text-white/60">{result.windDirection}</div>
+                  <div className="text-[10px] text-white/25">drift</div>
+                </div>
               </div>
             )}
+            <div>
+              {result.windowRemaining && (
+                <div className="text-sm font-bold text-emerald-400 tabular-nums">{result.windowRemaining}</div>
+              )}
+              {result.nextWindowLabel && (
+                <div className="text-[11px] text-white/30">
+                  Next: <span className="text-white/60 font-semibold">{result.nextWindowLabel}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -290,7 +340,7 @@ export default function SprayStatusHero({ weather }: SprayStatusHeroProps) {
         )}
 
         {/* Condition factor pills */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className={`grid gap-2 ${result.conditions.length > 4 ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
           {result.conditions.map(c => (
             <div
               key={c.factor}
@@ -313,14 +363,20 @@ export default function SprayStatusHero({ weather }: SprayStatusHeroProps) {
           ))}
         </div>
 
-        {/* Mobile: window info */}
+        {/* Mobile: wind direction + window info */}
         <div className="sm:hidden mt-3">
+          {result.windDeg !== null && result.windDirection && (
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <WindArrow deg={result.windDeg} size={16} />
+              <span className="text-xs font-semibold text-white/50">Wind from {result.windDirection}</span>
+            </div>
+          )}
           {result.windowRemaining && (
             <div className="text-sm font-bold text-emerald-400 tabular-nums text-center">{result.windowRemaining}</div>
           )}
           {result.nextWindowLabel && (
             <div className="text-[11px] text-white/30 text-center mt-1">
-              Next window: <span className="text-white/60 font-semibold">{result.nextWindowLabel}</span>
+              Next: <span className="text-white/60 font-semibold">{result.nextWindowLabel}</span>
             </div>
           )}
         </div>

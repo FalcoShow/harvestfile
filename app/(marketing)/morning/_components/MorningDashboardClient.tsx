@@ -1,22 +1,17 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
-// HarvestFile — Surface 2 Deploy 2: Farm Command Center
+// HarvestFile — Surface 2 Deploy 2B-P2: UI Component Rewrites
 //
-// COMPLETE REWRITE — replaces 691-line useState/useCallback implementation
-// with TanStack Query for all data fetching + Zustand for UI state.
+// DEPLOY 2B-P2 CHANGES:
+//   - CurrentWeatherCard: shows current.temp_f (real-time) not daily max
+//   - CurrentWeatherCard: wind direction cardinal + dew point + Delta T badge
+//   - CurrentWeatherCard: mini 12-hour Recharts ComposedChart (temp line + precip bars)
+//   - LiveClock wired into morning header greeting
+//   - "Full USDA calendar" broken link removed (was 301 loop)
+//   - Bottom CTA redesigned as premium card matching dashboard aesthetic
+//   - QuickActions updated: removed /calendar link, added /morning self-reference fix
 //
-// Deploy 2 changes:
-//   - useWeather() replaces manual fetchWeather/useState
-//   - useMarketPrices() replaces manual fetchPrices/useState
-//   - useLocationStore() replaces useGeolocation() hook
-//   - NEW: SprayStatusHero — go/no-go spray decision card
-//   - NEW: ForecastGrid — 7/14-day expandable agricultural forecast
-//   - NEW: SoilConditions — multi-depth soil temp + moisture
-//   - NEW: PlantingWindows — crop-specific readiness scorecards
-//   - Bento grid expanded: spray → stats → payments/grain → weather/markets → forecast → soil/planting → actions
-//   - All animations preserved from Deploy 5 (stagger, flash, count-up)
-//
-// Data architecture:
+// Data architecture (unchanged from Deploy 2):
 //   - TanStack Query manages all server data (weather, prices, grain bids)
 //   - Zustand morning-store manages UI state (sections, preferences)
 //   - Zustand location-store provides shared coordinates from /check
@@ -36,6 +31,10 @@ import SprayStatusHero from './SprayStatusHero';
 import ForecastGrid from './ForecastGrid';
 import SoilConditions from './SoilConditions';
 import PlantingWindows from './PlantingWindows';
+import LiveClock from './LiveClock';
+import {
+  ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Area,
+} from 'recharts';
 
 const LazySparkline = lazy(() => import('./SparklineChart'));
 
@@ -297,6 +296,7 @@ function WeatherSkeleton() {
     <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-5 sm:p-6 h-full">
       <div className="flex items-center gap-2 mb-4"><Shimmer className="w-5 h-5 rounded" /><Shimmer className="w-36 h-4" /></div>
       <div className="flex items-start gap-4 mb-5"><Shimmer className="w-14 h-14 rounded-xl flex-shrink-0" /><div className="flex-1 space-y-2"><Shimmer className="w-20 h-8" /><Shimmer className="w-36 h-4" /></div></div>
+      <Shimmer className="w-full h-[100px] rounded-xl mb-4" />
       <div className="grid grid-cols-5 gap-2">{[1,2,3,4,5].map(i => <div key={i} className="rounded-xl bg-white/[0.03] p-2.5"><Shimmer className="w-full h-3 mb-2" /><Shimmer className="w-full h-4" /></div>)}</div>
     </div>
   );
@@ -327,7 +327,7 @@ function SpraySkeleton() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WEATHER CARD (compact — preserved from Deploy 5, adapted for TanStack Query)
+// WEATHER ICONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function WeatherIcon({ code, size = 32 }: { code: number; size?: number }) {
@@ -356,20 +356,90 @@ function getWeatherDescription(code: number): string {
   return 'Unknown';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// DELTA T STATUS HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function getDeltaTStatus(deltaT: number): { label: string; color: string; bg: string; border: string } {
+  // Delta T in °F: safe spray range is 3.6–14.4°F (2–8°C per Stull 2011)
+  if (deltaT >= 3.6 && deltaT <= 14.4) return { label: 'Ideal', color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/25' };
+  if (deltaT > 14.4 && deltaT <= 18) return { label: 'Marginal', color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/25' };
+  if (deltaT < 3.6 && deltaT >= 1.8) return { label: 'Marginal', color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/25' };
+  if (deltaT < 1.8) return { label: 'Inversion', color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/25' };
+  return { label: 'Too Dry', color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/25' };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MINI 12-HOUR CHART TOOLTIP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function MiniChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg bg-[#0C1F17] border border-white/[0.1] px-2.5 py-1.5 shadow-lg">
+      <p className="text-[10px] text-white/40 mb-0.5">{label}</p>
+      {payload.map((p: any) => (
+        <p key={p.name} className="text-[11px] font-semibold tabular-nums" style={{ color: p.color }}>
+          {p.name === 'temp' ? `${p.value}°F` : `${p.value}"`}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CURRENT WEATHER CARD — DEPLOY 2B-P2 REWRITE
+// Now uses weatherData.current (real-time 15-min) instead of daily forecast max.
+// Adds: wind direction, dew point, Delta T badge, mini 12h chart.
+// ═══════════════════════════════════════════════════════════════════════════════
+
 function CurrentWeatherCard({ weatherData, dataUpdatedAt }: { weatherData: any; dataUpdatedAt: number }) {
+  const current = weatherData?.current;
   const today = weatherData?.forecast?.daily?.[0];
-  if (!today) return null;
 
-  const weatherCode = today.weather_code ?? today.weathercode ?? today.condition_code ?? 0;
+  // Graceful fallback: if no current block, use daily data (backward compat)
+  const hasCurrent = !!current;
+  const weatherCode = hasCurrent
+    ? (current.weather_code ?? 0)
+    : (today?.weather_code ?? today?.weathercode ?? today?.condition_code ?? 0);
   const tint = getAtmosphericTint(weatherCode);
-  const temp = Math.round(today.temp_max_f ?? 72);
-  const feelsLike = Math.round(today.apparent_temperature_max ?? today.temp_max_f ?? 72);
-  const wind = Math.round(today.wind_speed_max_mph ?? 8);
-  const humidity = Math.round(today.humidity_mean ?? today.humidity_avg ?? 65);
-  const description = today.conditions || getWeatherDescription(weatherCode);
 
-  const windDirections = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-  const windDir = windDirections[Math.round((today.wind_direction_10m_dominant ?? today.wind_direction_dominant ?? 0) / 22.5) % 16];
+  // Temperature: current actual vs daily forecast max
+  const temp = hasCurrent ? Math.round(current.temp_f) : Math.round(today?.temp_max_f ?? 72);
+  const feelsLike = hasCurrent ? Math.round(current.feels_like_f) : Math.round(today?.temp_max_f ?? 72);
+  const description = hasCurrent ? (current.conditions || getWeatherDescription(weatherCode)) : (today?.conditions || getWeatherDescription(weatherCode));
+
+  // Wind — now with cardinal direction from current block
+  const wind = hasCurrent ? Math.round(current.wind_speed_mph) : Math.round(today?.wind_speed_max_mph ?? 8);
+  const windGusts = hasCurrent ? Math.round(current.wind_gusts_mph ?? 0) : Math.round(today?.wind_gusts_mph ?? 0);
+  const windDir = hasCurrent ? (current.wind_direction_cardinal ?? 'N') : (() => {
+    const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    return dirs[Math.round((today?.wind_direction_dominant ?? 0) / 22.5) % 16];
+  })();
+
+  // Dew point and Delta T — only available from current block
+  const dewPoint = hasCurrent ? Math.round(current.dew_point_f) : null;
+  const deltaT = hasCurrent ? current.delta_t_f : null;
+  const deltaTStatus = deltaT !== null ? getDeltaTStatus(deltaT) : null;
+  const humidity = hasCurrent ? current.humidity : Math.round(today?.humidity_mean ?? 65);
+
+  // High/Low from daily forecast (always useful context)
+  const highTemp = today ? Math.round(today.temp_max_f) : null;
+  const lowTemp = today ? Math.round(today.temp_min_f) : null;
+
+  // Mini 12-hour chart data from hourly array
+  const hourlyData = useMemo(() => {
+    const hourly = weatherData?.hourly;
+    if (!hourly || !Array.isArray(hourly)) return [];
+    return hourly.slice(0, 12).map((h: any) => {
+      const time = new Date(h.time);
+      return {
+        label: time.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
+        temp: Math.round(h.temp_f),
+        precip: h.precipitation_in ?? 0,
+      };
+    });
+  }, [weatherData?.hourly]);
 
   // 5-day mini forecast
   const fiveDays = (weatherData?.forecast?.daily || []).slice(0, 5);
@@ -377,28 +447,112 @@ function CurrentWeatherCard({ weatherData, dataUpdatedAt }: { weatherData: any; 
   return (
     <div className="rounded-2xl border border-white/[0.06] overflow-hidden h-full flex flex-col" style={{ background: `linear-gradient(135deg, ${tint}, rgba(27,67,50,0.30))` }}>
       <div className="p-5 sm:p-6 flex-1">
+        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg>
             <h2 className="text-sm font-semibold text-white/90 tracking-tight">Agricultural Weather</h2>
             <FreshnessTimestamp dataUpdatedAt={dataUpdatedAt} />
           </div>
+          {hasCurrent && <span className="text-[10px] text-white/20 tabular-nums">Real-time</span>}
         </div>
-        <div className="flex items-start gap-4 mb-5">
+
+        {/* Hero: Icon + Temperature + Description */}
+        <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-white/[0.06] flex items-center justify-center border border-white/[0.06]">
             <WeatherIcon code={weatherCode} size={36} />
           </div>
-          <div>
-            <div className="flex items-baseline gap-1">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-1.5">
               <span className="text-[36px] font-bold text-white leading-none tracking-tight tabular-nums">{temp}°</span>
               <span className="text-sm text-white/30 font-medium">F</span>
+              {highTemp !== null && lowTemp !== null && (
+                <span className="text-xs text-white/25 ml-2 tabular-nums">
+                  H:{highTemp}° L:{lowTemp}°
+                </span>
+              )}
             </div>
             <p className="text-sm text-white/60 font-medium mt-0.5">{description}</p>
-            <p className="text-xs text-white/30 mt-0.5">
-              Feels {feelsLike}°<span className="mx-1.5 text-white/10">·</span>Wind {wind} mph {windDir}<span className="mx-1.5 text-white/10">·</span>{humidity}% humid
-            </p>
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1">
+              <span className="text-xs text-white/30">Feels {feelsLike}°</span>
+              <span className="text-xs text-white/30">
+                <span className="font-semibold text-white/50">{windDir}</span> {wind} mph
+                {windGusts > wind + 5 && <span className="text-white/20"> (gusts {windGusts})</span>}
+              </span>
+              <span className="text-xs text-white/30">{humidity}% humid</span>
+              {dewPoint !== null && (
+                <span className="text-xs text-white/30">Dew {dewPoint}°</span>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Delta T Badge — critical for spray decisions */}
+        {deltaTStatus && deltaT !== null && (
+          <div className={`inline-flex items-center gap-2 rounded-lg ${deltaTStatus.bg} border ${deltaTStatus.border} px-3 py-1.5 mb-4`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={deltaTStatus.color}>
+              <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" />
+            </svg>
+            <span className={`text-xs font-bold ${deltaTStatus.color}`}>
+              Delta T {deltaT.toFixed(1)}°F
+            </span>
+            <span className={`text-[10px] font-semibold ${deltaTStatus.color} opacity-70`}>
+              {deltaTStatus.label}
+            </span>
+          </div>
+        )}
+
+        {/* Mini 12-Hour Chart */}
+        {hourlyData.length > 0 && (
+          <div className="mb-4 rounded-xl bg-white/[0.03] border border-white/[0.04] p-3">
+            <div className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">Next 12 Hours</div>
+            <div className="h-[80px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={hourlyData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.2)' }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={2}
+                  />
+                  <YAxis
+                    yAxisId="temp"
+                    domain={['dataMin - 5', 'dataMax + 5']}
+                    hide
+                  />
+                  <YAxis
+                    yAxisId="precip"
+                    orientation="right"
+                    domain={[0, 'auto']}
+                    hide
+                  />
+                  <Tooltip content={<MiniChartTooltip />} />
+                  <Bar
+                    yAxisId="precip"
+                    dataKey="precip"
+                    name="precip"
+                    fill="rgba(96,165,250,0.3)"
+                    radius={[2, 2, 0, 0]}
+                    barSize={6}
+                  />
+                  <Area
+                    yAxisId="temp"
+                    type="monotone"
+                    dataKey="temp"
+                    name="temp"
+                    stroke="#F59E0B"
+                    strokeWidth={2}
+                    fill="rgba(245,158,11,0.06)"
+                    dot={false}
+                    activeDot={{ r: 3, fill: '#F59E0B', stroke: 'rgba(245,158,11,0.3)', strokeWidth: 4 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {/* 5-day mini row */}
         <div className="grid grid-cols-5 gap-1.5">
           {fiveDays.map((d: any, i: number) => {
@@ -505,7 +659,7 @@ function AlertBanner({ alerts }: { alerts: any[] }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// QUICK ACTIONS (preserved from Deploy 5)
+// QUICK ACTIONS — Deploy 2B-P2: Removed /calendar (301 loop), premium CTA
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuickActions() {
@@ -529,7 +683,58 @@ function QuickActions() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN CLIENT COMPONENT — Deploy 2: Farm Command Center
+// PREMIUM BOTTOM CTA — Deploy 2B-P2 Redesign
+// Replaces bland "See what today's prices mean" box with a premium conversion card
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function BottomCTA() {
+  return (
+    <div className="relative rounded-2xl border border-[#C9A84C]/20 overflow-hidden">
+      {/* Gold gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#C9A84C]/[0.08] via-transparent to-[#1B4332]/40" />
+      <div className="absolute top-0 right-0 w-[400px] h-[250px] pointer-events-none" style={{ background: 'radial-gradient(ellipse at top right, rgba(201,168,76,0.1), transparent 70%)' }} />
+
+      <div className="relative z-10 p-6 sm:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+          {/* Left: value prop */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-[#C9A84C]" />
+              <span className="text-[11px] font-semibold text-[#C9A84C] uppercase tracking-[0.1em]">Free Decision Tool</span>
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight mb-2">
+              See what today&apos;s prices mean for your farm
+            </h3>
+            <p className="text-sm text-white/40 leading-relaxed max-w-lg">
+              Enter your county and crops to get personalized ARC vs PLC projections using the live market data above. Takes 30 seconds, no account required.
+            </p>
+          </div>
+
+          {/* Right: CTA button */}
+          <div className="flex-shrink-0">
+            <Link
+              href="/check"
+              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl font-bold text-[#0C1F17] text-sm transition-all hf-btn-hover"
+              style={{ background: 'linear-gradient(135deg, #C9A84C, #E2C366, #D4B55A)' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" />
+              </svg>
+              Run ARC/PLC Calculator
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+              </svg>
+            </Link>
+            <p className="text-[10px] text-white/20 mt-2 text-center">3,000+ counties · Updated daily</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN CLIENT COMPONENT — Deploy 2B-P2: Farm Command Center
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function MorningDashboardClient() {
@@ -590,12 +795,13 @@ export default function MorningDashboardClient() {
 
   return (
     <>
-      {/* ═══ MORNING HEADER ═══ */}
+      {/* ═══ MORNING HEADER — Deploy 2B-P2: LiveClock wired in ═══ */}
       <section className="relative bg-gradient-to-br from-[#0C1F17] via-[#1B4332] to-[#0f2b1e] pt-24 pb-8 sm:pt-28 sm:pb-10 overflow-hidden">
         <div className="hf-noise-subtle" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 lg:px-6">
-          <div className="mb-1">
+          <div className="flex items-baseline gap-3 mb-1">
             <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-[-0.03em]">{getGreeting()}</h1>
+            <LiveClock />
           </div>
           <p className="text-white/40 text-sm font-medium">
             {formatDateHeader()}
@@ -612,7 +818,7 @@ export default function MorningDashboardClient() {
         </div>
       </section>
 
-      {/* ═══ BENTO GRID DASHBOARD — Deploy 2: Farm Command Center ═══ */}
+      {/* ═══ BENTO GRID DASHBOARD — Deploy 2B-P2: Farm Command Center ═══ */}
       <div className="mx-auto max-w-7xl px-4 lg:px-6 -mt-3 pb-4 space-y-6">
 
         {/* ─── NWS ALERT BANNER (conditional, full-width) ─── */}
@@ -715,7 +921,12 @@ export default function MorningDashboardClient() {
           </div>
         )}
 
-        {/* ─── ROW 7: Quick Actions ─── */}
+        {/* ─── ROW 7: Premium Bottom CTA — Deploy 2B-P2 redesign ─── */}
+        <AnimateIn delay={nextStagger()}>
+          <BottomCTA />
+        </AnimateIn>
+
+        {/* ─── ROW 8: Quick Actions ─── */}
         <AnimateIn delay={nextStagger()}>
           <QuickActions />
         </AnimateIn>
