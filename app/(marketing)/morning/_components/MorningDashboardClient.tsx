@@ -20,7 +20,7 @@
 
 'use client';
 
-import { useMemo, useRef, useEffect, useState, lazy, Suspense } from 'react';
+import { useMemo, useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { GrainBidCard } from '@/components/grain/GrainBidCard';
 import { PaymentEstimateCard } from '@/components/morning/PaymentEstimateCard';
@@ -32,6 +32,7 @@ import ForecastGrid from './ForecastGrid';
 import SoilConditions from './SoilConditions';
 import PlantingWindows from './PlantingWindows';
 import LiveClock from './LiveClock';
+import CommodityDetailCard from './CommodityDetailCard';
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Area,
 } from 'recharts';
@@ -789,6 +790,10 @@ export default function MorningDashboardClient() {
   }, [pricesResponse]);
 
   const marketStatus = useMemo(() => getMarketStatus(), []);
+  const [expandedCommodity, setExpandedCommodity] = useState<string | null>(null);
+  const handleToggleCommodity = useCallback((code: string) => {
+    setExpandedCommodity(prev => prev === code ? null : code);
+  }, []);
 
   let staggerIdx = 0;
   const nextStagger = () => (staggerIdx++) * 60;
@@ -840,9 +845,18 @@ export default function MorningDashboardClient() {
 
         {/* ─── ROW 2: Compact Stat Cards — 3 commodities at a glance ─── */}
         <AnimateIn delay={nextStagger()}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <SectionEyebrow label="Commodity Markets" />
+          <div className="grid grid-cols-1 gap-3">
             {COMMODITY_ORDER.map(code => (
-              <CommodityStatCard key={code} code={code} data={prices[code]} flash={flashStates[code] || null} />
+              <CommodityDetailCard
+                key={code}
+                code={code}
+                config={COMMODITIES[code]}
+                data={prices[code]}
+                flash={flashStates[code] || null}
+                isExpanded={expandedCommodity === code}
+                onToggle={handleToggleCommodity}
+              />
             ))}
           </div>
         </AnimateIn>
