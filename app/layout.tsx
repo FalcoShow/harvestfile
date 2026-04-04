@@ -5,12 +5,17 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { Bricolage_Grotesque, Instrument_Serif } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import { cn } from "@/lib/utils";
+import { QueryProvider } from "@/lib/providers/query-provider";
 
 // =============================================================================
 // HarvestFile — Root Layout
-// Build 17 Deploy 1: iOS horizontal scroll fix
+// Surface 2 Deploy 1: Added QueryProvider for TanStack Query
 //
-// Changes from Build 14:
+// Changes from Build 17 Deploy 1:
+//   1. QueryProvider wraps children inside body for TanStack Query support
+//   2. All existing functionality preserved (fonts, analytics, iOS fixes)
+//
+// Build 17 Deploy 1 (preserved):
 //   1. overflow-x-hidden + overscroll-behavior-x: none on html AND body
 //   2. Removed maximumScale: 5 (accessibility violation — prevents pinch zoom)
 //   3. min-h-svh on body for iOS Safari dynamic toolbar
@@ -153,7 +158,9 @@ export default function RootLayout({
         <JsonLd />
       </head>
       <body className="font-sans antialiased overflow-x-hidden overscroll-x-none relative w-full min-h-svh">
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
         <Analytics />
         <SpeedInsights />
       </body>

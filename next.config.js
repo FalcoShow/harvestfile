@@ -88,7 +88,7 @@ const nextConfig = {
       },
 
       // ═══════════════════════════════════════════════════════════════════
-      // Build 18 Deploy 6: Tool Consolidation Redirects
+      // Build 18 Deploy 6: Tool Consolidation Redirects — Surface 1
       // Surface 1 (Decision Hub) absorbed these standalone tools into
       // /check tabs. 308 permanent (Next.js default for permanent: true)
       // is treated identically to 301 by Google for SEO purposes.
@@ -119,6 +119,47 @@ const nextConfig = {
       {
         source: '/sdrp',
         destination: '/check',
+        permanent: true,
+      },
+
+      // ═══════════════════════════════════════════════════════════════════
+      // Surface 2 Deploy 1: Tool Consolidation Redirects — Farm Command Center
+      // Surface 2 (/morning) absorbs 5 standalone tools:
+      //   /markets  → commodity futures + ARC/PLC payment projections
+      //   /grain    → Marketing Score + grain position tracker
+      //   /weather  → ag weather + GDD + soil + planting windows
+      //   /calendar → USDA report calendar (was standalone page)
+      //   /spray-window → spray window calculator
+      //
+      // Redirect to /morning (NOT /morning#section — Google ignores # fragments).
+      // Each section will have <h2 id="markets"> etc. for scroll-to-section
+      // linking from the floating nav and email digest deep links.
+      //
+      // Keep these redirects active permanently per Google guidance.
+      // ═══════════════════════════════════════════════════════════════════
+      {
+        source: '/markets',
+        destination: '/morning',
+        permanent: true,
+      },
+      {
+        source: '/grain',
+        destination: '/morning',
+        permanent: true,
+      },
+      {
+        source: '/weather',
+        destination: '/morning',
+        permanent: true,
+      },
+      {
+        source: '/calendar',
+        destination: '/morning',
+        permanent: true,
+      },
+      {
+        source: '/spray-window',
+        destination: '/morning',
         permanent: true,
       },
 
