@@ -1,18 +1,17 @@
 // =============================================================================
 // app/(marketing)/morning/page.tsx
-// HarvestFile — Surface 2 Deploy 2: Farm Command Center
+// HarvestFile — Surface 2 Deploy 2B-P2 Final: Farm Command Center
 //
 // SERVER COMPONENT — renders static sections (zero JS), wraps interactive
 // data sections in client boundary.
 //
-// Deploy 2 changes:
-//   - Skeleton updated for expanded bento grid (spray hero, forecast, soil)
-//   - Container stays max-w-7xl (1280px)
-//   - Calendar + CTA side-by-side on large screens (unchanged)
+// Deploy 2B-P2 Final changes:
+//   - "Full USDA calendar" link removed (was 301 loop back to /morning)
+//   - Duplicate BottomCTA removed (premium CTA now lives in client component)
+//   - Calendar section is now full-width instead of 1/2 + 1/2 grid
 // =============================================================================
 
 import { Suspense } from 'react';
-import Link from 'next/link';
 import MorningDashboardClient from './_components/MorningDashboardClient';
 
 export const dynamic = 'force-dynamic';
@@ -57,12 +56,12 @@ function daysUntil(dateStr: string): number {
 function CalendarCard({ reports }: { reports: USDAReport[] }) {
   if (reports.length === 0) return null;
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-5 sm:p-6 h-full">
+    <div className="rounded-2xl border border-white/[0.06] bg-[rgba(27,67,50,0.30)] p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-4">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></svg>
         <h2 className="text-sm font-semibold text-white/90 tracking-tight">USDA Reports That Move Markets</h2>
       </div>
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {reports.map((r, i) => {
           const days = daysUntil(r.date);
           const isImminent = days <= 3;
@@ -84,35 +83,6 @@ function CalendarCard({ reports }: { reports: USDAReport[] }) {
             </div>
           );
         })}
-      </div>
-      <Link href="/calendar" className="flex items-center justify-center gap-1 mt-3 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors">
-        Full USDA calendar<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-      </Link>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// BOTTOM CTA
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function BottomCTA() {
-  return (
-    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#163826] to-[#1B4332] p-6 text-center relative overflow-hidden h-full flex flex-col justify-center">
-      <div className="hf-noise-subtle" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[200px] bg-[radial-gradient(ellipse,rgba(201,168,76,0.08)_0%,transparent_70%)] pointer-events-none" />
-      <div className="relative z-10">
-        <h3 className="text-lg font-bold text-white tracking-[-0.02em] mb-2">
-          See what today&apos;s prices mean for{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C9A84C] to-[#E2C366]">your farm</span>
-        </h3>
-        <p className="text-white/30 text-sm mb-4 max-w-md mx-auto">Enter your county and crops to get personalized ARC/PLC payment projections based on live market data.</p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link href="/check" className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-gradient-to-r from-[#C9A84C] to-[#E2C366] text-[#0C1F17] text-sm font-bold hover:shadow-lg hover:shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
-            Calculate My Payment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-          </Link>
-          <Link href="/signup" className="text-white/30 hover:text-white/60 text-sm font-medium transition-colors">Create free account →</Link>
-        </div>
       </div>
     </div>
   );
@@ -146,25 +116,19 @@ function MorningSkeleton() {
         </div>
       </section>
       <div className="mx-auto max-w-7xl px-4 lg:px-6 -mt-3 space-y-6">
-        {/* Spray hero skeleton */}
         <div className="h-[160px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
-        {/* Stat cards skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[1,2,3].map(i => <div key={i} className="h-[100px] rounded-2xl bg-[#0f2518] border border-white/[0.08] animate-pulse" />)}
         </div>
-        {/* Payment + Grain bids skeleton */}
         <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
           <div className="lg:col-span-4 h-[280px] rounded-2xl bg-gradient-to-br from-[#0C1F17] to-[#1B4332] border border-white/[0.06] animate-pulse" />
           <div className="lg:col-span-3 h-[280px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
         </div>
-        {/* Weather + Markets skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="h-[320px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
           <div className="h-[320px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
         </div>
-        {/* Forecast skeleton */}
         <div className="h-[300px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
-        {/* Soil + Planting skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="h-[240px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
           <div className="h-[240px] rounded-2xl bg-[rgba(27,67,50,0.30)] border border-white/[0.06] animate-pulse" />
@@ -204,14 +168,13 @@ export default function MorningPage() {
 
         {/* Server-rendered sections */}
         <div className="mx-auto max-w-7xl px-4 lg:px-6 pb-20 space-y-6">
-          {/* USDA Calendar + Bottom CTA */}
-          <div>
-            <SectionEyebrow label="Upcoming & Actions" />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* USDA Calendar — full width, no duplicate CTA */}
+          {reports.length > 0 && (
+            <div>
+              <SectionEyebrow label="Upcoming & Actions" />
               <CalendarCard reports={reports} />
-              <BottomCTA />
             </div>
-          </div>
+          )}
 
           {/* Data freshness note */}
           <p className="text-center text-[10px] text-white/15 px-4 mt-4">
