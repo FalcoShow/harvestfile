@@ -1,28 +1,23 @@
 // =============================================================================
-// HarvestFile — Surface 2 Deploy 1: Market Prices Query Hook
 // lib/hooks/morning/use-market-prices.ts
+// HarvestFile — Surface 2 Deploy 3A: Market Prices Query Hook
 //
 // TanStack Query hook wrapping /api/prices/futures.
 // Polls every 5 minutes during market hours, stops on weekends.
 //
+// DEPLOY 3A CHANGES:
+//   - Default days increased from 30 → 90 (TradingView charts need history)
+//   - Added MarketState to response for market status display
+//   - Maintained full backward compatibility with existing components
+//
 // Response shape from API:
 // {
 //   success: boolean,
-//   data: Record<string, {
-//     commodity: string,
-//     contractCode: string,
-//     latestSettle: number | null,
-//     latestDate: string | null,
-//     previousSettle: number | null,
-//     change: number | null,
-//     changePct: number | null,
-//     referencePrice: number | null,
-//     unit: string | null,
-//     prices: Array<{ date: string, settle: number, open: number|null, high: number|null, low: number|null, volume: number|null }>,
-//     count: number,
-//   }>,
+//   data: Record<string, CommodityPriceData>,
 //   source: string,
+//   marketState: 'open' | 'electronic' | 'closed',
 //   timestamp: string,
+//   warnings?: string[],
 // }
 // =============================================================================
 
@@ -57,7 +52,9 @@ export interface MarketPricesResponse {
   success: boolean;
   data: Record<string, CommodityPriceData>;
   source: string;
+  marketState?: 'open' | 'electronic' | 'closed';
   timestamp: string;
+  warnings?: string[];
 }
 
 // ─── Market Hours Detection ──────────────────────────────────────────────────
@@ -101,6 +98,7 @@ async function fetchMarketPrices(
 
 interface UseMarketPricesOptions {
   commodities?: string[];
+  /** Number of days of history to fetch. Default 90 for TradingView charts. */
   days?: number;
   enabled?: boolean;
 }
@@ -108,7 +106,7 @@ interface UseMarketPricesOptions {
 export function useMarketPrices(options: UseMarketPricesOptions = {}) {
   const {
     commodities = ['CORN', 'SOYBEANS', 'WHEAT'],
-    days = 30,
+    days = 90,  // Deploy 3A: increased from 30 → 90 for TradingView chart history
     enabled = true,
   } = options;
 
@@ -116,8 +114,8 @@ export function useMarketPrices(options: UseMarketPricesOptions = {}) {
     queryKey: ['market-prices', commodities.sort().join(','), days],
     queryFn: () => fetchMarketPrices(commodities, days),
     enabled,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 15 * 60 * 1000,   // 15 minutes
+    staleTime: 2 * 60 * 1000,   // 2 minutes
+    gcTime: 15 * 60 * 1000,     // 15 minutes
     // Poll every 5 min during market hours, stop when markets closed
     refetchInterval: () => (isMarketHours() ? 5 * 60 * 1000 : false),
     // Don't poll when tab is hidden

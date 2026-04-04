@@ -1,11 +1,12 @@
 // =============================================================================
-// HarvestFile — Surface 2 Deploy 2B: Morning Query Hooks Index
 // lib/hooks/morning/index.ts
+// HarvestFile — Surface 2 Deploy 3A: Morning Query Hooks Index
 //
 // Barrel export for all TanStack Query hooks used by /morning.
 // Import like: import { useMarketPrices, useWeather, useGrainBids } from '@/lib/hooks/morning';
 //
 // Deploy 2B: Added CurrentConditions, HourlyPoint, SprayWindowData exports
+// Deploy 3A: Added MarketPricesResponse.marketState, PricePoint OHLCV for TradingView
 // =============================================================================
 
 export { useMarketPrices } from './use-market-prices';

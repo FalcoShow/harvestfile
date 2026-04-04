@@ -1,27 +1,27 @@
 // =============================================================================
-// HarvestFile — Futures Price API (Yahoo Finance)
 // app/api/prices/futures/route.ts
+// HarvestFile — Surface 2 Deploy 3A: Enhanced Futures Price API
 //
 // GET /api/prices/futures?commodity=CORN
 // GET /api/prices/futures?commodities=CORN,SOYBEANS,WHEAT
-// GET /api/prices/futures?commodities=CORN,SOYBEANS,WHEAT,OATS,RICE,COTTON&days=90
+// GET /api/prices/futures?commodities=CORN,SOYBEANS,WHEAT&days=90
 //
-// MIGRATED from Nasdaq Data Link CHRIS (deprecated 2024, data stopped updating)
-// to Yahoo Finance v8 chart API — free, no API key, covers all 6 commodities.
+// Data source: Yahoo Finance v8 chart API (free, no key required).
+// Barchart futures require $25K+/yr CME licensing — not viable pre-revenue.
 //
-// CRITICAL: Yahoo Finance returns raw CME/ICE exchange quotes in CENTS per unit.
-// All grain/commodity futures trade in cents:
-//   - Corn (ZC=F): cents/bushel → 460 = $4.60/bu
-//   - Soybeans (ZS=F): cents/bushel → 1165 = $11.65/bu
-//   - Wheat (ZW=F): cents/bushel → 589 = $5.89/bu
-//   - Oats (ZO=F): cents/bushel → 340 = $3.40/bu
-//   - Rice (ZR=F): cents/cwt → 1850 = $18.50/cwt
-//   - Cotton (CT=F): cents/lb → 68 = $0.68/lb
+// DEPLOY 3A CHANGES:
+//   - Default days increased from 30 → 90 (TradingView charts need more history)
+//   - Market-hours-aware Cache-Control headers for optimal CDN behavior
+//   - OHLCV data retained for TradingView candlestick/area series
+//   - Improved error handling with partial failure support
 //
-// We divide by 100 to convert to $/unit for consistency with USDA reference
-// prices, NASS marketing year average prices, and farmer breakeven costs.
+// CRITICAL: Yahoo Finance returns CME quotes in CENTS per unit.
+// We divide by 100 to convert to $/unit for USDA reference price consistency.
 //
-// Caches results in Supabase futures_prices table for historical tracking.
+// Market hours (CBOT grains, Central Time):
+//   Electronic: Sun 7 PM → Fri 1:20 PM CT
+//   Regular:    Mon–Fri 8:30 AM → 1:20 PM CT
+//   Closed:     Fri 1:20 PM → Sun 7 PM CT
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -53,15 +53,67 @@ const FUTURES_CODES: Record<string, string> = {
   COTTON: 'CT=F',
 };
 
+// ─── Market Hours Detection ──────────────────────────────────────────────────
+
+type MarketState = 'open' | 'electronic' | 'closed';
+
+function getMarketState(): MarketState {
+  const ct = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })
+  );
+  const day = ct.getDay();
+  const h = ct.getHours() + ct.getMinutes() / 60;
+
+  // Weekend (Sat all day, Sun before 7 PM)
+  if (day === 6) return 'closed';
+  if (day === 0 && h < 19) return 'closed';
+
+  // Friday after close
+  if (day === 5 && h >= 13.333) return 'closed';
+
+  // Regular trading hours: Mon-Fri 8:30 AM - 1:20 PM CT
+  if (h >= 8.5 && h < 13.333) return 'open';
+
+  // Electronic session: Sun 7 PM through next regular open
+  if (h >= 19 || h < 8.5) return 'electronic';
+
+  return 'closed';
+}
+
+function getCacheHeaders(): string {
+  const state = getMarketState();
+  switch (state) {
+    case 'open':
+      // During regular hours, cache 60s with 120s stale fallback
+      return 'public, s-maxage=60, stale-while-revalidate=120';
+    case 'electronic':
+      // During electronic session, cache 5 min with 10 min stale
+      return 'public, s-maxage=300, stale-while-revalidate=600';
+    case 'closed':
+      // Markets closed, cache 1 hour with 2 hour stale
+      return 'public, s-maxage=3600, stale-while-revalidate=7200';
+    default:
+      return 'public, s-maxage=1800, stale-while-revalidate=900';
+  }
+}
+
 // ─── Cents → Dollars conversion ──────────────────────────────────────────────
-// All CME/ICE commodity futures are quoted in cents per unit on the exchange.
-// Yahoo Finance returns the raw exchange quote. We convert to dollars here
-// so every downstream consumer (Markets page, Grain page, Cash Flow, Marketing
-// Score, MYA projections) works in $/unit matching USDA reference prices.
-// ─────────────────────────────────────────────────────────────────────────────
+
 function centsToDollars(cents: number): number {
   return Math.round((cents / 100) * 10000) / 10000;
 }
+
+// ─── Yahoo Finance range selector ────────────────────────────────────────────
+
+function getYahooRange(days: number): string {
+  if (days > 180) return '1y';
+  if (days > 90) return '6mo';
+  if (days > 30) return '3mo';
+  if (days > 14) return '1mo';
+  return '1mo';
+}
+
+// ─── Price Point type ────────────────────────────────────────────────────────
 
 interface PricePoint {
   date: string;
@@ -72,22 +124,28 @@ interface PricePoint {
   volume: number | null;
 }
 
+// ─── Fetch from Yahoo Finance ────────────────────────────────────────────────
+
 async function fetchFuturesFromYahoo(
   commodity: string,
-  days: number = 30
+  days: number = 90
 ): Promise<PricePoint[]> {
   const symbol = YAHOO_SYMBOLS[commodity];
   if (!symbol) return [];
 
   try {
-    // Yahoo Finance v8 chart API — no API key needed
-    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${days > 60 ? '6mo' : days > 14 ? '3mo' : '1mo'}`;
+    const range = getYahooRange(days);
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${range}`;
+
+    // Market-hours-aware revalidation for the fetch itself
+    const state = getMarketState();
+    const revalidate = state === 'open' ? 60 : state === 'electronic' ? 300 : 1800;
 
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      next: { revalidate: 1800 }, // Cache for 30 minutes
+      next: { revalidate },
     });
 
     if (!res.ok) {
@@ -121,7 +179,6 @@ async function fetchFuturesFromYahoo(
       const close = closes[i];
       if (close === null || close === undefined) continue;
 
-      // Convert Unix timestamp to YYYY-MM-DD
       const date = new Date(timestamps[i] * 1000);
       const dateStr = date.toISOString().split('T')[0];
 
@@ -143,12 +200,15 @@ async function fetchFuturesFromYahoo(
   }
 }
 
+// ─── GET handler ─────────────────────────────────────────────────────────────
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const singleCommodity = searchParams.get('commodity')?.toUpperCase();
   const multipleCommodities = searchParams.get('commodities');
-  const daysParam = parseInt(searchParams.get('days') || '30');
-  const store = searchParams.get('store') !== 'false'; // Default: store to DB
+  // Deploy 3A: Default to 90 days for TradingView chart history
+  const daysParam = parseInt(searchParams.get('days') || '90');
+  const store = searchParams.get('store') !== 'false';
 
   // Determine commodities
   let commodities: string[];
@@ -160,7 +220,7 @@ export async function GET(request: NextRequest) {
     commodities = ['CORN', 'SOYBEANS', 'WHEAT'];
   }
 
-  // Filter to only those with Yahoo symbols
+  // Filter to valid symbols
   commodities = commodities.filter((c) => YAHOO_SYMBOLS[c]);
 
   if (commodities.length === 0) {
@@ -172,79 +232,91 @@ export async function GET(request: NextRequest) {
 
   try {
     const results: Record<string, any> = {};
+    const errors: string[] = [];
 
     await Promise.all(
       commodities.map(async (commodity) => {
-        const prices = await fetchFuturesFromYahoo(commodity, daysParam);
+        try {
+          const prices = await fetchFuturesFromYahoo(commodity, daysParam);
 
-        if (prices.length === 0) {
-          results[commodity] = { commodity, prices: [], error: 'No data returned' };
-          return;
-        }
-
-        // Store to Supabase if requested (prices are already converted to $/unit)
-        if (store && prices.length > 0) {
-          const upsertRows = prices.map((p) => ({
-            commodity,
-            contract_code: FUTURES_CODES[commodity],
-            price_date: p.date,
-            settle: p.settle,
-            open_price: p.open,
-            high: p.high,
-            low: p.low,
-            volume: p.volume,
-            source: 'yahoo_finance',
-            fetched_at: new Date().toISOString(),
-          }));
-
-          const { error: upsertError } = await supabase
-            .from('futures_prices')
-            .upsert(upsertRows, {
-              onConflict: 'commodity,price_date,contract_code',
-            });
-
-          if (upsertError) {
-            console.error(`[Futures] Upsert error for ${commodity}:`, upsertError);
+          if (prices.length === 0) {
+            errors.push(`${commodity}: No data returned`);
+            results[commodity] = { commodity, prices: [], error: 'No data returned' };
+            return;
           }
+
+          // Store to Supabase if requested
+          if (store && prices.length > 0) {
+            const upsertRows = prices.map((p) => ({
+              commodity,
+              contract_code: FUTURES_CODES[commodity],
+              price_date: p.date,
+              settle: p.settle,
+              open_price: p.open,
+              high: p.high,
+              low: p.low,
+              volume: p.volume,
+              source: 'yahoo_finance',
+              fetched_at: new Date().toISOString(),
+            }));
+
+            const { error: upsertError } = await supabase
+              .from('futures_prices')
+              .upsert(upsertRows, {
+                onConflict: 'commodity,price_date,contract_code',
+              });
+
+            if (upsertError) {
+              console.error(`[Futures] Upsert error for ${commodity}:`, upsertError);
+            }
+          }
+
+          const latest = prices[prices.length - 1];
+          const previous = prices.length > 1 ? prices[prices.length - 2] : null;
+          const change = latest && previous
+            ? Math.round((latest.settle - previous.settle) * 10000) / 10000
+            : null;
+          const changePct = latest && previous && previous.settle
+            ? Math.round(((latest.settle - previous.settle) / previous.settle) * 10000) / 100
+            : null;
+
+          const config = COMMODITIES[commodity];
+
+          results[commodity] = {
+            commodity,
+            contractCode: FUTURES_CODES[commodity],
+            latestSettle: latest?.settle || null,
+            latestDate: latest?.date || null,
+            previousSettle: previous?.settle || null,
+            change,
+            changePct,
+            referencePrice: config?.effectiveRefPrice || null,
+            unit: config?.unit || null,
+            prices,
+            count: prices.length,
+          };
+        } catch (err: any) {
+          console.error(`[Futures] Error processing ${commodity}:`, err);
+          errors.push(`${commodity}: ${err.message}`);
+          results[commodity] = { commodity, prices: [], error: err.message };
         }
-
-        const latest = prices[prices.length - 1];
-        const previous = prices.length > 1 ? prices[prices.length - 2] : null;
-        const change = latest && previous
-          ? Math.round((latest.settle - previous.settle) * 10000) / 10000
-          : null;
-        const changePct = latest && previous && previous.settle
-          ? Math.round(((latest.settle - previous.settle) / previous.settle) * 10000) / 100
-          : null;
-
-        const config = COMMODITIES[commodity];
-
-        results[commodity] = {
-          commodity,
-          contractCode: FUTURES_CODES[commodity],
-          latestSettle: latest?.settle || null,
-          latestDate: latest?.date || null,
-          previousSettle: previous?.settle || null,
-          change,
-          changePct,
-          referencePrice: config?.effectiveRefPrice || null,
-          unit: config?.unit || null,
-          prices,
-          count: prices.length,
-        };
       })
     );
+
+    const marketState = getMarketState();
 
     return NextResponse.json(
       {
         success: true,
         data: results,
         source: 'yahoo_finance',
+        marketState,
         timestamp: new Date().toISOString(),
+        ...(errors.length > 0 && { warnings: errors }),
       },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=900',
+          'Cache-Control': getCacheHeaders(),
         },
       }
     );
