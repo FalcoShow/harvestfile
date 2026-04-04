@@ -761,7 +761,7 @@ export default function MorningDashboardClient() {
     isLoading: pricesLoading,
     error: pricesError,
     dataUpdatedAt: pricesUpdatedAt,
-  } = useMarketPrices({ commodities: ['CORN', 'SOYBEANS', 'WHEAT'], days: 30, enabled: true });
+  } = useMarketPrices({ commodities: ['CORN', 'SOYBEANS', 'WHEAT'], days: 365, enabled: true });
 
   const prices = pricesResponse?.data || {};
 
