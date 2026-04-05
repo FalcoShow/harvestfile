@@ -1,6 +1,10 @@
 // =============================================================================
 // HarvestFile — Barchart OnDemand API Client
-// Build 6 Deploy 1: Production-grade client with critical bug fixes
+// Build 6 Deploy 1 → Deploy 3D-fix: Fixed basis unit handling
+//
+// DEPLOY 3D-FIX: Barchart returns basis in CENTS (not dollars).
+// Removed erroneous * 100 multiplication from formatBasis().
+// Fixed formatBasisDollars() to divide by 100 (cents → dollars).
 //
 // Server-side only. Never import this in client components.
 //
@@ -243,7 +247,8 @@ function normalizeBids(rawBids: BarchartRawBid[]): NormalizedBid[] {
     .map((b): NormalizedBid => {
       // Cash price: prefer `cashprice`, fall back to `price`
       const cashPrice = parseFloat(String(b.cashprice || b.price || '0')) || 0;
-      // Basis: string from API, convert to number
+      // Basis: string from API in CENTS per bushel (e.g., "-38.00" = 38 under)
+      // Store as-is — DO NOT divide or multiply. It's already in cents.
       const basis = parseFloat(String(b.basis || '0')) || 0;
       // Change: prefer rawchange (number), fall back to change (string)
       const change = b.rawchange ?? (parseFloat(String(b.change || '0')) || 0);
@@ -531,19 +536,22 @@ export function getBestBids(
 }
 
 // ── Utility: Format basis for display ────────────────────────────────────
+// DEPLOY 3D-FIX: Barchart returns basis ALREADY in cents.
+// Previous code multiplied by 100, causing double-conversion (e.g., 28 → 2800).
 
 export function formatBasis(basis: number): string {
   const sign = basis >= 0 ? '+' : '';
-  // Basis is in dollars from Barchart; display in cents for farmer familiarity
-  const cents = Math.round(basis * 100);
+  const cents = Math.round(basis);
   return `${sign}${cents}¢`;
 }
 
 // ── Utility: Format basis as dollars ─────────────────────────────────────
+// DEPLOY 3D-FIX: basis is in cents, divide by 100 to get dollars.
 
 export function formatBasisDollars(basis: number): string {
   const sign = basis >= 0 ? '+' : '';
-  return `${sign}$${Math.abs(basis).toFixed(2)}`;
+  const dollars = Math.abs(basis) / 100;
+  return `${sign}$${dollars.toFixed(2)}`;
 }
 
 // ── Utility: Query budget stats ──────────────────────────────────────────

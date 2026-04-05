@@ -1,6 +1,10 @@
 // =============================================================================
 // HarvestFile — Barchart OnDemand API Types
-// Build 6 Deploy 1: Updated to match actual Barchart API response format
+// Build 6 Deploy 1 → Deploy 3D-fix: Corrected basis unit documentation
+//
+// DEPLOY 3D-FIX: Barchart returns basis in CENTS per bushel, not dollars.
+// Confirmed by project knowledge brief: "The close field returns basis in
+// cents (e.g., -38.00 means 38 under)." All type comments updated accordingly.
 //
 // Endpoints enabled (confirmed 3/27/2026 by Thomas Willis @ Barchart):
 //   - getGrainBids (cash grain bids by FIPS, zip, or coordinates)
@@ -58,7 +62,7 @@ export interface BarchartRawBid {
   delivery_start?: string;
   /** Delivery end date */
   delivery_end?: string;
-  /** Basis in dollars per bushel (string, e.g. "-38.00") */
+  /** Basis in CENTS per bushel (string, e.g. "-38.00" = 38 cents under futures) */
   basis?: string;
   /** Notes or special conditions */
   notes?: string | null;
@@ -133,6 +137,7 @@ export interface BarchartRawHistoryEntry {
   open?: number;
   high?: number;
   low?: number;
+  /** For basis symbols (e.g., ZCBA-*), close is in CENTS per bushel */
   close?: number;
   volume?: number;
   symbol?: string;
@@ -211,7 +216,12 @@ export interface NormalizedBid {
   deliveryEnd: string;
   /** Basis month, e.g. "Dec 2023" */
   basisMonth: string;
-  /** Basis in dollars/bushel (negative means below futures) */
+  /**
+   * Basis in CENTS per bushel (negative means below futures).
+   * Barchart returns basis in cents — e.g., -38.00 = 38 cents under futures.
+   * Both getGrainBids and getHistory return basis in the same unit (cents).
+   * DO NOT multiply by 100 — it is already in cents.
+   */
   basis: number;
   /** Cash price in $/bushel */
   cashPrice: number;

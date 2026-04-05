@@ -2,7 +2,12 @@
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
 // HarvestFile — Surface 2 Deploy 3D: Basis Tracking Integration
 //
-// DEPLOY 3D CHANGES:
+// DEPLOY 3D-FIX CHANGES:
+//   - Added basisCommodity state so commodity toggle in BasisTrackingCard
+//     triggers actual re-fetch (was hardcoded to 'Corn')
+//   - Pass selectedCommodity and onCommodityChange props to BasisTrackingCard
+//
+// DEPLOY 3D CHANGES (preserved):
 //   - useBasisTracking hook wired for live basis percentile scoring
 //   - BasisTrackingCard positioned between Marketing Score and Farm Financials
 //   - Live basisOpportunityScore passed to MarketingScoreCard (replaces hardcoded 50)
@@ -778,12 +783,15 @@ export default function MorningDashboardClient() {
   const prices = pricesResponse?.data || {};
 
   // ── TanStack Query: Basis Tracking (Deploy 3D — live percentile scoring) ──
+  // DEPLOY 3D-FIX: commodity is now dynamic via basisCommodity state,
+  // controlled by the pill toggle in BasisTrackingCard.
+  const [basisCommodity, setBasisCommodity] = useState('Corn');
   const {
     data: basisResponse,
     isLoading: basisLoading,
     error: basisError,
     refetch: refetchBasis,
-  } = useBasisTracking({ lat, lng, commodity: 'Corn', enabled: true });
+  } = useBasisTracking({ lat, lng, commodity: basisCommodity, enabled: true });
 
   const basisData = basisResponse?.data ?? null;
 
@@ -901,6 +909,8 @@ export default function MorningDashboardClient() {
             loading={basisLoading}
             error={!!basisError}
             onRetry={() => refetchBasis()}
+            selectedCommodity={basisCommodity}
+            onCommodityChange={setBasisCommodity}
           />
         </AnimateIn>
 

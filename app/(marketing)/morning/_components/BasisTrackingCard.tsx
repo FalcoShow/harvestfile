@@ -1,6 +1,12 @@
 // =============================================================================
 // app/(marketing)/morning/_components/BasisTrackingCard.tsx
-// HarvestFile — Surface 2 Deploy 3D: Basis Tracking Card
+// HarvestFile — Surface 2 Deploy 3D-fix: Basis Tracking Card
+//
+// DEPLOY 3D-FIX:
+//   1. Removed * 100 from chart data mapping — weeklyData values from the API
+//      are already in cents (from Barchart getHistory). Previous code doubled them.
+//   2. Commodity toggle now calls onCommodityChange callback to trigger parent
+//      re-fetch instead of only changing local pill styling.
 //
 // Transforms the /morning dashboard from passive bid viewer into active
 // marketing signal by showing:
@@ -35,6 +41,10 @@ interface BasisTrackingCardProps {
   loading: boolean;
   error?: boolean;
   onRetry?: () => void;
+  /** Currently selected commodity — controlled by parent */
+  selectedCommodity: string;
+  /** Callback when user clicks a commodity pill — triggers parent re-fetch */
+  onCommodityChange: (commodity: string) => void;
   className?: string;
 }
 
@@ -184,22 +194,25 @@ export default function BasisTrackingCard({
   loading,
   error,
   onRetry,
+  selectedCommodity,
+  onCommodityChange,
   className = '',
 }: BasisTrackingCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const [selectedCommodity, setSelectedCommodity] = useState('Corn');
 
-  // Chart data: convert cents to display values, trim to recent 26 weeks for collapsed view
+  // DEPLOY 3D-FIX: weeklyData values are already in CENTS from the API.
+  // Previous code multiplied by 100, causing double-conversion.
+  // Now we pass them through as-is — they display correctly as cents.
   const chartData = useMemo(() => {
     if (!basisData?.weeklyData?.length) return [];
 
     const data = basisData.weeklyData.map(w => ({
       ...w,
-      // Convert to cents for display
-      threeYearAvg: Math.round(w.threeYearAvg * 100),
-      currentYear: w.currentYear !== null ? Math.round(w.currentYear * 100) : null,
-      min: Math.round(w.min * 100),
-      max: Math.round(w.max * 100),
+      // Values are already in cents — just round for clean display
+      threeYearAvg: Math.round(w.threeYearAvg),
+      currentYear: w.currentYear !== null ? Math.round(w.currentYear) : null,
+      min: Math.round(w.min),
+      max: Math.round(w.max),
     }));
 
     if (!expanded && basisData.currentWeekIndex >= 0) {
@@ -279,12 +292,12 @@ export default function BasisTrackingCard({
             <h2 className="text-sm font-semibold text-white/90 tracking-tight">Basis Tracker</h2>
           </div>
 
-          {/* Commodity Toggle */}
+          {/* Commodity Toggle — DEPLOY 3D-FIX: calls onCommodityChange to trigger parent re-fetch */}
           <div className="flex gap-1">
             {COMMODITIES.map(c => (
               <button
                 key={c.code}
-                onClick={() => setSelectedCommodity(c.code)}
+                onClick={() => onCommodityChange(c.code)}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
                   selectedCommodity === c.code
                     ? 'text-white/90 border'

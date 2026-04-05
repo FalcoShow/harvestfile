@@ -1,6 +1,11 @@
 // =============================================================================
 // app/api/markets/basis-tracking/route.ts
-// HarvestFile — Surface 2 Deploy 3D: Basis Tracking API
+// HarvestFile — Surface 2 Deploy 3D-fix: Basis Tracking API
+//
+// DEPLOY 3D-FIX: Barchart returns basis in CENTS (both getGrainBids and
+// getHistory). Removed ALL erroneous * 100 multiplications that caused
+// double-conversion (e.g., 28 cents → 2800). Also fixed computeTrendScore
+// and volatility normalization ranges (were calibrated for dollars, not cents).
 //
 // Single endpoint that returns everything the BasisTrackingCard needs:
 //   1. Current basis at the nearest elevator (from getGrainBids)
@@ -31,10 +36,10 @@ export const dynamic = 'force-dynamic';
 interface WeeklyAverage {
   weekOfYear: number;
   weekLabel: string;
-  threeYearAvg: number;
-  currentYear: number | null;
-  min: number;
-  max: number;
+  threeYearAvg: number;    // cents (already from Barchart)
+  currentYear: number | null; // cents
+  min: number;             // cents
+  max: number;             // cents
   sampleCount: number;
 }
 
@@ -43,8 +48,8 @@ interface ElevatorComparison {
   city: string;
   state: string;
   distance: number;
-  basis: number;
-  basisCents: number;
+  basis: number;           // cents (raw from NormalizedBid)
+  basisCents: number;      // cents (rounded)
   deviation: number;       // cents vs 3-year weekly avg
   deviationLabel: string;  // e.g. "8¢ stronger than avg"
   commodity: string;
@@ -62,8 +67,8 @@ interface BasisTrackingResponse {
       distance: number;
     };
     commodity: string;
-    currentBasis: number;          // dollars (e.g., -0.35)
-    currentBasisCents: number;     // cents (e.g., -35)
+    currentBasis: number;          // cents (e.g., -35)
+    currentBasisCents: number;     // cents, rounded integer (e.g., -35)
     futuresMonth: string;          // e.g., "Jul '26"
     deliveryMonth: string;
     percentileScore: number;       // 0-100
@@ -73,7 +78,7 @@ interface BasisTrackingResponse {
     scoreColor: string;            // hex color
     threeYearAvgForWeek: number;   // cents
     deviationFromAvg: number;      // cents (positive = stronger)
-    weeklyData: WeeklyAverage[];   // 52 weeks of seasonal data
+    weeklyData: WeeklyAverage[];   // 52 weeks of seasonal data (all values in cents)
     currentWeekIndex: number;      // which week in the array is "now"
     elevatorComparison: ElevatorComparison[];
     dataYears: number[];           // which years are in the average
@@ -118,6 +123,7 @@ function getScoreLabel(score: number): { label: string; color: string } {
 }
 
 // ── Compute 3-Year Weekly Averages ───────────────────────────────────────
+// All values from getHistory are in CENTS. We store them as-is.
 
 function computeWeeklyAverages(
   history: BarchartRawHistoryEntry[],
@@ -188,6 +194,7 @@ function computeWeeklyAverages(
     const min = allValues.length > 0 ? Math.min(...allValues) : 0;
     const max = allValues.length > 0 ? Math.max(...allValues) : 0;
 
+    // Round to 2 decimal places for precision (still in cents, e.g., -38.25)
     weeklyData.push({
       weekOfYear: w,
       weekLabel: getWeekLabel(w),
@@ -211,6 +218,7 @@ function computeWeeklyAverages(
 }
 
 // ── Compute Percentile Score ─────────────────────────────────────────────
+// Both currentBasis and entry.close are in CENTS — same unit, comparison works.
 
 function computePercentileScore(
   currentBasis: number,
@@ -244,6 +252,7 @@ function computePercentileScore(
 }
 
 // ── Compute Trend Score ──────────────────────────────────────────────────
+// DEPLOY 3D-FIX: Normalization range changed from ±0.20 (dollars) to ±20 (cents).
 
 function computeTrendScore(history: BarchartRawHistoryEntry[]): number {
   // Look at the last 20 trading days (~4 weeks)
@@ -263,8 +272,9 @@ function computeTrendScore(history: BarchartRawHistoryEntry[]): number {
   // Positive change = strengthening basis = higher score
   const change = secondAvg - firstAvg;
 
-  // Normalize: ±0.20 (20 cents) maps to 0-100 range
-  const normalized = (change + 0.20) / 0.40; // -0.20 → 0, 0 → 0.5, +0.20 → 1.0
+  // Normalize: ±20 cents maps to 0-100 range
+  // -20¢ → 0, 0 → 50, +20¢ → 100
+  const normalized = (change + 20) / 40;
   return Math.round(Math.max(0, Math.min(100, normalized * 100)));
 }
 
@@ -349,7 +359,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`[basis-tracking] Got ${elevators.length} elevators for ${lat},${lng}`);
+    console.log(`[basis-tracking] Got ${elevators.length} elevators for ${fips || `${lat},${lng}`}`);
 
     if (elevators.length === 0) {
       return NextResponse.json(
@@ -389,7 +399,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[basis-tracking] Primary: ${primaryElevator?.name || 'none'}, basisRollingSymbol: ${primaryBid?.basisRollingSymbol || 'null'}, hasBasisHistory: ${hasBasisHistory}`);
+    // DIAGNOSTIC: Log raw basis value from Barchart to verify units (remove after verification)
+    console.log(`[basis-tracking] Primary: ${primaryElevator?.name || 'none'}, raw basis: ${primaryBid?.basis}, basisRollingSymbol: ${primaryBid?.basisRollingSymbol || 'null'}, hasBasisHistory: ${hasBasisHistory}`);
 
     if (!primaryElevator || !primaryBid) {
       // No bids at all for this commodity — return comparison with whatever we have
@@ -444,6 +455,12 @@ export async function GET(request: NextRequest) {
           startDate,
         });
         console.log(`[basis-tracking] Got ${history.length} history records`);
+
+        // DIAGNOSTIC: Log first few close values to verify units (remove after verification)
+        if (history.length > 0) {
+          const sample = history.slice(0, 3).map(h => `${h.tradingDay}: close=${h.close}`).join(', ');
+          console.log(`[basis-tracking] History sample (should be in cents): ${sample}`);
+        }
       } catch (historyError) {
         console.warn(`[basis-tracking] getHistory failed, continuing without historical data:`, historyError);
         hasBasisHistory = false;
@@ -473,6 +490,7 @@ export async function GET(request: NextRequest) {
       : 50;
 
     // Volatility adjustment: compute std dev of recent 4 weeks of basis
+    // DEPLOY 3D-FIX: threshold changed from 0.30 (dollars) to 30 (cents)
     let volatilityAdj = 75; // default: moderate confidence
     if (history.length >= 10) {
       const recentHistory = history
@@ -482,7 +500,8 @@ export async function GET(request: NextRequest) {
       const mean = recentHistory.reduce((s, e) => s + (e.close ?? 0), 0) / Math.max(1, recentHistory.length);
       const variance = recentHistory.reduce((s, e) => s + Math.pow((e.close ?? 0) - mean, 2), 0) / Math.max(1, recentHistory.length);
       const stdDev = Math.sqrt(variance);
-      const normalizedStdDev = Math.min(1, stdDev / 0.30);
+      // 30 cents std dev = high volatility (normalizedStdDev → 1.0)
+      const normalizedStdDev = Math.min(1, stdDev / 30);
       volatilityAdj = Math.max(25, Math.min(100, Math.round(100 - normalizedStdDev * 50)));
     }
 
@@ -496,10 +515,11 @@ export async function GET(request: NextRequest) {
     const { label: scoreLabel, color: scoreColor } = getScoreLabel(basisOpportunityScore);
 
     // Step 6: Find the 3-year average for the current week
+    // DEPLOY 3D-FIX: basis is already in cents — DO NOT multiply by 100
     const currentWeekData = weeklyData.find(w => w.weekOfYear === currentWeek);
     const threeYearAvgForWeek = currentWeekData?.threeYearAvg ?? 0;
-    const currentBasisCents = Math.round(primaryBid.basis * 100);
-    const threeYearAvgCents = Math.round(threeYearAvgForWeek * 100);
+    const currentBasisCents = Math.round(primaryBid.basis);
+    const threeYearAvgCents = Math.round(threeYearAvgForWeek);
     const deviationFromAvg = currentBasisCents - threeYearAvgCents;
 
     // Step 7: Find current week index in the marketing-year-ordered weeklyData
@@ -576,11 +596,12 @@ export async function GET(request: NextRequest) {
 }
 
 // ── Build Elevator Comparison ────────────────────────────────────────────
+// DEPLOY 3D-FIX: basis and threeYearAvg are both in CENTS — no * 100 needed.
 
 function buildElevatorComparison(
   elevators: GrainElevator[],
   commodity: string,
-  threeYearAvg: number, // in dollars
+  threeYearAvg: number, // in cents
 ): ElevatorComparison[] {
   const comparisons: ElevatorComparison[] = [];
 
@@ -590,8 +611,8 @@ function buildElevatorComparison(
     );
     if (!bid) continue;
 
-    const basisCents = Math.round(bid.basis * 100);
-    const avgCents = Math.round(threeYearAvg * 100);
+    const basisCents = Math.round(bid.basis);
+    const avgCents = Math.round(threeYearAvg);
     const deviationCents = basisCents - avgCents;
     const absDeviation = Math.abs(deviationCents);
 
