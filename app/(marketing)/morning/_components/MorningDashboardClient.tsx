@@ -1,8 +1,13 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
-// HarvestFile — Surface 2 Deploy 3C: Marketing Score Gauge Integration
+// HarvestFile — Surface 2 Deploy 3D: Basis Tracking Integration
 //
-// DEPLOY 3C CHANGES:
+// DEPLOY 3D CHANGES:
+//   - useBasisTracking hook wired for live basis percentile scoring
+//   - BasisTrackingCard positioned between Marketing Score and Farm Financials
+//   - Live basisOpportunityScore passed to MarketingScoreCard (replaces hardcoded 50)
+//
+// DEPLOY 3C CHANGES (preserved):
 //   - MarketingScoreCard imported and wired between Commodity Markets and Farm Financials
 //   - Passes prices + loading state from TanStack Query to MarketingScoreCard
 //
@@ -31,6 +36,7 @@ import { PaymentEstimateCard } from '@/components/morning/PaymentEstimateCard';
 import { useLocationStore } from '@/lib/stores/location-store';
 import { useMarketPrices } from '@/lib/hooks/morning/use-market-prices';
 import { useWeather } from '@/lib/hooks/morning/use-weather';
+import { useBasisTracking } from '@/lib/hooks/morning/use-basis';
 import SprayStatusHero from './SprayStatusHero';
 import ForecastGrid from './ForecastGrid';
 import SoilConditions from './SoilConditions';
@@ -38,6 +44,7 @@ import PlantingWindows from './PlantingWindows';
 import LiveClock from './LiveClock';
 import CommodityDetailCard from './CommodityDetailCard';
 import MarketingScoreCard from './MarketingScoreCard';
+import BasisTrackingCard from './BasisTrackingCard';
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Area,
 } from 'recharts';
@@ -770,6 +777,16 @@ export default function MorningDashboardClient() {
 
   const prices = pricesResponse?.data || {};
 
+  // ── TanStack Query: Basis Tracking (Deploy 3D — live percentile scoring) ──
+  const {
+    data: basisResponse,
+    isLoading: basisLoading,
+    error: basisError,
+    refetch: refetchBasis,
+  } = useBasisTracking({ lat, lng, commodity: 'Corn', enabled: true });
+
+  const basisData = basisResponse?.data ?? null;
+
   // ── Price flash detection ──
   const prevPricesRef = useRef<Record<string, number | null>>({});
   const [flashStates, setFlashStates] = useState<Record<string, 'up' | 'down' | null>>({});
@@ -869,7 +886,22 @@ export default function MorningDashboardClient() {
         {/* ─── ROW 2.5: Marketing Score Gauge ─── */}
         <AnimateIn delay={nextStagger()}>
           <SectionEyebrow label="Marketing Score" />
-          <MarketingScoreCard prices={prices} loading={pricesLoading} />
+          <MarketingScoreCard
+            prices={prices}
+            loading={pricesLoading}
+            liveBasisScore={basisData?.basisOpportunityScore}
+          />
+        </AnimateIn>
+
+        {/* ─── ROW 2.75: Basis Tracker (Deploy 3D) ─── */}
+        <AnimateIn delay={nextStagger()}>
+          <SectionEyebrow label="Local Basis" />
+          <BasisTrackingCard
+            basisData={basisData}
+            loading={basisLoading}
+            error={!!basisError}
+            onRetry={() => refetchBasis()}
+          />
         </AnimateIn>
 
         {/* ─── ROW 3: Payment Estimate + Grain Bids — 4/3 split ─── */}

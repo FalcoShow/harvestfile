@@ -1,6 +1,10 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MarketingScoreCard.tsx
-// HarvestFile — Surface 2 Deploy 3C: Marketing Score Gauge
+// HarvestFile — Surface 2 Deploy 3D: Live Basis Score Integration
+//
+// DEPLOY 3D CHANGES:
+//   - Added `liveBasisScore` prop from BasisTrackingCard percentile engine
+//   - Replaces hardcoded basisOpportunity: 50 with live Barchart data
 //
 // v2 FIXES (Deploy 3C hotfix):
 //   - Needle shortened: only extends from arc inward ~28px, no longer overlaps score
@@ -28,6 +32,8 @@ import {
 interface MarketingScoreCardProps {
   prices: Record<string, any>;
   loading?: boolean;
+  /** Live Basis Opportunity Score from BasisTrackingCard (0-100). Replaces hardcoded 50. */
+  liveBasisScore?: number;
   className?: string;
 }
 
@@ -266,7 +272,7 @@ function getRecommendation(score: number, primaryCrop: string) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function MarketingScoreCard({ prices, loading, className = '' }: MarketingScoreCardProps) {
+export default function MarketingScoreCard({ prices, loading, liveBasisScore, className = '' }: MarketingScoreCardProps) {
   const [containerRef, inView] = useInView(0.2);
   const [hasAnimated, setHasAnimated] = useState(false);
 
@@ -291,7 +297,9 @@ export default function MarketingScoreCard({ prices, loading, className = '' }: 
       Math.round(breakdowns.reduce((sum, b) => sum + b.breakdown[key], 0) / breakdowns.length);
     const factors = {
       profitability: avg('profitability'), seasonal: avg('seasonal'), curveShape: avg('curveShape'),
-      storageBurn: avg('storageBurn'), basisOpportunity: avg('basisOpportunity'),
+      storageBurn: avg('storageBurn'),
+      // Deploy 3D: Use live Barchart percentile score when available, else averaged default
+      basisOpportunity: liveBasisScore !== undefined ? liveBasisScore : avg('basisOpportunity'),
     };
     const composite = Math.round(
       factors.profitability * 0.30 + factors.seasonal * 0.25 + factors.curveShape * 0.20 +
@@ -300,7 +308,7 @@ export default function MarketingScoreCard({ prices, loading, className = '' }: 
     const primaryCrop = breakdowns.reduce((best, curr) =>
       curr.breakdown.composite > best.breakdown.composite ? curr : best).code;
     return { composite, factors, primaryCrop, cropCount: breakdowns.length };
-  }, [prices]);
+  }, [prices, liveBasisScore]);
 
   const recommendation = useMemo(
     () => getRecommendation(scoreData.composite, scoreData.primaryCrop),
