@@ -1,8 +1,12 @@
 // =============================================================================
 // app/(marketing)/morning/_components/MorningDashboardClient.tsx
-// HarvestFile — Surface 2 Deploy 2B-P2: UI Component Rewrites
+// HarvestFile — Surface 2 Deploy 3C: Marketing Score Gauge Integration
 //
-// DEPLOY 2B-P2 CHANGES:
+// DEPLOY 3C CHANGES:
+//   - MarketingScoreCard imported and wired between Commodity Markets and Farm Financials
+//   - Passes prices + loading state from TanStack Query to MarketingScoreCard
+//
+// DEPLOY 2B-P2 CHANGES (preserved):
 //   - CurrentWeatherCard: shows current.temp_f (real-time) not daily max
 //   - CurrentWeatherCard: wind direction cardinal + dew point + Delta T badge
 //   - CurrentWeatherCard: mini 12-hour Recharts ComposedChart (temp line + precip bars)
@@ -33,6 +37,7 @@ import SoilConditions from './SoilConditions';
 import PlantingWindows from './PlantingWindows';
 import LiveClock from './LiveClock';
 import CommodityDetailCard from './CommodityDetailCard';
+import MarketingScoreCard from './MarketingScoreCard';
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Area,
 } from 'recharts';
@@ -859,6 +864,12 @@ export default function MorningDashboardClient() {
               />
             ))}
           </div>
+        </AnimateIn>
+
+        {/* ─── ROW 2.5: Marketing Score Gauge ─── */}
+        <AnimateIn delay={nextStagger()}>
+          <SectionEyebrow label="Marketing Score" />
+          <MarketingScoreCard prices={prices} loading={pricesLoading} />
         </AnimateIn>
 
         {/* ─── ROW 3: Payment Estimate + Grain Bids — 4/3 split ─── */}
