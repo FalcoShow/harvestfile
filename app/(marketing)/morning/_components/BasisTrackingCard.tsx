@@ -348,7 +348,7 @@ export default function BasisTrackingCard({
       </div>
 
       {/* ─── Seasonal Chart ─── */}
-      {chartData.length > 0 && (
+      {chartData.length > 0 ? (
         <div className="px-3 sm:px-4 pt-1 pb-2">
           <ResponsiveContainer width="100%" height={expanded ? 220 : 160}>
             <ComposedChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
@@ -433,6 +433,14 @@ export default function BasisTrackingCard({
               <div className="w-4 h-[2px] bg-white/25 rounded-full" style={{ backgroundImage: 'repeating-linear-gradient(90deg, rgba(156,163,175,0.5) 0, rgba(156,163,175,0.5) 4px, transparent 4px, transparent 7px)' }} />
               <span className="text-[10px] text-white/25">3-yr avg</span>
             </div>
+          </div>
+        </div>
+      ) : (
+        <div className="px-5 sm:px-6 py-3">
+          <div className="rounded-xl bg-white/[0.03] border border-white/[0.04] p-4 text-center">
+            <p className="text-[12px] text-white/30">
+              Seasonal basis chart will appear once historical data is available for this location.
+            </p>
           </div>
         </div>
       )}

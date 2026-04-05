@@ -321,10 +321,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Step 1: Get nearby elevators with bids
+    // IMPORTANT: Do NOT pass commodity filter to Barchart — it's case-sensitive
+    // and may return no results. Fetch all bids, filter server-side.
     let elevators: GrainElevator[];
     if (fips && /^\d{4,5}$/.test(fips)) {
       elevators = await getGrainBidsByFips(fips, {
-        commodities: [commodity],
         maxLocations: 10,
         bidsPerCommodity: 3,
       });
@@ -338,7 +339,6 @@ export async function GET(request: NextRequest) {
         );
       }
       elevators = await getGrainBidsByCoords(latitude, longitude, {
-        commodities: [commodity],
         maxLocations: 10,
         bidsPerCommodity: 3,
       });
@@ -348,6 +348,8 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log(`[basis-tracking] Got ${elevators.length} elevators for ${lat},${lng}`);
 
     if (elevators.length === 0) {
       return NextResponse.json(
@@ -360,6 +362,7 @@ export async function GET(request: NextRequest) {
     let primaryElevator: GrainElevator | null = null;
     let primaryBid: NormalizedBid | null = null;
 
+    // First pass: exact commodity match with basisRollingSymbol
     for (const elevator of elevators) {
       const bid = elevator.bids.find(
         b => b.commodity.toLowerCase() === commodity.toLowerCase() && b.basisRollingSymbol
@@ -371,13 +374,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!primaryElevator || !primaryBid || !primaryBid.basisRollingSymbol) {
-      // Fall back: return comparison data without historical analysis
+    // Second pass: exact commodity match WITHOUT basisRollingSymbol (still useful for comparison)
+    let hasBasisHistory = !!primaryBid?.basisRollingSymbol;
+    if (!primaryBid) {
+      for (const elevator of elevators) {
+        const bid = elevator.bids.find(
+          b => b.commodity.toLowerCase() === commodity.toLowerCase()
+        );
+        if (bid) {
+          primaryElevator = elevator;
+          primaryBid = bid;
+          break;
+        }
+      }
+    }
+
+    console.log(`[basis-tracking] Primary: ${primaryElevator?.name || 'none'}, basisRollingSymbol: ${primaryBid?.basisRollingSymbol || 'null'}, hasBasisHistory: ${hasBasisHistory}`);
+
+    if (!primaryElevator || !primaryBid) {
+      // No bids at all for this commodity — return comparison with whatever we have
       const comparison = buildElevatorComparison(elevators, commodity, 0);
       return NextResponse.json(
         {
           success: true,
-          data: {
+          data: comparison.length > 0 ? {
             elevator: {
               name: elevators[0].name,
               city: elevators[0].city,
@@ -385,10 +405,10 @@ export async function GET(request: NextRequest) {
               distance: elevators[0].distance,
             },
             commodity,
-            currentBasis: elevators[0].bids[0]?.basis ?? 0,
-            currentBasisCents: Math.round((elevators[0].bids[0]?.basis ?? 0) * 100),
-            futuresMonth: elevators[0].bids[0]?.basisMonth || '',
-            deliveryMonth: elevators[0].bids[0]?.deliveryMonth || '',
+            currentBasis: 0,
+            currentBasisCents: 0,
+            futuresMonth: '',
+            deliveryMonth: '',
             percentileScore: 50,
             trendScore: 50,
             basisOpportunityScore: 50,
@@ -400,44 +420,71 @@ export async function GET(request: NextRequest) {
             currentWeekIndex: -1,
             elevatorComparison: comparison,
             dataYears: [],
-            narrativeSummary: `${commodity} basis data available but no historical tracking symbol found for seasonal analysis.`,
-          },
+            narrativeSummary: `No ${commodity} bids found at nearby elevators. Try selecting a different commodity.`,
+          } : null,
           attribution: ATTRIBUTION,
         },
         { headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' } }
       );
     }
 
-    // Step 3: Pull 3 years of daily basis history
+    // Step 3: Pull 3 years of daily basis history (only if basisRollingSymbol exists)
+    let history: BarchartRawHistoryEntry[] = [];
+    if (hasBasisHistory && primaryBid.basisRollingSymbol) {
+      try {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const threeYearsAgo = new Date(currentYear - 3, 0, 1);
+        const startDate = threeYearsAgo.toISOString().slice(0, 10).replace(/-/g, '');
+
+        console.log(`[basis-tracking] Fetching history for ${primaryBid.basisRollingSymbol} since ${startDate}`);
+        history = await getBidHistory(primaryBid.basisRollingSymbol, {
+          type: 'daily',
+          maxRecords: 5000,
+          startDate,
+        });
+        console.log(`[basis-tracking] Got ${history.length} history records`);
+      } catch (historyError) {
+        console.warn(`[basis-tracking] getHistory failed, continuing without historical data:`, historyError);
+        hasBasisHistory = false;
+        history = [];
+      }
+    }
+
+    // Step 4: Compute weekly seasonal averages (if history available)
     const now = new Date();
     const currentYear = now.getFullYear();
-    const threeYearsAgo = new Date(currentYear - 3, 0, 1);
-    const startDate = threeYearsAgo.toISOString().slice(0, 10).replace(/-/g, '');
+    let weeklyData: WeeklyAverage[] = [];
+    let dataYears: number[] = [];
 
-    const history = await getBidHistory(primaryBid.basisRollingSymbol, {
-      type: 'daily',
-      maxRecords: 5000,
-      startDate,
-    });
-
-    // Step 4: Compute weekly seasonal averages
-    const { weeklyData, dataYears } = computeWeeklyAverages(history, currentYear);
+    if (history.length > 0) {
+      const result = computeWeeklyAverages(history, currentYear);
+      weeklyData = result.weeklyData;
+      dataYears = result.dataYears;
+    }
 
     // Step 5: Compute percentile and trend scores
     const currentWeek = getISOWeek(now);
-    const percentileScore = computePercentileScore(primaryBid.basis, history, currentWeek, currentYear);
-    const trendScore = computeTrendScore(history);
+    const percentileScore = history.length > 0
+      ? computePercentileScore(primaryBid.basis, history, currentWeek, currentYear)
+      : 50;
+    const trendScore = history.length > 0
+      ? computeTrendScore(history)
+      : 50;
 
     // Volatility adjustment: compute std dev of recent 4 weeks of basis
-    const recentHistory = history
-      .filter(e => e.tradingDay && e.close !== undefined)
-      .sort((a, b) => (a.tradingDay! > b.tradingDay! ? 1 : -1))
-      .slice(-20);
-    const mean = recentHistory.reduce((s, e) => s + (e.close ?? 0), 0) / Math.max(1, recentHistory.length);
-    const variance = recentHistory.reduce((s, e) => s + Math.pow((e.close ?? 0) - mean, 2), 0) / Math.max(1, recentHistory.length);
-    const stdDev = Math.sqrt(variance);
-    const normalizedStdDev = Math.min(1, stdDev / 0.30); // 30 cents std dev = max volatility
-    const volatilityAdj = Math.max(25, Math.min(100, Math.round(100 - normalizedStdDev * 50)));
+    let volatilityAdj = 75; // default: moderate confidence
+    if (history.length >= 10) {
+      const recentHistory = history
+        .filter(e => e.tradingDay && e.close !== undefined)
+        .sort((a, b) => (a.tradingDay! > b.tradingDay! ? 1 : -1))
+        .slice(-20);
+      const mean = recentHistory.reduce((s, e) => s + (e.close ?? 0), 0) / Math.max(1, recentHistory.length);
+      const variance = recentHistory.reduce((s, e) => s + Math.pow((e.close ?? 0) - mean, 2), 0) / Math.max(1, recentHistory.length);
+      const stdDev = Math.sqrt(variance);
+      const normalizedStdDev = Math.min(1, stdDev / 0.30);
+      volatilityAdj = Math.max(25, Math.min(100, Math.round(100 - normalizedStdDev * 50)));
+    }
 
     // Composite Basis Opportunity Score
     const basisOpportunityScore = Math.round(
@@ -463,14 +510,16 @@ export async function GET(request: NextRequest) {
 
     // Step 9: Build narrative summary
     const futuresMonth = primaryBid.basisMonth || primaryBid.deliveryMonth || '';
-    const narrative = buildNarrative(
-      primaryElevator.name,
-      commodity,
-      currentBasisCents,
-      deviationFromAvg,
-      percentileScore,
-      futuresMonth,
-    );
+    const narrative = hasBasisHistory && history.length > 0
+      ? buildNarrative(
+          primaryElevator.name,
+          commodity,
+          currentBasisCents,
+          deviationFromAvg,
+          percentileScore,
+          futuresMonth,
+        )
+      : `${commodity} basis at ${primaryElevator.name} is ${Math.abs(currentBasisCents)}¢ ${currentBasisCents >= 0 ? 'over' : 'under'} ${futuresMonth} futures. Historical seasonal comparison will be available when more data is collected.`;
 
     return NextResponse.json(
       {
