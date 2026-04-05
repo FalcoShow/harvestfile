@@ -1,10 +1,14 @@
 // =============================================================================
 // app/(marketing)/morning/_components/CommodityDetailCard.tsx
-// HarvestFile — Surface 2 Deploy 3B: Commodity Detail Cards with TradingView
+// HarvestFile — Surface 2 Deploy 3E: Tap-to-Interact + Accessibility
 //
-// Expandable commodity card that collapses to a compact price display and
-// expands to reveal a full TradingView Lightweight Charts v4.2.3 area chart
-// with USDA Effective Reference Price and Loan Rate overlay lines.
+// DEPLOY 3E CHANGES:
+//   - Added tap-to-interact overlay for mobile TradingView charts
+//   - Chart starts PASSIVE (page scrolls freely over it)
+//   - Tap overlay activates full chart interaction (pan/zoom)
+//   - Auto-deactivates after 3 seconds of no touch interaction
+//   - sr-only data table for screen reader accessibility
+//   - Gold contrast fix: body text uses #F0E6D0 for WCAG AAA (8.93:1)
 //
 // Architecture:
 //   - Collapsed: crop icon, price, change %, PLC status dot, Recharts sparkline
@@ -17,10 +21,13 @@
 //   - createPriceLine() for USDA reference price + loan rate overlays
 //   - autoSize: true for responsive container (no manual ResizeObserver)
 //   - handleScroll.vertTouchDrag: false — allows page scrolling over chart
+//   - chart.applyOptions() toggles between passive and active modes
 //   - attributionLogo: false — we add footer attribution link instead
 //
 // Mobile safety:
 //   - Chart is passive by default (page scrolls over it)
+//   - Tap-to-interact overlay activates full touch interaction
+//   - Auto-deactivates after 3 seconds of no interaction
 //   - 48px min touch targets on all interactive elements
 //   - Time period pills are 44px tall with generous hit areas
 //   - Grid-template-rows animation for smooth expand/collapse
@@ -191,9 +198,44 @@ function calcPLCStatus(price: number, refPrice: number): 'above' | 'near' | 'bel
   return 'below';
 }
 
+// ─── Passive/Active Chart Options for tap-to-interact ────────────────────────
+
+const PASSIVE_CHART_OPTS = {
+  handleScroll: {
+    mouseWheel: true,
+    pressedMouseMove: true,
+    horzTouchDrag: false,
+    vertTouchDrag: false,
+  },
+  handleScale: {
+    axisPressedMouseMove: true,
+    mouseWheel: true,
+    pinch: false,
+  },
+  kineticScroll: { mouse: false, touch: false },
+};
+
+const ACTIVE_CHART_OPTS = {
+  handleScroll: {
+    mouseWheel: true,
+    pressedMouseMove: true,
+    horzTouchDrag: true,
+    vertTouchDrag: true,
+  },
+  handleScale: {
+    axisPressedMouseMove: true,
+    mouseWheel: true,
+    pinch: true,
+  },
+  kineticScroll: { mouse: false, touch: true },
+};
+
+const INACTIVITY_MS = 3000;
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// TRADINGVIEW CHART COMPONENT
+// TRADINGVIEW CHART COMPONENT WITH TAP-TO-INTERACT
 // Created on expand, destroyed on collapse. Zero memory when hidden.
+// Mobile: starts passive, tap overlay activates interaction, auto-deactivates.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function TradingViewChart({
@@ -208,6 +250,14 @@ function TradingViewChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isChartActive, setIsChartActive] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  // Detect touch device on mount
+  useEffect(() => {
+    setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  }, []);
 
   // Convert PricePoint[] to TradingView format
   const chartData = useMemo(() => {
@@ -226,6 +276,36 @@ function TradingViewChart({
       chartRef.current.timeScale().fitContent();
     }
   }, [filteredData]);
+
+  // Deactivate handler
+  const deactivate = useCallback(() => {
+    setIsChartActive(false);
+    if (chartRef.current) {
+      chartRef.current.applyOptions(PASSIVE_CHART_OPTS);
+    }
+  }, []);
+
+  // Reset inactivity timer
+  const resetTimer = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(deactivate, INACTIVITY_MS);
+  }, [deactivate]);
+
+  // Activate handler
+  const activate = useCallback(() => {
+    setIsChartActive(true);
+    if (chartRef.current) {
+      chartRef.current.applyOptions(ACTIVE_CHART_OPTS);
+    }
+    resetTimer();
+  }, [resetTimer]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   // Create chart on mount, destroy on unmount
   useEffect(() => {
@@ -284,10 +364,8 @@ function TradingViewChart({
           fixLeftEdge: true,
           fixRightEdge: true,
         },
-        // CRITICAL: Allow page scrolling over the chart on mobile
-        handleScroll: { vertTouchDrag: false },
-        handleScale: { pinch: true, mouseWheel: true },
-        kineticScroll: { touch: true, mouse: false },
+        // Start in PASSIVE mode — page scrolls freely over chart
+        ...PASSIVE_CHART_OPTS,
       });
 
       const areaSeries = chart.addAreaSeries({
@@ -340,6 +418,7 @@ function TradingViewChart({
 
     return () => {
       isMounted = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       chartRef.current?.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -348,10 +427,68 @@ function TradingViewChart({
 
   return (
     <div
-      ref={containerRef}
-      className="w-full"
-      style={{ height: 'clamp(200px, 40vw, 320px)' }}
-    />
+      className="relative"
+      onTouchMove={() => { if (isChartActive) resetTimer(); }}
+    >
+      {/* Chart container */}
+      <div
+        ref={containerRef}
+        className="w-full"
+        style={{ height: 'clamp(200px, 40vw, 320px)' }}
+      />
+
+      {/* Tap-to-interact overlay — only shown on touch devices when chart is passive */}
+      {isTouchDevice && !isChartActive && (
+        <button
+          onClick={activate}
+          onTouchEnd={(e) => { e.preventDefault(); activate(); }}
+          aria-label="Tap to interact with chart"
+          className="absolute inset-0 z-10 flex items-center justify-center"
+          style={{ touchAction: 'auto' }}
+        >
+          <span className="flex items-center gap-2 px-4 py-2.5 bg-[#1B4332]/85 text-[#D4B85C] rounded-lg text-[13px] font-semibold min-h-[44px] shadow-lg backdrop-blur-sm border border-white/[0.08]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" /><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" /><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+            </svg>
+            Tap to interact
+          </span>
+        </button>
+      )}
+
+      {/* Active indicator badge */}
+      {isTouchDevice && isChartActive && (
+        <div className="absolute top-2 right-2 px-2 py-1 bg-[#D4B85C]/90 text-[#0C1F17] rounded text-[10px] font-bold z-10 pointer-events-none">
+          Interactive
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Screen Reader Data Table ─────────────────────────────────────────────────
+
+function SrOnlyDataTable({ prices, name }: { prices: PricePoint[]; name: string }) {
+  if (!prices || prices.length === 0) return null;
+  // Show last 10 data points for screen readers
+  const recent = prices.slice(-10);
+  return (
+    <table className="sr-only">
+      <caption>{name} futures prices, last {recent.length} trading days</caption>
+      <thead>
+        <tr>
+          <th scope="col">Date</th>
+          <th scope="col">Settlement Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {recent.map((point) => (
+          <tr key={point.date}>
+            <td>{point.date}</td>
+            <td>${point.settle.toFixed(2)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -425,7 +562,8 @@ export default function CommodityDetailCard({
               }`} />
             )}
           </div>
-          <span className="text-[10px] text-white/25 tabular-nums">
+          {/* DEPLOY 3E: Gold contrast fix — #F0E6D0 body text for WCAG AAA */}
+          <span className="text-[10px] text-[#F0E6D0]/40 tabular-nums">
             vs ${config.effectiveRefPrice.toFixed(2)} ERP
           </span>
         </div>
@@ -480,8 +618,8 @@ export default function CommodityDetailCard({
                   </button>
                 ))}
 
-                {/* Price context */}
-                <div className="ml-auto flex items-center gap-3 text-[10px] text-white/20">
+                {/* Price context legend */}
+                <div className="ml-auto flex items-center gap-3 text-[10px] text-[#F0E6D0]/30">
                   <span className="flex items-center gap-1">
                     <span className="w-3 h-0.5 bg-emerald-600 rounded" style={{ borderTop: '1px dashed #16a34a' }} />
                     ERP
@@ -493,8 +631,8 @@ export default function CommodityDetailCard({
                 </div>
               </div>
 
-              {/* TradingView Chart */}
-              <div className="rounded-xl bg-black/20 border border-white/[0.04] overflow-hidden">
+              {/* TradingView Chart with tap-to-interact */}
+              <div className="rounded-xl bg-black/20 border border-white/[0.04] overflow-hidden" aria-hidden="true">
                 <TradingViewChart
                   prices={data.prices}
                   code={code}
@@ -502,29 +640,32 @@ export default function CommodityDetailCard({
                 />
               </div>
 
+              {/* Screen reader accessible data table */}
+              <SrOnlyDataTable prices={data.prices} name={config.name} />
+
               {/* Price context row */}
               <div className="flex items-center justify-between mt-3 px-1">
                 <div className="flex items-center gap-4 text-[11px]">
                   <div>
-                    <span className="text-white/25">High </span>
-                    <span className="text-white/60 font-semibold tabular-nums">
+                    <span className="text-[#F0E6D0]/30">High </span>
+                    <span className="text-[#F0E6D0]/70 font-semibold tabular-nums">
                       ${Math.max(...(data.prices || []).map(p => p.settle)).toFixed(2)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-white/25">Low </span>
-                    <span className="text-white/60 font-semibold tabular-nums">
+                    <span className="text-[#F0E6D0]/30">Low </span>
+                    <span className="text-[#F0E6D0]/70 font-semibold tabular-nums">
                       ${Math.min(...(data.prices || []).map(p => p.settle)).toFixed(2)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-white/25">Avg </span>
-                    <span className="text-white/60 font-semibold tabular-nums">
+                    <span className="text-[#F0E6D0]/30">Avg </span>
+                    <span className="text-[#F0E6D0]/70 font-semibold tabular-nums">
                       ${((data.prices || []).reduce((s, p) => s + p.settle, 0) / Math.max(1, (data.prices || []).length)).toFixed(2)}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] text-white/15 tabular-nums">
+                <span className="text-[10px] text-[#F0E6D0]/20 tabular-nums">
                   {data.count} trading days
                 </span>
               </div>

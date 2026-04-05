@@ -1,22 +1,18 @@
 // =============================================================================
 // HarvestFile — Marketing Header (Server Component)
-// THE GREAT CONSOLIDATION — Build 1: Navigation Overhaul
+// DEPLOY 3E: Navigation Restructure — 4 Surface Architecture
 //
-// FROM: "Free Tools" mega-dropdown listing 17 separate tools
-// TO:   5-item nav presenting HarvestFile as ONE platform
+// FROM: 5 items (Calculator, Markets, Dashboard, Advisor, More)
+//       "Markets" and "Dashboard" both pointed to /morning — confusing
+// TO:   4 items matching the 4-surface architecture
+//       My Farm → /morning (daily habit)
+//       Programs → /check (acquisition tool)
+//       Planner → /planner (monetization bridge — Coming Soon)
+//       Advisor → /advisor (AI connective tissue)
 //
-// Nav structure:
-//   Calculator → /check (the franchise, primary SEO page)
-//   Markets   → /markets (commodity prices + ARC/PLC payment impact)
-//   Dashboard → /morning (the daily engagement anchor)
-//   Advisor   → /advisor (AI-powered conversational interface)
-//   More      → dropdown (Election Map, OBBBA Guide, Pricing, About)
-//
-// Every existing tool URL stays alive. The nav just stops presenting
-// HarvestFile as a collection of tools and starts presenting it as
-// one product with depth. This is the Credit Karma moment — they
-// don't list "Credit Score Tool, Credit Card Finder, Loan Matcher"
-// in their nav. They show ONE product.
+// Every tab leads to a UNIQUE destination. Zero redundancy.
+// Farmer-friendly language — not developer language.
+// "More" dropdown eliminated — secondary pages live in footer only.
 //
 // Auth-aware CTA: Dashboard (logged in) vs Get Started (anonymous)
 // Adaptive colors via CSS custom properties from HeaderScrollWrapper
@@ -27,7 +23,6 @@ import { createClient } from '@/lib/supabase/server';
 import { HeaderScrollWrapper } from './header-scroll-wrapper';
 import { MobileMenu } from './mobile-menu';
 import { Logo } from './logo';
-import { MoreDropdown } from './more-dropdown';
 import { HeaderCountySearch } from './header-county-search';
 
 export async function MarketingHeader() {
@@ -52,12 +47,12 @@ export async function MarketingHeader() {
           </span>
         </Link>
 
-        {/* Desktop nav — 5 items, clean and focused */}
+        {/* Desktop nav — 4 surfaces, clean and focused */}
         <div className="hidden md:flex items-center gap-7">
           {[
-            { href: '/check', label: 'Calculator' },
-            { href: '/morning#markets', label: 'Markets' },
-            { href: '/morning', label: 'Dashboard' },
+            { href: '/morning', label: 'My Farm' },
+            { href: '/check', label: 'Programs' },
+            { href: '/planner', label: 'Planner' },
             { href: '/advisor', label: 'Advisor' },
           ].map((link) => (
             <Link
@@ -69,9 +64,6 @@ export async function MarketingHeader() {
               {link.label}
             </Link>
           ))}
-
-          {/* More dropdown — Election Map, OBBBA Guide, Pricing, About */}
-          <MoreDropdown />
         </div>
 
         {/* Desktop: Search + CTAs */}

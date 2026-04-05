@@ -28,6 +28,12 @@
   --color-harvest-gold-bright: #E2C366;
   --color-harvest-gold-dim: #9E7E30;
 
+  /* DEPLOY 3E: WCAG contrast-corrected gold for dark surfaces
+     #D4B85C on #1B4332 = 5.70:1 (AA large + AA normal text)
+     #F0E6D0 on #1B4332 = 8.93:1 (AAA — safe for 58+ farmer demo) */
+  --color-harvest-gold-heading: #D4B85C;
+  --color-harvest-body-soft: #F0E6D0;
+
   /* Cream palette (light sections) */
   --color-harvest-cream: #F5F0E6;
   --color-harvest-cream-warm: #FDF8F0;

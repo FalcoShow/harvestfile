@@ -1,14 +1,14 @@
 // =============================================================================
 // HarvestFile — Mobile Menu (Client Component)
-// THE GREAT CONSOLIDATION — Build 1
+// DEPLOY 3E: Navigation Restructure — 4 Surface Architecture
 //
-// FROM: Flat list of 17 tools (overwhelming, feels like a directory)
-// TO:   5 primary nav items + expandable "More Tools" section
+// FROM: 5 primary nav items with redundant /morning links
+// TO:   4 surface items with farmer-friendly language
 //
-// The mobile nav now tells a story:
-//   1. Hero section — the 4 core surfaces every farmer uses daily
-//   2. Resources — Election Map, OBBBA Guide, Programs
-//   3. Expandable — all other tools (still accessible, not hidden)
+// The mobile nav now tells a clear story:
+//   1. Hero section — the 4 core surfaces (My Farm, Programs, Planner, Advisor)
+//   2. Resources — OBBBA Guide, Pricing, About, etc.
+//   3. Expandable — deeper tools still accessible
 //
 // Same portal-based rendering pattern for iOS compatibility.
 // =============================================================================
@@ -26,28 +26,8 @@ interface MobileMenuProps {
 
 const PRIMARY_NAV = [
   {
-    href: "/check",
-    label: "ARC/PLC Calculator",
-    desc: "Compare programs by county & crop",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="8" y1="6" x2="16" y2="6" /><line x1="16" y1="14" x2="16" y2="18" /><line x1="8" y1="10" x2="8" y2="10.01" /><line x1="12" y1="10" x2="12" y2="10.01" /><line x1="16" y1="10" x2="16" y2="10.01" />
-      </svg>
-    ),
-  },
-  {
-    href: "/morning#markets",
-    label: "Commodity Markets",
-    desc: "Futures prices with ARC/PLC payment impact",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-      </svg>
-    ),
-  },
-  {
     href: "/morning",
-    label: "Morning Dashboard",
+    label: "My Farm",
     desc: "Weather, markets & your daily briefing",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -56,8 +36,28 @@ const PRIMARY_NAV = [
     ),
   },
   {
+    href: "/check",
+    label: "Programs",
+    desc: "ARC/PLC calculator & election tools",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="8" y1="6" x2="16" y2="6" /><line x1="16" y1="14" x2="16" y2="18" /><line x1="8" y1="10" x2="8" y2="10.01" /><line x1="12" y1="10" x2="12" y2="10.01" /><line x1="16" y1="10" x2="16" y2="10.01" />
+      </svg>
+    ),
+  },
+  {
+    href: "/planner",
+    label: "Planner",
+    desc: "Cash flow, breakeven & farm score",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+    ),
+  },
+  {
     href: "/advisor",
-    label: "AI Farm Advisor",
+    label: "Advisor",
     desc: "AI-powered farm financial intelligence",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -68,25 +68,26 @@ const PRIMARY_NAV = [
 ];
 
 const RESOURCES = [
-  { href: "/elections", label: "Election Map" },
-  { href: "/navigator", label: "USDA Programs" },
   { href: "/obbba", label: "OBBBA Guide" },
+  { href: "/navigator", label: "USDA Programs" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
 ];
 
 const MORE_TOOLS = [
+  { href: '/morning#markets', label: 'Commodity Markets' },
   { href: '/morning#grain', label: 'Grain Basis Tracker' },
+  { href: '/morning#weather', label: 'Ag Weather' },
+  { href: '/morning#spray', label: 'Spray Window' },
+  { href: '/morning#calendar', label: 'Policy Calendar' },
+  { href: '/check?tab=elections', label: 'Election Map' },
+  { href: '/check?tab=optimization', label: 'Election Optimizer' },
+  { href: '/check?tab=historical', label: 'Payment Scanner' },
+  { href: '/check?tab=base-acres', label: 'Base Acre Analyzer' },
   { href: '/cashflow', label: 'Cash Flow Forecaster' },
   { href: '/farm-score', label: 'Farm Score' },
   { href: '/breakeven', label: 'Breakeven Calculator' },
   { href: '/insurance', label: 'Crop Insurance' },
-  { href: '/check?tab=optimization', label: 'Election Optimizer' },
-  { href: '/morning#weather', label: 'Ag Weather' },
-  { href: '/morning#spray', label: 'Spray Window' },
-  { href: '/check?tab=historical', label: 'Payment Scanner' },
-  { href: '/check?tab=base-acres', label: 'Base Acre Analyzer' },
-  { href: '/morning#calendar', label: 'Policy Calendar' },
 ];
 
 export function MobileMenu({ isAuthenticated }: MobileMenuProps) {

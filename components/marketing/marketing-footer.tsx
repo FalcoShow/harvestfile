@@ -1,13 +1,12 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Phase B/C Deploy: Route consolidation + attribution compliance
+// DEPLOY 3E: Updated to match 4-surface nav architecture
 //
 // CHANGES:
-//   - Tools column links updated: /grain, /weather, /spray-window, /calendar
-//     now point to /morning#section deep links
-//   - SDRP Checker REMOVED (sunset)
-//   - Platform column: /markets → /morning#markets
-//   - Attribution line updated with TradingView + Barchart credits
+//   - Platform column renamed to "Surfaces" with 4-surface labels
+//   - Labels now match nav: My Farm, Programs, Planner, Advisor
+//   - Tools column preserved with deep links
+//   - Attribution line updated
 //   - Footer reorganized to reflect consolidated 4-surface architecture
 //
 // The 50-state grid stays — massive SEO asset.
@@ -18,25 +17,25 @@ import { Logo } from "./logo";
 
 const footerLinks = {
   Platform: [
-    { label: "ARC/PLC Calculator", href: "/check" },
-    { label: "Morning Dashboard", href: "/morning" },
-    { label: "Commodity Markets", href: "/morning#markets" },
-    { label: "AI Farm Advisor", href: "/advisor" },
-    { label: "Election Map", href: "/check?tab=elections" },
-    { label: "USDA Programs", href: "/navigator" },
+    { label: "My Farm", href: "/morning" },
+    { label: "Programs", href: "/check" },
+    { label: "Planner", href: "/planner" },
+    { label: "Advisor", href: "/advisor" },
+    { label: "Founding Farmer", href: "/founding-farmer" },
+    { label: "Pricing", href: "/pricing" },
   ],
   Tools: [
+    { label: "Commodity Markets", href: "/morning#markets" },
     { label: "Grain Basis Tracker", href: "/morning#grain" },
-    { label: "Cash Flow Forecaster", href: "/cashflow" },
-    { label: "Farm Score", href: "/farm-score" },
-    { label: "Breakeven Calculator", href: "/breakeven" },
-    { label: "Crop Insurance", href: "/insurance" },
-    { label: "Election Optimizer", href: "/check?tab=optimization" },
     { label: "Ag Weather", href: "/morning#weather" },
     { label: "Spray Window", href: "/morning#spray" },
+    { label: "Policy Calendar", href: "/morning#calendar" },
+    { label: "Election Map", href: "/check?tab=elections" },
+    { label: "Election Optimizer", href: "/check?tab=optimization" },
     { label: "Payment Scanner", href: "/check?tab=historical" },
     { label: "Base Acre Analyzer", href: "/check?tab=base-acres" },
-    { label: "Policy Calendar", href: "/morning#calendar" },
+    { label: "Cash Flow Forecaster", href: "/cashflow" },
+    { label: "Breakeven Calculator", href: "/breakeven" },
   ],
   Learn: [
     { label: "OBBBA Guide", href: "/obbba" },
@@ -45,6 +44,7 @@ const footerLinks = {
     { label: "EQIP Guide", href: "/programs/eqip" },
     { label: "CRP Guide", href: "/programs/crp" },
     { label: "CSP Guide", href: "/programs/csp" },
+    { label: "USDA Programs", href: "/navigator" },
   ],
   "Top Counties": [
     { label: "Champaign County, IL", href: "/illinois/champaign-county/arc-plc" },
@@ -57,7 +57,6 @@ const footerLinks = {
     { label: "Sedgwick County, KS", href: "/kansas/sedgwick-county/arc-plc" },
   ],
   Company: [
-    { label: "Pricing", href: "/pricing" },
     { label: "About", href: "/about" },
     { label: "Contact", href: "mailto:hello@harvestfile.com" },
     { label: "Privacy Policy", href: "/privacy" },
@@ -200,6 +199,7 @@ export function MarketingFooter() {
           <p className="text-[11px] text-white/10 max-w-[500px] text-right leading-relaxed">
             HarvestFile is not affiliated with, endorsed by, or connected to the USDA, FSA, or any government agency.
             Data sourced from USDA NASS, ERS, and FSA public databases. Market data provided by Barchart.
+            Charts powered by TradingView Lightweight Charts™.
           </p>
         </div>
       </div>
