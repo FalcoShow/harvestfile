@@ -36,7 +36,7 @@ const PRIMARY_NAV = [
     ),
   },
   {
-    href: "/markets",
+    href: "/morning#markets",
     label: "Commodity Markets",
     desc: "Futures prices with ARC/PLC payment impact",
     icon: (
@@ -76,18 +76,17 @@ const RESOURCES = [
 ];
 
 const MORE_TOOLS = [
-  { href: "/grain", label: "Grain Marketing" },
-  { href: "/cashflow", label: "Cash Flow Forecaster" },
-  { href: "/farm-score", label: "Farm Score" },
-  { href: "/breakeven", label: "Breakeven Calculator" },
-  { href: "/insurance", label: "Crop Insurance" },
-  { href: "/optimize", label: "Election Optimizer" },
-  { href: "/weather", label: "Ag Weather" },
-  { href: "/spray-window", label: "Spray Window" },
-  { href: "/payments", label: "Payment Scanner" },
-  { href: "/fba", label: "Base Acre Analyzer" },
-  { href: "/sdrp", label: "SDRP Checker" },
-  { href: "/calendar", label: "Policy Calendar" },
+  { href: '/morning#grain', label: 'Grain Basis Tracker' },
+  { href: '/cashflow', label: 'Cash Flow Forecaster' },
+  { href: '/farm-score', label: 'Farm Score' },
+  { href: '/breakeven', label: 'Breakeven Calculator' },
+  { href: '/insurance', label: 'Crop Insurance' },
+  { href: '/check?tab=optimization', label: 'Election Optimizer' },
+  { href: '/morning#weather', label: 'Ag Weather' },
+  { href: '/morning#spray', label: 'Spray Window' },
+  { href: '/check?tab=historical', label: 'Payment Scanner' },
+  { href: '/check?tab=base-acres', label: 'Base Acre Analyzer' },
+  { href: '/morning#calendar', label: 'Policy Calendar' },
 ];
 
 export function MobileMenu({ isAuthenticated }: MobileMenuProps) {

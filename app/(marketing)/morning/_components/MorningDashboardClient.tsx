@@ -864,6 +864,7 @@ export default function MorningDashboardClient() {
         )}
 
         {/* ─── ROW 1: Spray Status Hero (full-width) ─── */}
+        <div id="spray" className="scroll-mt-20">
         <AnimateIn delay={nextStagger()}>
           {weatherLoading ? <SpraySkeleton /> : weatherError ? (
             <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 text-center">
@@ -872,8 +873,10 @@ export default function MorningDashboardClient() {
             </div>
           ) : weatherData ? <SprayStatusHero weather={weatherData} /> : null}
         </AnimateIn>
+        </div>
 
         {/* ─── ROW 2: Compact Stat Cards — 3 commodities at a glance ─── */}
+        <div id="markets" className="scroll-mt-20">
         <AnimateIn delay={nextStagger()}>
           <SectionEyebrow label="Commodity Markets" />
           <div className="grid grid-cols-1 gap-3">
@@ -890,6 +893,7 @@ export default function MorningDashboardClient() {
             ))}
           </div>
         </AnimateIn>
+        </div>
 
         {/* ─── ROW 2.5: Marketing Score Gauge ─── */}
         <AnimateIn delay={nextStagger()}>
@@ -902,6 +906,7 @@ export default function MorningDashboardClient() {
         </AnimateIn>
 
         {/* ─── ROW 2.75: Basis Tracker (Deploy 3D) ─── */}
+        <div id="grain" className="scroll-mt-20">
         <AnimateIn delay={nextStagger()}>
           <SectionEyebrow label="Local Basis" />
           <BasisTrackingCard
@@ -913,6 +918,7 @@ export default function MorningDashboardClient() {
             onCommodityChange={setBasisCommodity}
           />
         </AnimateIn>
+        </div>
 
         {/* ─── ROW 3: Payment Estimate + Grain Bids — 4/3 split ─── */}
         <div>
@@ -934,7 +940,7 @@ export default function MorningDashboardClient() {
         </div>
 
         {/* ─── ROW 4: Weather + Markets — 1/2 + 1/2 ─── */}
-        <div>
+        <div id="weather" className="scroll-mt-20">
           <AnimateIn delay={nextStagger()}>
             <SectionEyebrow label="Intelligence" />
           </AnimateIn>

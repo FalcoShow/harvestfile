@@ -1,22 +1,14 @@
 // =============================================================================
 // HarvestFile — Marketing Footer (Server Component)
-// Build 18 Deploy 6: Tool Consolidation
+// Phase B/C Deploy: Route consolidation + attribution compliance
 //
-// Changes from previous version:
-//   - SDRP Checker REMOVED (dairy RPP serves different audience)
-//   - Election Map link → /check?tab=elections (absorbed into Decision Hub)
-//   - Election Optimizer → /check?tab=optimization (absorbed)
-//   - Payment Scanner → /check?tab=historical (absorbed)
-//   - Base Acre Analyzer → /check?tab=base-acres (absorbed)
-//   - Internal links use direct /check?tab=... paths (no redirect hop)
-//   - External/bookmarked links still get 301'd via next.config.js
-//
-// Footer reorganized to reflect the 4-surface architecture:
-//   - Platform (the 4 core surfaces + key features)
-//   - Tools (remaining tools — important for SEO crawling)
-//   - Learn (educational content)
-//   - Top Counties (SEO internal links)
-//   - Company
+// CHANGES:
+//   - Tools column links updated: /grain, /weather, /spray-window, /calendar
+//     now point to /morning#section deep links
+//   - SDRP Checker REMOVED (sunset)
+//   - Platform column: /markets → /morning#markets
+//   - Attribution line updated with TradingView + Barchart credits
+//   - Footer reorganized to reflect consolidated 4-surface architecture
 //
 // The 50-state grid stays — massive SEO asset.
 // =============================================================================
@@ -28,23 +20,23 @@ const footerLinks = {
   Platform: [
     { label: "ARC/PLC Calculator", href: "/check" },
     { label: "Morning Dashboard", href: "/morning" },
-    { label: "Commodity Markets", href: "/markets" },
+    { label: "Commodity Markets", href: "/morning#markets" },
     { label: "AI Farm Advisor", href: "/advisor" },
     { label: "Election Map", href: "/check?tab=elections" },
     { label: "USDA Programs", href: "/navigator" },
   ],
   Tools: [
-    { label: "Grain Marketing", href: "/grain" },
+    { label: "Grain Basis Tracker", href: "/morning#grain" },
     { label: "Cash Flow Forecaster", href: "/cashflow" },
     { label: "Farm Score", href: "/farm-score" },
     { label: "Breakeven Calculator", href: "/breakeven" },
     { label: "Crop Insurance", href: "/insurance" },
     { label: "Election Optimizer", href: "/check?tab=optimization" },
-    { label: "Ag Weather", href: "/weather" },
-    { label: "Spray Window", href: "/spray-window" },
+    { label: "Ag Weather", href: "/morning#weather" },
+    { label: "Spray Window", href: "/morning#spray" },
     { label: "Payment Scanner", href: "/check?tab=historical" },
     { label: "Base Acre Analyzer", href: "/check?tab=base-acres" },
-    { label: "Policy Calendar", href: "/calendar" },
+    { label: "Policy Calendar", href: "/morning#calendar" },
   ],
   Learn: [
     { label: "OBBBA Guide", href: "/obbba" },

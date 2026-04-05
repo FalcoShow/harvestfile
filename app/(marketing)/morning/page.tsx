@@ -1,20 +1,70 @@
 // =============================================================================
 // app/(marketing)/morning/page.tsx
-// HarvestFile — Surface 2 Deploy 2B-P2 Final: Farm Command Center
+// HarvestFile — Surface 2: Farm Command Center
+//
+// PHASE B/C DEPLOY:
+//   - Added Metadata export (title, description, canonical, OG, Twitter)
+//   - Added JSON-LD WebApplication structured data
+//   - Added section id="calendar" with scroll-mt-20 for deep linking
+//   - Keywords absorbed from 5 merged tool pages (/markets, /grain,
+//     /weather, /calendar, /spray-window)
 //
 // SERVER COMPONENT — renders static sections (zero JS), wraps interactive
 // data sections in client boundary.
-//
-// Deploy 2B-P2 Final changes:
-//   - "Full USDA calendar" link removed (was 301 loop back to /morning)
-//   - Duplicate BottomCTA removed (premium CTA now lives in client component)
-//   - Calendar section is now full-width instead of 1/2 + 1/2 grid
 // =============================================================================
 
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import MorningDashboardClient from './_components/MorningDashboardClient';
 
 export const dynamic = 'force-dynamic';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEO METADATA — absorbs keywords from 5 merged tool pages
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const BASE_URL = 'https://harvestfile.com';
+
+export const metadata: Metadata = {
+  title: 'Farm Command Center — Markets, Weather, Grain & Spray | HarvestFile',
+  description:
+    'Your daily agricultural dashboard: live grain market prices with USDA reference lines, ' +
+    'weather forecasts, spray window conditions, crop marketing scores, and basis tracking. ' +
+    'Updated daily for smarter farm decisions.',
+  alternates: {
+    canonical: `${BASE_URL}/morning`,
+  },
+  keywords: [
+    'grain market prices', 'farm weather forecast', 'spray window calculator',
+    'agricultural calendar', 'crop marketing dashboard', 'USDA reference prices',
+    'basis tracking', 'commodity markets', 'farm management tool',
+    'corn futures', 'soybean futures', 'wheat prices', 'morning market report',
+    'farm command center', 'agricultural dashboard',
+  ],
+  openGraph: {
+    title: 'Farm Command Center — All Your Daily Farm Intel in One Place',
+    description:
+      'Live grain markets, weather, spray conditions, and marketing insights in a single daily view.',
+    url: `${BASE_URL}/morning`,
+    siteName: 'HarvestFile',
+    type: 'website',
+    locale: 'en_US',
+    images: [
+      {
+        url: `${BASE_URL}/og/morning-dashboard.png`,
+        width: 1200,
+        height: 630,
+        alt: 'HarvestFile Farm Command Center dashboard',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Farm Command Center — Markets, Weather & More',
+    description: 'All your daily farm data in one view.',
+    images: [`${BASE_URL}/og/morning-dashboard.png`],
+  },
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // USDA REPORT CALENDAR
@@ -139,14 +189,62 @@ function MorningSkeleton() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PAGE COMPONENT
+// PAGE COMPONENT — with JSON-LD structured data
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function MorningPage() {
   const reports = getUpcomingReports();
 
+  // JSON-LD WebApplication structured data (Step 4)
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'HarvestFile Farm Command Center',
+    url: 'https://harvestfile.com/morning',
+    description:
+      'All-in-one morning dashboard for farmers: live commodity markets, grain basis tracking, ' +
+      'ag weather forecasts, spray window conditions, and farm policy calendar.',
+    applicationCategory: 'BusinessApplication',
+    applicationSubCategory: 'Agricultural Management Software',
+    operatingSystem: 'All',
+    browserRequirements: 'Requires JavaScript. Works on all modern browsers.',
+    featureList: [
+      'Live Commodity Market Prices',
+      'Grain Basis Tracking with 3-Year Seasonal Averages',
+      'Agricultural Weather Forecasts',
+      'Spray Window Calculator with Delta T',
+      'USDA Report Calendar',
+      'Marketing Score with 5-Factor Analysis',
+      'ARC/PLC Payment Estimates',
+    ],
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+    },
+    author: {
+      '@type': 'Organization',
+      name: 'HarvestFile',
+      url: 'https://harvestfile.com',
+    },
+    audience: {
+      '@type': 'Audience',
+      audienceType: 'Farmers, Agronomists, Agricultural Professionals',
+    },
+    dateModified: new Date().toISOString().split('T')[0],
+  };
+
   return (
     <div className="min-h-screen bg-[#050f09] relative overflow-hidden">
+      {/* JSON-LD structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+        }}
+      />
+
       {/* Aurora mesh gradient background */}
       <div className="fixed inset-0 pointer-events-none" style={{
         backgroundImage: [
@@ -161,27 +259,40 @@ export default function MorningPage() {
       }} />
 
       <div className="relative z-10">
-        {/* Interactive sections */}
+        {/* Interactive sections (client component handles all dynamic content) */}
         <Suspense fallback={<MorningSkeleton />}>
           <MorningDashboardClient />
         </Suspense>
 
         {/* Server-rendered sections */}
         <div className="mx-auto max-w-7xl px-4 lg:px-6 pb-20 space-y-6">
-          {/* USDA Calendar — full width, no duplicate CTA */}
+          {/* USDA Calendar — full width, section ID for deep linking */}
           {reports.length > 0 && (
-            <div>
+            <section id="calendar" className="scroll-mt-20">
               <SectionEyebrow label="Upcoming & Actions" />
               <CalendarCard reports={reports} />
-            </div>
+            </section>
           )}
 
-          {/* Data freshness note */}
-          <p className="text-center text-[10px] text-white/15 px-4 mt-4">
-            Futures: CME settlement prices via Nasdaq Data Link, updated daily after 1:15 PM CT.
-            Weather: Open-Meteo, updated every 30 minutes. Soil data: Open-Meteo ERA5 Land model.
-            Market data provided by Barchart. Data for educational purposes only.
-          </p>
+          {/* Data freshness + attribution note */}
+          <div className="border-t border-white/[0.06] pt-4 mt-8 space-y-2 text-center">
+            <p className="text-[10px] text-white/15 px-4 leading-relaxed">
+              Futures: CME settlement prices via Nasdaq Data Link, updated daily after 1:15 PM CT.
+              Weather: Open-Meteo, updated every 30 minutes. Soil data: Open-Meteo ERA5 Land model.
+            </p>
+            <p className="text-[10px] text-white/15 px-4 leading-relaxed">
+              Charts powered by{' '}
+              <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/30">
+                TradingView Lightweight Charts™
+              </a>
+              {' '}© TradingView, Inc. Licensed under Apache 2.0.
+              {' · '}Market data provided by{' '}
+              <a href="https://www.barchart.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/30">
+                Barchart
+              </a>
+              . Data may be delayed per exchange requirements. For educational purposes only.
+            </p>
+          </div>
         </div>
       </div>
     </div>

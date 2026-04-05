@@ -399,8 +399,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // DIAGNOSTIC: Log raw basis value from Barchart to verify units (remove after verification)
-    console.log(`[basis-tracking] Primary: ${primaryElevator?.name || 'none'}, raw basis: ${primaryBid?.basis}, basisRollingSymbol: ${primaryBid?.basisRollingSymbol || 'null'}, hasBasisHistory: ${hasBasisHistory}`);
+    console.log(`[basis-tracking] Primary: ${primaryElevator?.name || 'none'}, basisRollingSymbol: ${primaryBid?.basisRollingSymbol || 'null'}, hasBasisHistory: ${hasBasisHistory}`);
 
     if (!primaryElevator || !primaryBid) {
       // No bids at all for this commodity — return comparison with whatever we have
@@ -455,12 +454,6 @@ export async function GET(request: NextRequest) {
           startDate,
         });
         console.log(`[basis-tracking] Got ${history.length} history records`);
-
-        // DIAGNOSTIC: Log first few close values to verify units (remove after verification)
-        if (history.length > 0) {
-          const sample = history.slice(0, 3).map(h => `${h.tradingDay}: close=${h.close}`).join(', ');
-          console.log(`[basis-tracking] History sample (should be in cents): ${sample}`);
-        }
       } catch (historyError) {
         console.warn(`[basis-tracking] getHistory failed, continuing without historical data:`, historyError);
         hasBasisHistory = false;

@@ -56,7 +56,7 @@ export async function MarketingHeader() {
         <div className="hidden md:flex items-center gap-7">
           {[
             { href: '/check', label: 'Calculator' },
-            { href: '/markets', label: 'Markets' },
+            { href: '/morning#markets', label: 'Markets' },
             { href: '/morning', label: 'Dashboard' },
             { href: '/advisor', label: 'Advisor' },
           ].map((link) => (

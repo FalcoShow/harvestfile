@@ -1,16 +1,18 @@
 // =============================================================================
 // HarvestFile — Segmented Sitemap Generator
-// Phase 25 Build 2 Part 2: Segmented sitemaps for better GSC monitoring
+// Phase B/C Deploy: Consolidated after Surface 2 route cleanup
 //
-// Next.js 14.2+ supports generateSitemaps() which creates a sitemap index
-// at /sitemap.xml pointing to /sitemap/0.xml, /sitemap/1.xml, etc.
+// CHANGES:
+//   - Removed 9 redirected URLs: /markets, /grain, /weather, /calendar,
+//     /spray-window, /sdrp, /optimize, /payments, /fba, /elections
+//   - /morning elevated to priority 1.0 with changeFrequency 'daily'
+//   - /check remains at 0.95 (primary acquisition tool)
+//   - Kept segmented structure for 3,000+ county pages
 //
 // Segments:
 //   0 = Core pages (tools, programs, OBBBA, auth, legal)
 //   1 = State hub pages (/{state}/arc-plc)
 //   2+ = County pages (paginated in batches of 2,000)
-//
-// Google ignores <priority> and <changefreq> but we keep lastmod accurate.
 // =============================================================================
 
 import { MetadataRoute } from 'next';
@@ -18,7 +20,6 @@ import { supabasePublic } from '@/lib/supabase/public';
 
 // ── Generate sitemap index entries ──────────────────────────────────────
 export async function generateSitemaps() {
-  // Count total counties for pagination
   let totalCounties = 0;
   try {
     const { count } = await supabasePublic
@@ -27,12 +28,11 @@ export async function generateSitemaps() {
       .eq('has_arc_plc_data', true);
     totalCounties = count || 0;
   } catch {
-    totalCounties = 2500; // Fallback estimate
+    totalCounties = 2500;
   }
 
   const countySitemapCount = Math.ceil(totalCounties / 2000);
 
-  // Segment 0 = core pages, Segment 1 = state hubs, Segment 2+ = counties
   const ids = [
     { id: 0 },  // Core pages
     { id: 1 },  // State hubs
@@ -55,50 +55,52 @@ export default async function sitemap({
   const now = new Date();
 
   // ── Segment 0: Core pages ─────────────────────────────────────────────
+  // ONLY canonical 200-OK URLs. All redirected routes removed.
   if (id === 0) {
     return [
       // Homepage
       { url: baseUrl, lastModified: now, changeFrequency: 'weekly', priority: 1.0 },
 
-      // Free tools (highest value pages)
-      { url: `${baseUrl}/check`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
-      { url: `${baseUrl}/spray-window`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
-      { url: `${baseUrl}/weather`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
+      // Daily habit tool (highest engagement)
       { url: `${baseUrl}/morning`, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
-      { url: `${baseUrl}/markets`, lastModified: now, changeFrequency: 'daily', priority: 0.95 },
-      { url: `${baseUrl}/insurance`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
-      { url: `${baseUrl}/optimize`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
-      { url: `${baseUrl}/payments`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
-      { url: `${baseUrl}/fba`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
-      { url: `${baseUrl}/sdrp`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
-      { url: `${baseUrl}/calendar`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
 
-      // Data pages
-      { url: `${baseUrl}/elections`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+      // Primary acquisition tool
+      { url: `${baseUrl}/check`, lastModified: now, changeFrequency: 'weekly', priority: 0.95 },
+
+      // Active tools (not yet consolidated into surfaces)
+      { url: `${baseUrl}/insurance`, lastModified: now, changeFrequency: 'weekly', priority: 0.90 },
+      { url: `${baseUrl}/advisor`, lastModified: now, changeFrequency: 'weekly', priority: 0.85 },
+      { url: `${baseUrl}/navigator`, lastModified: now, changeFrequency: 'weekly', priority: 0.85 },
+      { url: `${baseUrl}/founding-farmer`, lastModified: now, changeFrequency: 'weekly', priority: 0.80 },
+
+      // Standalone tools (future Surface 3 candidates)
+      { url: `${baseUrl}/cashflow`, lastModified: now, changeFrequency: 'weekly', priority: 0.80 },
+      { url: `${baseUrl}/breakeven`, lastModified: now, changeFrequency: 'weekly', priority: 0.80 },
+      { url: `${baseUrl}/farm-score`, lastModified: now, changeFrequency: 'weekly', priority: 0.80 },
 
       // OBBBA content hub
       { url: `${baseUrl}/obbba`, lastModified: now, changeFrequency: 'monthly', priority: 0.85 },
-      { url: `${baseUrl}/obbba/arc-sco-stacking`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
-      { url: `${baseUrl}/obbba/new-base-acres`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
+      { url: `${baseUrl}/obbba/arc-sco-stacking`, lastModified: now, changeFrequency: 'monthly', priority: 0.80 },
+      { url: `${baseUrl}/obbba/new-base-acres`, lastModified: now, changeFrequency: 'monthly', priority: 0.80 },
 
       // Program guides
       { url: `${baseUrl}/programs/arc-co`, lastModified: now, changeFrequency: 'monthly', priority: 0.75 },
       { url: `${baseUrl}/programs/plc`, lastModified: now, changeFrequency: 'monthly', priority: 0.75 },
-      { url: `${baseUrl}/programs/eqip`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
-      { url: `${baseUrl}/programs/crp`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
-      { url: `${baseUrl}/programs/csp`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+      { url: `${baseUrl}/programs/eqip`, lastModified: now, changeFrequency: 'monthly', priority: 0.70 },
+      { url: `${baseUrl}/programs/crp`, lastModified: now, changeFrequency: 'monthly', priority: 0.70 },
+      { url: `${baseUrl}/programs/csp`, lastModified: now, changeFrequency: 'monthly', priority: 0.70 },
 
       // Company pages
-      { url: `${baseUrl}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
-      { url: `${baseUrl}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+      { url: `${baseUrl}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.70 },
+      { url: `${baseUrl}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.50 },
 
       // Auth pages
-      { url: `${baseUrl}/login`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-      { url: `${baseUrl}/signup`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+      { url: `${baseUrl}/login`, lastModified: now, changeFrequency: 'yearly', priority: 0.30 },
+      { url: `${baseUrl}/signup`, lastModified: now, changeFrequency: 'yearly', priority: 0.30 },
 
       // Legal
-      { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
-      { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
+      { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.20 },
+      { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.20 },
     ];
   }
 
@@ -142,7 +144,7 @@ export default async function sitemap({
         url: `${baseUrl}/${c.states.slug}/${c.slug}/arc-plc`,
         lastModified: now,
         changeFrequency: 'weekly' as const,
-        priority: 0.7,
+        priority: 0.70,
       }));
     }
   } catch (err) {

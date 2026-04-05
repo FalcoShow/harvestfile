@@ -77,11 +77,11 @@ const MORE_LINKS = [
 
 // Tools that are still accessible but moved out of primary nav
 const ALL_TOOLS_HIGHLIGHTS = [
-  { href: '/grain', label: 'Grain Marketing' },
+  { href: '/morning#grain', label: 'Grain Basis' },
   { href: '/farm-score', label: 'Farm Score' },
   { href: '/cashflow', label: 'Cash Flow' },
   { href: '/insurance', label: 'Crop Insurance' },
-  { href: '/weather', label: 'Ag Weather' },
+  { href: '/morning#weather', label: 'Ag Weather' },
   { href: '/breakeven', label: 'Breakeven' },
 ];
 
