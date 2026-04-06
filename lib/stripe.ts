@@ -1,17 +1,21 @@
 // =============================================================================
 // HarvestFile — Stripe Configuration
-// Build 9 Deploy 1: Added Free Tier Limits
+// Updated: Pricing Restructure — Added Founding Farmer tier ($9/mo, $79/yr)
 //
 // PRODUCTS (Live Mode):
-//   HarvestFile Starter — prod_UBXj6RqSYOsv43
+//   Founding Farmer — prod_UHr1pInuSTYBn1
+//     $9/mo   (price_1TJHIzPQui3axCMcd4ni0WJh)
+//     $79/yr  (price_1TJHJNPQui3axCMcH6jvbeGK)
+//
+//   HarvestFile Starter — prod_UBXj6RqSYOsv43 (legacy, keep for existing subs)
 //     $29/mo  (lookup key: starter_monthly)
 //     $278/yr (lookup key: starter_annual)
 //
-//   HarvestFile Pro — prod_UBXNsh24CktzWa
+//   HarvestFile Pro — prod_UBXNsh24CktzWa (legacy, keep for existing subs)
 //     $59/mo  (lookup key: pro_monthly)
 //     $566/yr (lookup key: pro_annual)
 //
-//   HarvestFile Team — prod_UBXNIK92GZk1XP
+//   HarvestFile Team — prod_UBXNIK92GZk1XP (legacy, keep for existing subs)
 //     $149/mo  (lookup key: team_monthly)
 //     $1,430/yr (lookup key: team_annual)
 //
@@ -22,10 +26,12 @@
 //   STRIPE_PRO_ANNUAL_PRICE_ID, STRIPE_TEAM_MONTHLY_PRICE_ID,
 //   STRIPE_TEAM_ANNUAL_PRICE_ID
 //
-// WHAT CHANGED (Build 9):
-//   - Added 'free' tier to TIER_LIMITS (3 farmers, 1 user — enough to
-//     demonstrate value, not enough to run a real operation without upgrading)
-//   - Added TRIAL_TIER_LIMITS constant for documentation clarity
+// WHAT CHANGED (Pricing Restructure):
+//   - Added founding_monthly and founding_annual to STRIPE_PRICES
+//   - Founding Farmer prices are hardcoded (not env vars) since they're
+//     a single permanent product — no need for env var indirection
+//   - Updated getTierFromPriceId to recognize founding farmer prices
+//   - Added 'founding' tier to TIER_LIMITS (same limits as Pro)
 // =============================================================================
 
 import Stripe from 'stripe';
@@ -36,11 +42,20 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   typescript: true,
 });
 
+// ── Founding Farmer Price IDs (hardcoded — single permanent product) ────────
+const FOUNDING_MONTHLY_PRICE_ID = 'price_1TJHIzPQui3axCMcd4ni0WJh';
+const FOUNDING_ANNUAL_PRICE_ID = 'price_1TJHJNPQui3axCMcH6jvbeGK';
+
 // ── Stripe Price IDs ────────────────────────────────────────────────────────
-// Maps human-readable price types to Stripe price IDs from env vars.
+// Maps human-readable price types to Stripe price IDs.
 // The checkout route validates against these keys.
 
 export const STRIPE_PRICES: Record<string, string> = {
+  // ── Active tier (Founding Farmer $9/mo or $79/yr) ──
+  founding_monthly: FOUNDING_MONTHLY_PRICE_ID,
+  founding_annual: FOUNDING_ANNUAL_PRICE_ID,
+
+  // ── Legacy tiers (keep for existing subscribers, not shown on pricing page) ──
   starter_monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID!,
   starter_annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID!,
   pro_monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID!,
@@ -51,9 +66,14 @@ export const STRIPE_PRICES: Record<string, string> = {
 
 // ── Reverse lookup: price ID → tier name ────────────────────────────────────
 // Used by the webhook handler to determine which tier to provision.
-// Checks Team first (highest), then Pro, defaults to Starter.
+// Checks Founding Farmer first (new primary), then Team, Pro, defaults Starter.
 
-export function getTierFromPriceId(priceId: string): 'starter' | 'pro' | 'team' {
+export function getTierFromPriceId(priceId: string): 'founding' | 'starter' | 'pro' | 'team' {
+  // Founding Farmer (new primary tier)
+  if (priceId === FOUNDING_MONTHLY_PRICE_ID || priceId === FOUNDING_ANNUAL_PRICE_ID) {
+    return 'founding';
+  }
+
   const teamMonthly = process.env.STRIPE_TEAM_MONTHLY_PRICE_ID;
   const teamAnnual = process.env.STRIPE_TEAM_ANNUAL_PRICE_ID;
   const proMonthly = process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
@@ -69,14 +89,12 @@ export function getTierFromPriceId(priceId: string): 'starter' | 'pro' | 'team' 
 // Used by webhook to set organization.max_farmers and organization.max_users
 // when provisioning or upgrading a subscription.
 //
-// BUILD 9: Added 'free' tier for post-trial downgrade. Free tier gets limited
-// access (3 farmers, 1 user) — enough to demonstrate value and keep the farmer
-// in the ecosystem, but not enough to run a real operation without upgrading.
-// This follows the Credit Karma model: free users remain monetizable through
-// the marketplace (crop insurance referrals, farm loan referrals).
+// Founding Farmer gets the same limits as Pro — they're paying customers
+// who deserve full access. The price is lower, not the features.
 
 export const TIER_LIMITS: Record<string, { max_farmers: number; max_users: number }> = {
   free: { max_farmers: 3, max_users: 1 },
+  founding: { max_farmers: 50, max_users: 1 },
   starter: { max_farmers: 5, max_users: 1 },
   pro: { max_farmers: 50, max_users: 1 },
   team: { max_farmers: 250, max_users: 3 },
