@@ -1,6 +1,9 @@
 // =============================================================================
 // HarvestFile - Resend Email Client
-// Phase 3D: Price Alert Email System
+// lib/resend.ts
+//
+// Deploy 4: Added digest sender identity for Farm Brief emails
+// Phase 3D: Price Alert Email System (original)
 // =============================================================================
 
 import { Resend } from 'resend';
@@ -15,6 +18,7 @@ export const EMAIL_FROM = {
   alerts: process.env.RESEND_FROM_EMAIL || 'HarvestFile Alerts <alerts@mail.harvestfile.com>',
   onboarding: 'HarvestFile <hello@mail.harvestfile.com>',
   noreply: 'HarvestFile <noreply@mail.harvestfile.com>',
+  digest: 'HarvestFile <morning@mail.harvestfile.com>',
 };
 
 export async function sendEmail({

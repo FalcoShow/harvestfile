@@ -2,6 +2,7 @@
 // HarvestFile — Inngest Client
 // lib/inngest/client.ts
 //
+// Deploy 4: Added farm-brief event types for 5 AM Farm Brief digest system
 // Build 18 Deploy 6B: Added leads/analysis.saved event for enrollment drip
 // Phase 19: Added SMS alert event types
 // =============================================================================
@@ -83,6 +84,28 @@ export type HarvestFileEvents = {
       recommendation: string | null;
       arcPerAcre: number;
       plcPerAcre: number;
+    };
+  };
+
+  // ── Deploy 4: 5 AM Farm Brief digest ────────────────────────────────────
+  'digest/farm-brief.send': {
+    data: {
+      subscriberId: string;
+      email: string;
+      timezoneGroup: string;
+      countyFips: string | null;
+      countyName: string | null;
+      stateAbbr: string | null;
+      primaryCrop: string | null;
+      preferences: Record<string, unknown>;
+      // Shared market data (pre-fetched by cron, passed to worker)
+      marketData: {
+        corn: { price: number | null; change: number | null; deferred: number | null };
+        soybeans: { price: number | null; change: number | null; deferred: number | null };
+        wheat: { price: number | null; change: number | null; deferred: number | null };
+        fetchedAt: string;
+      };
+      sendDate: string; // YYYY-MM-DD for idempotency
     };
   };
 };
