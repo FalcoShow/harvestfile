@@ -450,7 +450,7 @@ export function generateCountyFAQs(profile: CountyProfile): Array<{ question: st
       `Key prices affecting ${county_name} include: corn at $4.10/bu (up from $3.70), soybeans at $10.00/bu ` +
       `(up from $8.40), and wheat at $6.35/bu (up from $5.50). The effective reference price formula now uses ` +
       `88% of the Olympic average (previously 85%), capped at 115% of statutory. For 2025-2026, effective ` +
-      `reference prices are even higher: corn $4.42/bu, soybeans $10.71/bu.`
+      `reference prices are even higher: corn $4.42/bu, soybeans $10.44/bu.`
   })
   
   // FAQ 5: Election deadline
