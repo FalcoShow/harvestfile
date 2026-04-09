@@ -372,10 +372,10 @@ export default function PricingPage() {
       );
     }
 
-    // Anonymous — link to signup
+    // Anonymous — link to Founding Farmer campaign flow
     return (
       <Link
-        href="/signup"
+        href="/founding-farmer"
         className={`flex items-center justify-center w-full rounded-[14px] font-bold transition-all duration-200 no-underline hover:-translate-y-0.5 hover:shadow-[0_16px_48px_rgba(201,168,76,0.3)] active:scale-[0.98] active:duration-75 ${large ? "py-4 text-[16px]" : "py-3.5 text-[15px]"}`}
         style={{
           background:

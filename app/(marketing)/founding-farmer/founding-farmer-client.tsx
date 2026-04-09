@@ -1,6 +1,26 @@
 // =============================================================================
-// HarvestFile — Phase 32 Build 1.2: Founding Farmer Client Component
-// FIXES: localStorage persistence for returning visitors, actual brand logo SVG
+// HarvestFile — Founding Farmer Client Component
+// UPDATED: Added Stripe checkout with monthly/annual toggle after email capture
+//
+// Flow:
+//   1. User enters email → /api/founding-farmer captures + assigns position
+//   2. Success card shows "Founding Farmer #47" + checkout CTA (primary)
+//   3. User picks monthly ($9/mo) or annual ($79/yr) → Lock in forever button
+//   4. Click → POST /api/stripe/checkout/founding → redirect to Stripe Checkout
+//   5. After payment → /founding-farmer/success (server-verified)
+//
+// PRESERVED FEATURES (all intact):
+//   - Live counter with 30s polling
+//   - Referral code detection and "invited by" banner
+//   - localStorage restore for returning visitors
+//   - Email capture + position assignment
+//   - Recent signups feed
+//   - 6-card benefits grid
+//   - 5-tier reward system
+//   - 16 free tools grid
+//   - 6-question FAQ
+//   - Final CTA section
+//   - Footer
 // =============================================================================
 
 'use client';
@@ -10,11 +30,27 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-interface CampaignStats { total_claimed: number; spots_remaining: number; is_open: boolean; recent_signups: Array<{ position: number; state: string; created_at: string }>; }
-interface SignupResult { success: boolean; position?: number; referral_code?: string; total_claimed?: number; spots_remaining?: number; share_url?: string; already_registered?: boolean; message?: string; error?: string; }
+// ── Types ───────────────────────────────────────────────────────────────────
+interface CampaignStats {
+  total_claimed: number;
+  spots_remaining: number;
+  is_open: boolean;
+  recent_signups: Array<{ position: number; state: string; created_at: string }>;
+}
+interface SignupResult {
+  success: boolean;
+  position?: number;
+  referral_code?: string;
+  total_claimed?: number;
+  spots_remaining?: number;
+  share_url?: string;
+  already_registered?: boolean;
+  message?: string;
+  error?: string;
+  email?: string; // Stored locally for checkout
+}
 
-// ── Tool links ───────────────────────────────────────────────────────────────
+// ── Tool links ──────────────────────────────────────────────────────────────
 const TOOL_LINKS: Record<string, string> = {
   'ARC/PLC Calculator': '/check', 'Payment Estimator': '/payments', 'Base Acre Analyzer': '/fba', 'SDRP Tool': '/sdrp',
   'USDA Calendar': '/calendar', 'Crop Insurance': '/insurance', 'Spray Window': '/spray-window', 'Weather': '/weather',
@@ -22,7 +58,7 @@ const TOOL_LINKS: Record<string, string> = {
   'Farm Score': '/farm-score', 'Grain Marketing': '/grain', 'AI Farm Advisor': '/advisor', 'County Benchmarks': '/check',
 };
 
-// ── SVG Tier Icons (no emojis) ───────────────────────────────────────────────
+// ── SVG Tier Icons (no emojis) ──────────────────────────────────────────────
 function TierIcon({ tier, size = 32 }: { tier: string; size?: number }) {
   const s = size * 0.45;
   const cfg: Record<string, { bg: string; stroke: string }> = {
@@ -43,7 +79,7 @@ function TierIcon({ tier, size = 32 }: { tier: string; size?: number }) {
   return <div className="flex items-center justify-center rounded-full shrink-0" style={{ width: size, height: size, background: c.bg }}>{icons[tier]}</div>;
 }
 
-// ── ACTUAL HarvestFile Brand Logo (matches components/marketing/logo.tsx) ─────
+// ── Brand logo (matches components/marketing/logo.tsx) ──────────────────────
 function HFLogo({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true">
@@ -58,7 +94,7 @@ function HFLogo({ size = 28 }: { size?: number }) {
   );
 }
 
-// ── Reward Tiers ─────────────────────────────────────────────────────────────
+// ── Reward Tiers ────────────────────────────────────────────────────────────
 const REWARD_TIERS = [
   { name: 'Founding Farmer', referrals: 0, tierKey: 'base', color: '#6B8F71', benefits: ['Founding Farmer #XXX certificate', 'Lifetime locked-in pricing', 'Name on the Founders Wall', 'Early access to every new tool'] },
   { name: 'Bronze Steward', referrals: 3, tierKey: 'bronze', color: '#CD7F32', benefits: ['Everything above', 'Exclusive HarvestFile hat', 'Truck/gate sticker pack', 'Priority support queue'] },
@@ -67,10 +103,10 @@ const REWARD_TIERS = [
   { name: 'Platinum Founder', referrals: 25, tierKey: 'platinum', color: '#E5E4E2', benefits: ['Everything above', 'Advisory Board seat', 'Revenue share program', 'Personal onboarding for your entire operation'] },
 ];
 
-// ── localStorage key ─────────────────────────────────────────────────────────
+// ── localStorage key ────────────────────────────────────────────────────────
 const STORAGE_KEY = 'harvestfile_founding_farmer';
 
-// ── Main Component ───────────────────────────────────────────────────────────
+// ── Main Component ──────────────────────────────────────────────────────────
 function FoundingFarmerInner() {
   const searchParams = useSearchParams();
   const refCode = searchParams.get('ref');
@@ -82,10 +118,17 @@ function FoundingFarmerInner() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [referrerInfo, setReferrerInfo] = useState<{ valid: boolean; referrer_position?: number; referrer_state?: string } | null>(null);
+
+  // ── NEW: Checkout state ──────────────────────────────────────────────────
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [showReferralPanel, setShowReferralPanel] = useState(false);
+
   const emailInputRef = useRef<HTMLInputElement>(null);
   const rewardsRef = useRef<HTMLElement>(null);
 
-  // ── Restore from localStorage on mount ─────────────────────────────────
+  // ── Restore from localStorage on mount ───────────────────────────────────
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -93,6 +136,7 @@ function FoundingFarmerInner() {
         const parsed = JSON.parse(saved);
         if (parsed?.success && parsed?.position && parsed?.referral_code) {
           setResult(parsed);
+          if (parsed.email) setEmail(parsed.email);
         }
       }
     } catch { /* localStorage unavailable — no-op */ }
@@ -108,20 +152,69 @@ function FoundingFarmerInner() {
 
   useEffect(() => { fetchStats(); const i = setInterval(fetchStats, 30000); return () => clearInterval(i); }, [fetchStats]);
 
+  // ── Email capture handler (UNCHANGED except: store email in result + localStorage) ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
       const res = await fetch('/api/founding-farmer', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), referral_code: refCode || undefined, source: refCode ? 'referral' : 'direct', utm_source: searchParams.get('utm_source') || undefined, utm_medium: searchParams.get('utm_medium') || undefined, utm_campaign: searchParams.get('utm_campaign') || undefined }),
+        body: JSON.stringify({
+          email: email.trim(),
+          referral_code: refCode || undefined,
+          source: refCode ? 'referral' : 'direct',
+          utm_source: searchParams.get('utm_source') || undefined,
+          utm_medium: searchParams.get('utm_medium') || undefined,
+          utm_campaign: searchParams.get('utm_campaign') || undefined,
+        }),
       });
       const data: SignupResult = await res.json();
-      if (!res.ok || !data.success) { setError(data.error === 'campaign_full' ? 'All 500 spots have been claimed!' : data.error || 'Something went wrong. Please try again.'); return; }
-      setResult(data);
-      // ── Save to localStorage so returning visitors see their card ──────
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* no-op */ }
+      if (!res.ok || !data.success) {
+        setError(data.error === 'campaign_full' ? 'All 500 spots have been claimed!' : data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+      // Store email alongside data for checkout
+      const dataWithEmail: SignupResult = { ...data, email: email.trim() };
+      setResult(dataWithEmail);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(dataWithEmail)); } catch { /* no-op */ }
       fetchStats();
     } catch { setError('Network error. Please check your connection and try again.'); } finally { setLoading(false); }
+  };
+
+  // ── NEW: Stripe checkout handler ─────────────────────────────────────────
+  const handleCheckout = async () => {
+    const capturedEmail = result?.email || email.trim();
+    if (!capturedEmail) {
+      setCheckoutError('Email is missing. Please refresh the page and try again.');
+      return;
+    }
+
+    setCheckoutError('');
+    setCheckoutLoading(true);
+
+    try {
+      const res = await fetch('/api/stripe/checkout/founding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: capturedEmail,
+          billing_period: billingPeriod,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        setCheckoutError(data.error || 'Unable to start checkout. Please try again.');
+        setCheckoutLoading(false);
+        return;
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch {
+      setCheckoutError('Network error. Please check your connection and try again.');
+      setCheckoutLoading(false);
+    }
   };
 
   const copyReferralLink = () => { if (result?.share_url) { navigator.clipboard.writeText(result.share_url); setCopied(true); setTimeout(() => setCopied(false), 2000); } };
@@ -162,7 +255,7 @@ function FoundingFarmerInner() {
         </div>
       </section>
 
-      {/* Counter + Form */}
+      {/* Counter + Form / Result */}
       <section className="relative z-10 px-4 pb-16">
         <div className="max-w-lg mx-auto">
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm p-6 sm:p-8">
@@ -175,27 +268,111 @@ function FoundingFarmerInner() {
             </div>
 
             {result ? (
-              <div className="text-center">
-                <div className="flex justify-center mb-4"><HFLogo size={48} /></div>
-                <h3 className="text-xl font-bold text-white mb-1">{result.already_registered ? "Welcome back!" : "You're in!"}</h3>
-                <p className="text-2xl font-extrabold text-[#C9A84C] mb-1">Founding Farmer #{result.position}</p>
-                <p className="text-sm text-white/40 mb-6">{result.already_registered ? "You've already claimed your spot." : "Your spot is secured. Share to unlock rewards."}</p>
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-4 mb-4">
-                  <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2">Your Referral Link</p>
-                  <div className="flex items-center gap-2">
-                    <input type="text" readOnly value={result.share_url || ''} className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 font-mono truncate focus:outline-none" />
-                    <button onClick={copyReferralLink} className="shrink-0 px-4 py-2.5 rounded-lg bg-[#C9A84C] text-[#0a0f0d] text-sm font-bold hover:bg-[#E2C366] transition-colors">{copied ? '✓ Copied' : 'Copy'}</button>
+              <div>
+                {/* Welcome header */}
+                <div className="text-center mb-6">
+                  <div className="flex justify-center mb-3"><HFLogo size={48} /></div>
+                  <h3 className="text-xl font-bold text-white mb-1">{result.already_registered ? "Welcome back!" : "You're in!"}</h3>
+                  <p className="text-2xl font-extrabold text-[#C9A84C] mb-1">Founding Farmer #{result.position}</p>
+                  <p className="text-sm text-white/40">Your spot is secured. Now lock in your founding rate.</p>
+                </div>
+
+                {/* ── NEW: Checkout CTA card ──────────────────────────── */}
+                <div className="rounded-xl border border-[#C9A84C]/25 bg-gradient-to-b from-[#C9A84C]/[0.04] to-[#C9A84C]/[0.02] p-5 mb-3">
+                  {/* Billing period toggle */}
+                  <div className="flex items-center justify-center mb-5">
+                    <div className="inline-flex rounded-lg bg-white/[0.04] border border-white/[0.08] p-1">
+                      <button
+                        type="button"
+                        onClick={() => setBillingPeriod('monthly')}
+                        className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+                          billingPeriod === 'monthly'
+                            ? 'bg-white/[0.10] text-white shadow-sm'
+                            : 'text-white/40 hover:text-white/60'
+                        }`}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBillingPeriod('annual')}
+                        className={`px-4 py-2 rounded-md text-sm font-semibold transition-all flex items-center gap-2 ${
+                          billingPeriod === 'annual'
+                            ? 'bg-white/[0.10] text-white shadow-sm'
+                            : 'text-white/40 hover:text-white/60'
+                        }`}
+                      >
+                        Annual
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#C9A84C] text-[#0a0f0d] font-extrabold tracking-wide">SAVE 27%</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Price display */}
+                  <div className="text-center mb-5">
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-5xl font-extrabold text-white tabular-nums tracking-tight">${billingPeriod === 'monthly' ? '9' : '79'}</span>
+                      <span className="text-xl text-white/40 font-semibold">/{billingPeriod === 'monthly' ? 'mo' : 'yr'}</span>
+                    </div>
+                    <p className="text-xs text-[#C9A84C] font-semibold mt-2 tracking-wide">
+                      LOCKED FOREVER · NEVER INCREASES · CANCEL ANYTIME
+                    </p>
+                  </div>
+
+                  {/* Checkout button */}
+                  <button
+                    type="button"
+                    onClick={handleCheckout}
+                    disabled={checkoutLoading || !stats.is_open}
+                    className="w-full py-4 rounded-xl font-bold text-base transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-[#C9A84C] to-[#E2C366] text-[#0a0f0d] hover:shadow-[0_0_40px_rgba(201,168,76,0.35)] active:scale-[0.98]"
+                  >
+                    {checkoutLoading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round"/></svg>
+                        Redirecting to secure checkout...
+                      </span>
+                    ) : (
+                      `Lock in $${billingPeriod === 'monthly' ? '9/mo' : '79/yr'} forever →`
+                    )}
+                  </button>
+
+                  {checkoutError && (
+                    <p className="text-sm text-red-400 mt-3 text-center">{checkoutError}</p>
+                  )}
+
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/30"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <p className="text-[11px] text-white/30">Secure checkout by Stripe · 256-bit SSL · No hidden fees</p>
                   </div>
                 </div>
-                <div className="flex items-center justify-center gap-3">
-                  <a href={`sms:?body=${encodeURIComponent(`I just became Founding Farmer #${result.position} at HarvestFile — the most powerful farm decision platform ever built. Only ${stats.spots_remaining} spots left: ${result.share_url}`)}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2D6A4F]/30 border border-[#2D6A4F]/40 text-sm font-semibold text-[#6FCF97] hover:bg-[#2D6A4F]/50 transition-colors">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Text a Neighbor
-                  </a>
-                  <a href={`mailto:?subject=${encodeURIComponent('Join me as a Founding Farmer at HarvestFile')}&body=${encodeURIComponent(`I just became Founding Farmer #${result.position} at HarvestFile.\n\nOnly ${stats.spots_remaining} spots left:\n${result.share_url}`)}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm font-semibold text-white/60 hover:bg-white/[0.08] transition-colors">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Email
-                  </a>
-                </div>
-                <button onClick={scrollToRewards} className="text-xs text-white/30 mt-6 hover:text-white/50 transition-colors cursor-pointer inline-block">Refer 3 farmers to unlock <span className="text-[#CD7F32] font-semibold">Bronze Steward</span> rewards →</button>
+
+                {/* Secondary: Collapsible referral panel */}
+                <button
+                  type="button"
+                  onClick={() => setShowReferralPanel(!showReferralPanel)}
+                  className="w-full text-xs text-white/35 hover:text-white/55 transition-colors text-center py-3"
+                >
+                  {showReferralPanel ? '▲ Hide referral options' : 'Or skip for now — just share your referral link ↓'}
+                </button>
+
+                {showReferralPanel && (
+                  <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4 animate-fadeIn">
+                    <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2">Your Referral Link</p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <input type="text" readOnly value={result.share_url || ''} className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 font-mono truncate focus:outline-none" />
+                      <button onClick={copyReferralLink} className="shrink-0 px-4 py-2.5 rounded-lg bg-[#C9A84C] text-[#0a0f0d] text-sm font-bold hover:bg-[#E2C366] transition-colors">{copied ? '✓ Copied' : 'Copy'}</button>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 mb-3">
+                      <a href={`sms:?body=${encodeURIComponent(`I just became Founding Farmer #${result.position} at HarvestFile — the most powerful farm decision platform ever built. Only ${stats.spots_remaining} spots left: ${result.share_url}`)}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2D6A4F]/30 border border-[#2D6A4F]/40 text-sm font-semibold text-[#6FCF97] hover:bg-[#2D6A4F]/50 transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Text a Neighbor
+                      </a>
+                      <a href={`mailto:?subject=${encodeURIComponent('Join me as a Founding Farmer at HarvestFile')}&body=${encodeURIComponent(`I just became Founding Farmer #${result.position} at HarvestFile.\n\nOnly ${stats.spots_remaining} spots left:\n${result.share_url}`)}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm font-semibold text-white/60 hover:bg-white/[0.08] transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Email
+                      </a>
+                    </div>
+                    <button onClick={scrollToRewards} className="text-xs text-white/30 hover:text-white/50 transition-colors cursor-pointer w-full text-center">Refer 3 farmers to unlock <span className="text-[#CD7F32] font-semibold">Bronze Steward</span> rewards →</button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -206,7 +383,7 @@ function FoundingFarmerInner() {
                   </button>
                 </form>
                 {error && <p className="text-sm text-red-400 mt-3 text-center">{error}</p>}
-                <p className="text-[11px] text-white/20 text-center mt-3">No credit card required. Unsubscribe anytime. We never share your email.</p>
+                <p className="text-[11px] text-white/20 text-center mt-3">No credit card required to claim your spot. Unsubscribe anytime.</p>
               </>
             )}
           </div>
@@ -289,9 +466,9 @@ function FoundingFarmerInner() {
           <h2 className="text-2xl font-extrabold text-center text-white/90 mb-10" style={{ fontFamily: 'var(--font-bricolage, sans-serif)' }}>Questions? We&apos;ve got answers.</h2>
           <div className="space-y-4">
             {[
-              { q: 'What exactly is a Founding Farmer?', a: "You're one of the first 500 people to join HarvestFile. You get permanent benefits — lifetime pricing, early access to every feature, your name on our Founders Wall, and direct access to the team building the platform. These benefits never expire." },
-              { q: 'Is there any cost to sign up?', a: "No. Claiming your Founding Farmer spot is completely free. When HarvestFile's premium tools launch, you'll get a permanently locked-in rate that will never increase — even as we add tools worth significantly more." },
-              { q: 'What happens after I sign up?', a: "You'll get a confirmation email with your Founding Farmer number and a unique referral link. Share that link to unlock tiered rewards. We'll send you behind-the-scenes updates as we build, and you'll be the first to try new features." },
+              { q: 'What exactly is a Founding Farmer?', a: "You're one of the first 500 people to join HarvestFile. You get permanent benefits — lifetime pricing locked at $9/month or $79/year, early access to every feature, your name on our Founders Wall, and direct access to the team building the platform. These benefits never expire." },
+              { q: 'Is there any cost to sign up?', a: "Claiming your Founding Farmer spot is free — no credit card required to secure your position. If you want to lock in the $9/month or $79/year rate permanently, you can complete checkout right after claiming your spot. Your founding rate will never increase, even as we add tools worth significantly more." },
+              { q: 'What happens after I sign up?', a: "You'll get a confirmation email with your Founding Farmer number and a unique referral link. If you complete checkout, you'll also receive a magic login link so you can access the full platform immediately. Share your referral link to unlock tiered rewards." },
               { q: 'How does the referral program work?', a: 'Every Founding Farmer gets a unique link. When someone signs up through your link, you both benefit. Hit 3 referrals for a HarvestFile hat, 5 for a free year of Pro, 10 for lifetime premium access, and 25 for an advisory board seat.' },
               { q: 'What if all 500 spots fill up?', a: "When they're gone, they're gone. We will not expand beyond 500 Founding Farmers. You can join our general waitlist, but Founding Farmer benefits are exclusive to the first 500." },
               { q: "I'm not tech-savvy. Is this for me?", a: "Absolutely. If you grow crops on base acres and deal with ARC-CO or PLC decisions, this was built for you. Our tools are designed to be simpler than anything you've used before — no spreadsheets, no manuals, just answers." },
