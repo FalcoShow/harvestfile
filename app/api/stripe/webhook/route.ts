@@ -425,6 +425,10 @@ export async function POST(request: Request) {
       // CUSTOMER.SUBSCRIPTION.DELETED — Full cancellation
       // Only fires after all payment retries exhausted or immediate cancel.
       // Marks org as expired but preserves stripe_customer_id for re-sub.
+      //
+      // FOUNDING FARMER FIX: metadata.supabase_user_id is NOT set on founding
+      // subscriptions (they're created via /api/stripe/checkout/founding before
+      // the user exists). We resolve the user via the org → professional chain.
       // ════════════════════════════════════════════════════════════════════
       case 'customer.subscription.deleted': {
         const sub = getSubFields(event.data.object);
@@ -455,7 +459,18 @@ export async function POST(request: Request) {
           })
           .eq('id', orgId);
 
-        const userId = sub.metadata?.supabase_user_id;
+        // Resolve auth_id — try metadata first (standard path), then fall back
+        // to org → professional lookup (founding farmer path).
+        let userId: string | null = sub.metadata?.supabase_user_id || null;
+        if (!userId) {
+          const { data: pro } = await supabaseAdmin
+            .from('professionals')
+            .select('auth_id')
+            .eq('org_id', orgId)
+            .maybeSingle();
+          userId = pro?.auth_id || null;
+        }
+
         if (userId) {
           await supabaseAdmin.from('subscription_events').insert({
             user_id: userId,
@@ -464,11 +479,12 @@ export async function POST(request: Request) {
             metadata: {
               organization_id: orgId,
               subscription_id: sub.id,
+              source: sub.metadata?.tier === 'founding' ? 'founding_farmer' : 'standard',
             },
           });
         }
 
-        console.log(`[Webhook] Subscription deleted: org=${orgId}`);
+        console.log(`[Webhook] Subscription deleted: org=${orgId}, user=${userId || 'unresolved'}`);
         break;
       }
 
