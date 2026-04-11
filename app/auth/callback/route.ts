@@ -27,22 +27,35 @@ export async function GET(request: Request) {
   const nextParam = searchParams.get('next') ?? '/dashboard';
   const next = welcome ? `${nextParam}?welcome=${welcome}` : nextParam;
 
+  let error: any = null;
+  let lastErrorMessage = '';
+
   if (code || token_hash) {
     const supabase = await createClient();
 
-    let error = null;
     if (code) {
-      // OAuth flow (Google sign-in)
       const result = await supabase.auth.exchangeCodeForSession(code);
       error = result.error;
+      if (error) lastErrorMessage = `oauth:${error.message}`;
     } else if (token_hash) {
-      // Magic link flow (Founding Farmer returning member)
-      const result = await supabase.auth.verifyOtp({
-        token_hash,
-        type: (type as any) || 'magiclink',
-      });
+      // Try 'email' first (correct for generateLink magiclink flow), fall back to type from URL
+      const result = await supabase.auth.verifyOtp({ token_hash, type: 'email' as any });
       error = result.error;
+      if (error) {
+        lastErrorMessage = `magiclink_email:${error.message}`;
+        // Fallback: try the type from the URL
+        if (type) {
+          const fallback = await supabase.auth.verifyOtp({ token_hash, type: type as any });
+          if (!fallback.error) {
+            error = null;
+            lastErrorMessage = '';
+          } else {
+            lastErrorMessage += ` | ${type}:${fallback.error.message}`;
+          }
+        }
+      }
     }
+    console.log('[AuthCallback] result:', { hasCode: !!code, hasTokenHash: !!token_hash, type, lastErrorMessage });
 
     if (!error) {
       const {
@@ -159,5 +172,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed&debug=${encodeURIComponent(lastErrorMessage || 'no_error_captured')}`);
 }
