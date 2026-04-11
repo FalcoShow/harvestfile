@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const { data: existingPro } = await supabaseAdmin
       .from('professionals')
       .select('id, auth_id, org_id, organizations(subscription_tier, subscription_status)')
-      .eq('email', trimmedEmail)
+      .ilike('email', trimmedEmail)
       .maybeSingle();
 
     const existingOrg = existingPro?.organizations as any;
