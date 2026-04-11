@@ -21,11 +21,28 @@ import { getOrCreateCustomer } from '@/lib/stripe';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const token_hash = searchParams.get('token_hash');
+  const type = searchParams.get('type');
+  const welcome = searchParams.get('welcome');
+  const nextParam = searchParams.get('next') ?? '/dashboard';
+  const next = welcome ? `${nextParam}?welcome=${welcome}` : nextParam;
 
-  if (code) {
+  if (code || token_hash) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    let error = null;
+    if (code) {
+      // OAuth flow (Google sign-in)
+      const result = await supabase.auth.exchangeCodeForSession(code);
+      error = result.error;
+    } else if (token_hash) {
+      // Magic link flow (Founding Farmer returning member)
+      const result = await supabase.auth.verifyOtp({
+        token_hash,
+        type: (type as any) || 'magiclink',
+      });
+      error = result.error;
+    }
 
     if (!error) {
       const {
