@@ -50,12 +50,14 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     const existingOrg = existingPro?.organizations as any;
-    const isAlreadyFounding =
-      existingOrg?.subscription_tier === 'founding' &&
-      (existingOrg?.subscription_status === 'active' || existingOrg?.subscription_status === 'trialing');
+    const PAID_TIERS = ['founding', 'starter', 'pro', 'team', 'enterprise'];
+    const hasExistingAccount =
+      existingPro && existingOrg && PAID_TIERS.includes(existingOrg?.subscription_tier);
 
-    if (isAlreadyFounding) {
-      console.log(`[FoundingCheckout] ${trimmedEmail} is already a Founding Farmer — sending magic link`);
+    if (hasExistingAccount) {
+      const tier = existingOrg.subscription_tier;
+      const status = existingOrg.subscription_status;
+      console.log(`[FoundingCheckout] ${trimmedEmail} already has account (tier=${tier}, status=${status}) — sending magic link instead of charging`);
 
       // Generate a fresh magic link
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
         await resend.emails.send({
           from: EMAIL_FROM.onboarding,
           to: [trimmedEmail],
-          subject: "Welcome back, Founding Farmer — your login link",
+          subject: "Welcome back to HarvestFile — your login link",
           html: buildReturningMemberEmailHtml(magicLink),
         });
       } catch (emailErr) {
