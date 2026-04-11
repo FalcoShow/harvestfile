@@ -63,8 +63,22 @@ export async function POST(request: Request) {
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email: trimmedEmail,
-        options: { redirectTo: 'https://www.harvestfile.com/auth/callback?next=/dashboard&welcome=returning' },
+        options: {
+          redirectTo: 'https://www.harvestfile.com/auth/callback?next=/dashboard&welcome=returning',
+        },
       });
+
+      // PKCE flow: extract the hashed_token and rebuild the link to point at our /auth/confirm route
+      // instead of Supabase's /auth/v1/verify, which uses the implicit flow that breaks SSR.
+      let magicLinkOverride: string | null = null;
+      if (linkData?.properties?.hashed_token) {
+        const params = new URLSearchParams({
+          token_hash: linkData.properties.hashed_token,
+          type: 'magiclink',
+          next: '/dashboard?welcome=returning',
+        });
+        magicLinkOverride = `https://www.harvestfile.com/auth/confirm?${params.toString()}`;
+      }
 
       if (linkError || !linkData?.properties?.action_link) {
         console.error('[FoundingCheckout] Failed to generate magic link:', linkError);
@@ -76,7 +90,7 @@ export async function POST(request: Request) {
         });
       }
 
-      const magicLink = linkData.properties.action_link;
+      const magicLink = magicLinkOverride || linkData.properties.action_link;
 
       // Send a "welcome back" branded email with the magic link
       try {
