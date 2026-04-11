@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email: trimmedEmail,
-        options: { redirectTo: 'https://www.harvestfile.com/dashboard?welcome=returning' },
+        options: { redirectTo: 'https://www.harvestfile.com/auth/callback?next=/dashboard&welcome=returning' },
       });
 
       if (linkError || !linkData?.properties?.action_link) {
