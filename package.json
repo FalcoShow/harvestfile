@@ -22,7 +22,7 @@
     "ai": "^6.0.137",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "inngest": "^3.52.6",
+    "inngest": "^3.54.1",
     "jose": "^6.2.2",
     "lightweight-charts": "^4.2.3",
     "lucide-react": "^1.7.0",
