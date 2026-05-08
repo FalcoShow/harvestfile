@@ -25,7 +25,7 @@ function assert(name: string, cond: boolean, comment = '') {
   console.log(`${cond ? '✓' : '✗'} ${name}  ${comment}`);
 }
 
-// Deterministic basis history (uniform [-1.00, -0.01]; 75th ≈ -0.258, 50th ≈ -0.505)
+// Deterministic basis history (uniform [-1.00, -0.01]; 25th ≈ -0.7525, 75th ≈ -0.2575)
 const fixedHistory: number[] = [];
 for (let i = 0; i < 100; i++) fixedHistory.push(-1.00 + i * 0.01);
 
@@ -55,14 +55,22 @@ console.log(`  Margin:   "${r1.details.margin}"`);
 console.log(`  Basis:    "${r1.details.basis}"`);
 console.log(`  Pace:     "${r1.details.pace}"`);
 
-// ── Scenario 2: WATCH — margin and basis GREEN, pace AMBER ──
-console.log('\nScenario 2: WATCH — margin and basis GREEN, pace AMBER');
+// ── Scenario 2: WATCH — basis AMBER, margin and pace GREEN ──
+//
+// Under spec-aligned pace classifier (GREEN at-or-behind, AMBER ahead within
+// 5pp), the prior "WATCH with pace AMBER" scenario can't fire — pace AMBER
+// means farmer is slightly ahead, which forces quantity = 0 and routes
+// through HOLD via the quantity-zero gate. The natural WATCH scenario in
+// production is basis AMBER + others GREEN: farmer is behind, margin clears
+// target, but basis is in the interquartile range so it isn't a top-quartile
+// sell day. This is the dominant WATCH shape we expect to see in the field.
+console.log('\nScenario 2: WATCH — margin and pace GREEN, basis AMBER');
 const s2Sig = combineSignals(
-  classifyMarginSignal(4.50, 4.00, 0.20),
-  classifyBasisSignal(-0.10, fixedHistory),
-  classifyPaceSignal(67, 68),
+  classifyMarginSignal(4.50, 4.00, 0.20),     // GREEN
+  classifyBasisSignal(-0.40, fixedHistory),    // AMBER (interquartile)
+  classifyPaceSignal(50, 67.8),                // GREEN (behind target)
 );
-const s2Qty = computeRecommendedQuantity(33000, 100000, 67, 68);
+const s2Qty = computeRecommendedQuantity(50000, 100000, 50, 67.8);
 const r2 = generateRationale({
   crop: 'corn',
   cashBid: 4.50,
@@ -70,7 +78,7 @@ const r2 = generateRationale({
   quantity: s2Qty,
 });
 check('  action', r2.action, 'WATCH');
-assert('  summary mentions pace', r2.signalSummary.toLowerCase().includes('pace'));
+assert('  summary mentions basis', r2.signalSummary.toLowerCase().includes('basis'));
 console.log(`  Headline: "${r2.headline}"`);
 console.log(`  Summary:  "${r2.signalSummary}"`);
 
@@ -121,14 +129,20 @@ assert(
 console.log(`  Headline: "${r4.headline}"`);
 console.log(`  Summary:  "${r4.signalSummary}"`);
 
-// ── Scenario 5: HOLD — basis RED, pace AMBER ──
-console.log('\nScenario 5: HOLD — basis RED below average');
+// ── Scenario 5: HOLD — basis RED unusually weak, pace AMBER ──
+//
+// Pace 70% sold vs 68% target = +2pp ahead, which is AMBER under the
+// spec-aligned classifier. Combined with basis RED (below 25th pctl) and
+// margin GREEN, greenCount = 1 and quantity = 0 (ahead of pace), so action
+// routes to HOLD via the quantity-zero gate. The summary should adopt the
+// spec phrase "unusually weak" from §4.4 RED basis description.
+console.log('\nScenario 5: HOLD — basis RED unusually weak, pace AMBER');
 const s5Sig = combineSignals(
-  classifyMarginSignal(4.50, 4.00, 0.20),
-  classifyBasisSignal(-0.80, fixedHistory),
-  classifyPaceSignal(67, 68),
+  classifyMarginSignal(4.50, 4.00, 0.20),     // GREEN
+  classifyBasisSignal(-0.80, fixedHistory),    // RED (below 25th)
+  classifyPaceSignal(70, 68),                   // AMBER (slightly ahead)
 );
-const s5Qty = computeRecommendedQuantity(33000, 100000, 67, 68);
+const s5Qty = computeRecommendedQuantity(33000, 100000, 70, 68);
 const r5 = generateRationale({
   crop: 'corn',
   cashBid: 4.50,
@@ -137,10 +151,11 @@ const r5 = generateRationale({
 });
 check('  action', r5.action, 'HOLD');
 assert('  summary mentions basis', r5.signalSummary.toLowerCase().includes('basis'));
+assert('  summary uses spec phrase "unusually weak"', r5.signalSummary.toLowerCase().includes('unusually weak'));
 console.log(`  Headline: "${r5.headline}"`);
 console.log(`  Summary:  "${r5.signalSummary}"`);
 
-// ── Scenario 6: thin basis sample (<60 days) ──
+// ── Scenario 6: thin basis sample (<20 days) ──
 console.log('\nScenario 6: thin basis sample, margin and pace GREEN');
 const thinSample = [-0.20, -0.15, -0.25, -0.18, -0.22];
 const s6Sig = combineSignals(

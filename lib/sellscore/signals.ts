@@ -10,6 +10,12 @@
 // signal expects historicalBasisValues to be the seasonally-filtered set
 // returned by lib/sellscore/seasonal-basis.ts (3-year ±14 day same-date
 // window), not the full unfiltered distribution.
+//
+// Classification thresholds match Sell Score v1 Build Spec §4.4 verbatim:
+//
+//   Margin: GREEN ≥ breakeven + $0.20, AMBER ≥ breakeven, RED below.
+//   Basis:  GREEN ≥ 75th percentile, AMBER 25th–75th, RED below 25th.
+//   Pace:   GREEN at or behind target, AMBER ahead within 5pp, RED ahead by >5pp.
 
 export type SignalLevel = 'GREEN' | 'AMBER' | 'RED';
 
@@ -26,8 +32,8 @@ export interface BasisSignal {
   level: SignalLevel;
   todayBasis: number;          // $/bu (negative typical inland)
   percentileRank: number;      // 0–100, where today falls in historical distribution
-  threshold75thPctl: number;   // 75th percentile of historical sample
-  threshold50thPctl: number;   // 50th percentile (median)
+  threshold75thPctl: number;   // 75th percentile of historical sample (GREEN floor)
+  threshold25thPctl: number;   // 25th percentile of historical sample (AMBER floor / RED ceiling)
   historicalSampleSize: number;
   hasEnoughHistory: boolean;   // false if sample size < BASIS_MIN_SAMPLE_SIZE (seasonal window too thin)
 }
@@ -55,7 +61,10 @@ const MARGIN_TARGET_DEFAULT = 0.20;
 // healthy counties pass. Counties below this floor get forced RED with
 // hasEnoughHistory=false (conservative posture per spec §2.5).
 const BASIS_MIN_SAMPLE_SIZE = 20;
-const PACE_AMBER_BAND_PP = 5;            // within ±5pp = AMBER
+// Upper bound of the AMBER pace zone. AMBER fires when farmer is ahead of
+// target by 0–5pp; beyond 5pp ahead, signal flips to RED. GREEN covers
+// the entire "at or behind" range with no lower bound, per spec §4.4.
+const PACE_AMBER_AHEAD_BAND_PP = 5;
 
 /**
  * Margin signal: does the cash bid cover breakeven plus margin target?
@@ -114,9 +123,16 @@ function percentileRank(sortedValues: number[], value: number): number {
 
 /**
  * Basis signal: is today's basis better than recent history?
- *   GREEN: todayBasis ≥ 75th percentile
- *   AMBER: 50th ≤ todayBasis < 75th
- *   RED:   below 50th, OR thin sample (<20 obs in the 3-yr ±14 day window)
+ *   GREEN: todayBasis ≥ 75th percentile (top quartile)
+ *   AMBER: 25th ≤ todayBasis < 75th (interquartile range)
+ *   RED:   below 25th percentile (bottom quartile), OR thin sample
+ *          (<20 obs in the 3-yr ±14 day window)
+ *
+ * Per Sell Score v1 Build Spec §4.4. The 25th percentile cutoff for RED
+ * is intentionally permissive: only the worst quartile of historical
+ * basis days fires a RED. This avoids over-pessimism on slightly-below-
+ * average days and reserves the RED signal for genuinely poor basis
+ * conditions ("unusually weak" per spec phrasing).
  */
 export function classifyBasisSignal(
   todayBasis: number,
@@ -125,14 +141,14 @@ export function classifyBasisSignal(
   const hasEnoughHistory = historicalBasisValues.length >= BASIS_MIN_SAMPLE_SIZE;
   const sorted = [...historicalBasisValues].sort((a, b) => a - b);
 
-  const threshold50thPctl = percentile(sorted, 50);
+  const threshold25thPctl = percentile(sorted, 25);
   const threshold75thPctl = percentile(sorted, 75);
   const rank = percentileRank(sorted, todayBasis);
 
   let level: SignalLevel;
   if (!hasEnoughHistory) level = 'RED';
   else if (todayBasis >= threshold75thPctl) level = 'GREEN';
-  else if (todayBasis >= threshold50thPctl) level = 'AMBER';
+  else if (todayBasis >= threshold25thPctl) level = 'AMBER';
   else level = 'RED';
 
   return {
@@ -140,7 +156,7 @@ export function classifyBasisSignal(
     todayBasis,
     percentileRank: rank,
     threshold75thPctl,
-    threshold50thPctl,
+    threshold25thPctl,
     historicalSampleSize: historicalBasisValues.length,
     hasEnoughHistory,
   };
@@ -148,9 +164,16 @@ export function classifyBasisSignal(
 
 /**
  * Pace signal: are you behind, at, or ahead of the calendar target?
- *   GREEN: gap ≤ -5pp  (more than 5pp behind, room to sell)
- *   AMBER: gap within ±5pp  (at pace)
- *   RED:   gap > +5pp  (more than 5pp ahead, hold)
+ *   GREEN: gap ≤ 0 (at or behind target — urgency to sell)
+ *   AMBER: 0 < gap ≤ +5pp (slightly ahead — within 5pp of target)
+ *   RED:   gap > +5pp (materially ahead — no selling urgency)
+ *
+ * Per Sell Score v1 Build Spec §4.4. GREEN covers the entire "at or
+ * behind" range without a lower bound because the engine is biased
+ * toward firing sell discipline. Farmers tend to procrastinate on
+ * pricing, the calendar pace is already designed with conservative
+ * milestones, and the spec is explicit that any at-or-behind position
+ * carries "urgency to sell."
  */
 export function classifyPaceSignal(
   currentPctSold: number,
@@ -159,8 +182,8 @@ export function classifyPaceSignal(
   const gap = currentPctSold - targetPctSold;
 
   let level: SignalLevel;
-  if (gap <= -PACE_AMBER_BAND_PP) level = 'GREEN';
-  else if (gap <= PACE_AMBER_BAND_PP) level = 'AMBER';
+  if (gap <= 0) level = 'GREEN';
+  else if (gap <= PACE_AMBER_AHEAD_BAND_PP) level = 'AMBER';
   else level = 'RED';
 
   return { level, currentPctSold, targetPctSold, gap };

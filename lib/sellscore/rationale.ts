@@ -18,6 +18,10 @@
 // without modification — if either is omitted, the OUT_OF_SEASON branch
 // can't fire and the rest of the policy runs as before. The production
 // engine in recommendation-engine.ts always supplies both.
+//
+// Basis copy uses spec language verbatim: GREEN reads "top quartile",
+// RED reads "unusually weak" (the spec's own phrase from §4.4 RED
+// description) and references the 25th percentile threshold.
 
 import type { Crop } from './pace-calendar';
 import type {
@@ -195,7 +199,7 @@ function basisDetail(b: BasisSignal): string {
   if (b.level === 'AMBER') {
     return `Today's basis ${today} is in the middle of recent range (${pctl}th percentile).`;
   }
-  return `Today's basis ${today} is below recent average (${pctl}th percentile, median is ${formatCurrency(b.threshold50thPctl)}).`;
+  return `Today's basis ${today} is in the bottom quartile of recent prices (${pctl}th percentile, 25th is ${formatCurrency(b.threshold25thPctl)}).`;
 }
 
 function paceDetail(p: PaceSignal): string {
@@ -247,13 +251,13 @@ function buildHoldSummary(signals: SignalSet): string {
     signals.basis.hasEnoughHistory &&
     signals.pace.level === 'RED'
   ) {
-    return `Basis is below average and you're already ahead of pace. Sit tight.`;
+    return `Basis is unusually weak today and you're already ahead of pace. Sit tight.`;
   }
   if (signals.pace.level === 'RED') {
     return `You're already ahead of pace. No need to sell more right now.`;
   }
   if (signals.basis.level === 'RED' && signals.basis.hasEnoughHistory) {
-    return `Basis is below recent average. Wait for a better day.`;
+    return `Basis is unusually weak today. Wait for a better day.`;
   }
   if (signals.basis.level === 'RED' && !signals.basis.hasEnoughHistory) {
     return `Not enough basis history yet to read the market here. Score will sharpen as data comes in.`;
