@@ -22,8 +22,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
+# ─────────────────────────────────────────────────────────────────────────
+# Local env files
+# ─────────────────────────────────────────────────────────────────────────
+# Broad pattern catches every .env variant including .env.local,
+# .env.local.backup, .env.production.local, .env.staging, etc.
+# The .env.example allowlist below preserves any committed example file.
+.env*
+!.env.example
 
 # vercel
 .vercel
@@ -32,10 +38,58 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# ─────────────────────────────────────────────────────────────────────────
+# Local data
+# ─────────────────────────────────────────────────────────────────────────
 /data/
-
-# Add these lines to your existing .gitignore
-# (at the bottom of the file)
 
 # RMA Actuarial Data Master files (2.7 GB+)
 data/adm-2026/
+
+# ─────────────────────────────────────────────────────────────────────────
+# Backup / swap / temp files
+# ─────────────────────────────────────────────────────────────────────────
+# Catches editor backups, *.bak from manual saves, vim swap files, and
+# the trailing-tilde backup convention used by some editors.
+*.backup
+*.bak
+*.swp
+*.swo
+*~
+
+# ─────────────────────────────────────────────────────────────────────────
+# Lead / outreach data exports (may contain personal info)
+# ─────────────────────────────────────────────────────────────────────────
+# Apollo CSV exports — lead emails, phone numbers, company contacts.
+# n8n workflow JSON exports — may contain webhook URLs that act as
+# secrets (the URL itself is the auth in n8n's webhook design).
+_apollo_imports/
+_n8n_workflows/
+
+# ─────────────────────────────────────────────────────────────────────────
+# Production data smoke tests / dumps
+# ─────────────────────────────────────────────────────────────────────────
+# Root-level prod_*.csv and prod_*.sql cover smoke test fixtures that
+# may contain real customer data. Scoped to root with leading slash so
+# legitimate scripts/*.csv and seed files in subdirectories are unaffected.
+/prod_*.csv
+/prod_*.sql
+
+# ─────────────────────────────────────────────────────────────────────────
+# OS / editor noise
+# ─────────────────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE config — exclude entire folders rather than per-file rules
+# (these often hold local-only path configs and occasionally secrets).
+.idea/
+.vscode/
+*.iml
+
+# ─────────────────────────────────────────────────────────────────────────
+# Logs
+# ─────────────────────────────────────────────────────────────────────────
+*.log
+logs/
