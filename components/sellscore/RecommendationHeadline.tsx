@@ -23,7 +23,7 @@ export default function RecommendationHeadline({
         className="text-[11px] uppercase mb-6"
         style={{
           color: colors.textTertiary,
-          letterSpacing: '0.24em',
+          letterSpacing: '0.22em',
           fontWeight: 700,
           fontFamily: fonts.body,
         }}
@@ -98,10 +98,10 @@ function SellHeadlineComposed({
 
 function getEyebrow(type: Recommendation['recommendation_type']): string {
   switch (type) {
-    case 'sell': return "Today · Recommendation";
-    case 'hold': return "Today · Status";
-    case 'pace_alert': return "Today · Pace alert";
-    case 'out_of_season': return "Today · Status";
+    case 'sell': return 'Today · Recommendation';
+    case 'hold': return 'Today · Status';
+    case 'pace_alert': return 'Today · Pace alert';
+    case 'out_of_season': return 'Season · Complete';
   }
 }
 
@@ -110,6 +110,6 @@ function getAccentColor(type: Recommendation['recommendation_type']): string {
     case 'sell': return colors.emerald;
     case 'hold': return colors.borderEmphasis;
     case 'pace_alert': return colors.amber;
-    case 'out_of_season': return colors.borderDefault;
+    case 'out_of_season': return colors.gold;
   }
 }

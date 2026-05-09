@@ -48,7 +48,7 @@ export default function ScenarioToggle({ active, onChange }: ScenarioToggleProps
               role="tab"
               aria-selected={isActive}
               onClick={() => onChange(type)}
-              className="px-3 py-1.5 rounded-md text-[12px]"
+              className="px-3 py-1.5 rounded-md text-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0f0d]"
               style={{
                 fontFamily: fonts.body,
                 fontWeight: 500,

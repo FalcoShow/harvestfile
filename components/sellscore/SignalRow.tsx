@@ -27,11 +27,14 @@ export default function SignalRow({
   const cashBid = recommendation.recommended_cash_bid;
   const margin = cashBid !== null ? cashBid - breakeven.dollars_per_bu : null;
 
+  // A3: when margin is negative, display the magnitude (no embedded "-" inside
+  // the $-prefixed token). "$0.30 below breakeven" reads cleanly; "$-0.30
+  // below breakeven" looks like a typo.
   const marginPrimary =
     margin !== null
       ? margin >= 0
         ? `+${formatters.currency(margin)} above breakeven`
-        : `${formatters.currency(margin)} below breakeven`
+        : `${formatters.currency(Math.abs(margin))} below breakeven`
       : 'No live cash bid';
 
   const marginSecondary =
@@ -43,9 +46,17 @@ export default function SignalRow({
 
   const basisCents = Math.round(recommendation.current_basis * 100);
   const basisPrimary = `${formatters.cents(basisCents)} today`;
-  const basisSecondary = `${recommendation.basis_3yr_percentile}${ordinalSuffix(
-    recommendation.basis_3yr_percentile
-  )} percentile vs 3-year norm`;
+
+  // A5: quartile descriptor + null safety. Basis 3-yr percentile can come
+  // back null on thin samples; the quartile label puts an instantly readable
+  // word in front of the numeric percentile.
+  const basisPctile = recommendation.basis_3yr_percentile;
+  const basisSecondary =
+    basisPctile == null
+      ? 'Not enough basis history yet'
+      : `${quartileLabel(basisPctile)} · ${basisPctile}${ordinalSuffix(
+          basisPctile
+        )} percentile vs 3-yr norm`;
 
   const pacePrimary = `${pace.ytd_pct}% priced`;
   const paceSecondary = `Target ${pace.target_pct}% by ${pace.target_date_label}`;
@@ -165,6 +176,12 @@ function StatusDot({ status }: { status: SignalStatus }) {
       aria-hidden="true"
     />
   );
+}
+
+function quartileLabel(pctile: number): string {
+  if (pctile >= 75) return 'Top quartile';
+  if (pctile >= 25) return 'Mid-range';
+  return 'Bottom quartile';
 }
 
 function ordinalSuffix(n: number): string {

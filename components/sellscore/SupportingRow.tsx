@@ -13,7 +13,6 @@ export default function SupportingRow({ supporting }: SupportingRowProps) {
         <Figure
           label="Cash bid"
           value={formatters.currency(supporting.cash_price_per_bu)}
-          accent
         />
         <VerticalDivider />
         <Figure
@@ -25,6 +24,7 @@ export default function SupportingRow({ supporting }: SupportingRowProps) {
         <Figure
           label="Locks profit"
           value={formatters.perAcre(supporting.profit_per_acre)}
+          accent
         />
       </div>
     </div>

@@ -122,13 +122,14 @@ function PaceBar({
         }}
       />
 
+      {/* B2: target tick widened from 1px to 2px for prominence. */}
       <div
         className="absolute -translate-x-1/2"
         style={{
           left: `${targetClamped}%`,
           top: '-4px',
           bottom: '-4px',
-          width: '1px',
+          width: '2px',
           backgroundColor: colors.textSecondary,
         }}
         aria-hidden="true"

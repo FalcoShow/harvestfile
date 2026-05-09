@@ -39,7 +39,7 @@ export default function PrimaryActions({ recommendation }: PrimaryActionsProps) 
           type="button"
           onClick={() => setMarked((m) => !m)}
           aria-pressed={marked}
-          className="group relative inline-flex w-full sm:w-auto items-center justify-center gap-2.5 px-7 rounded-xl"
+          className="group relative inline-flex w-full sm:w-auto items-center justify-center gap-2.5 px-7 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0f0d]"
           style={{
             minHeight: '56px',
             backgroundColor: marked ? 'transparent' : colors.emerald,
@@ -75,7 +75,7 @@ export default function PrimaryActions({ recommendation }: PrimaryActionsProps) 
         <button
           type="button"
           onClick={handleSeeTheMath}
-          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-6 rounded-xl"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-6 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0f0d]"
           style={{
             minHeight: '56px',
             backgroundColor: 'transparent',

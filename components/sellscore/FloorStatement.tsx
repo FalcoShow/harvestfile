@@ -99,7 +99,7 @@ export default function FloorStatement({ floor, cropContext }: FloorStatementPro
       <p
         className="text-[13px]"
         style={{
-          color: colors.textMuted,
+          color: colors.textTertiary,
           fontFamily: fonts.body,
           fontWeight: 400,
           letterSpacing: '-0.005em',

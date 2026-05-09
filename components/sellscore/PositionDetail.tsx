@@ -72,7 +72,7 @@ function PositionCard({ position }: { position: CropPosition }) {
           className="text-[12px] uppercase"
           style={{
             color: colors.textSecondary,
-            letterSpacing: '0.20em',
+            letterSpacing: '0.22em',
             fontWeight: 700,
             fontFamily: fonts.body,
           }}
@@ -117,8 +117,8 @@ function PositionCard({ position }: { position: CropPosition }) {
         }}
       >
         {allPriced
-          ? `${formatters.bushels(position.expected_bushels)} bu marketed for ${position.crop_year}`
-          : `unsold of ${formatters.bushels(position.expected_bushels)} bu expected`}
+          ? `${formatters.bushels(position.expected_bushels)} bu marketed`
+          : `of ${formatters.bushels(position.expected_bushels)} bu expected`}
       </div>
 
       <PaceMeter pricing={position.pricing_pace_pct} target={target} />
@@ -137,9 +137,9 @@ function PositionCard({ position }: { position: CropPosition }) {
         <span style={{ ...tabularNums, color: colors.textSecondary, fontWeight: 600 }}>
           {formatters.currency(position.breakeven_dollars_per_bu)}
         </span>
-        <span style={{ color: colors.textMuted }}>/bu</span>
+        <span style={{ color: colors.textTertiary }}>/bu</span>
         {position.breakeven_source === 'county_default' && (
-          <span style={{ color: colors.textMuted }}> · county default</span>
+          <span style={{ color: colors.textTertiary }}> · county default</span>
         )}
       </div>
     </article>
@@ -175,7 +175,7 @@ function PaceMeter({ pricing, target }: { pricing: number; target: number }) {
             left: `${targetClamped}%`,
             top: '-3px',
             bottom: '-3px',
-            width: '1px',
+            width: '2px',
             backgroundColor: colors.textSecondary,
           }}
           aria-hidden="true"
