@@ -1,26 +1,30 @@
 // app/sellscore/me/page.tsx
 // =============================================================================
-// HarvestFile Sell Score — Live Personalized Score (server component)
+// HarvestFile Sell Score — Live Personalized Score (server component, Deploy 2)
 //
 // Renders the live Sell Score for the authenticated user's setup-complete
-// farm. Reads the most recent recommendation from sellscore_recommendations.
-// If no recommendation exists for today (cron hasn't run yet, or new farm),
-// shows a "preparing your first Sell Score" empty state.
+// farm. Reads from sellscore_recommendations (the daily/manual compute
+// output) AND grain_positions (per-crop expected/contracted bushels for
+// real pace numbers).
 //
-// This is a NEW route at /sellscore/me — separate from /sellscore (marketing)
-// and /sellscore/preview (mock data demo). The /dashboard route swap to
-// Sell Score is a future task; this page exists so newly-onboarded farmers
-// have somewhere to land after submitting the onboarding form.
+// Auth chain (SHORT, sellscore architecture):
+//   auth.uid() -> farms.owner_id
 //
-// Auth chain (SHORT): auth.uid() -> farms.owner_id
+// Data flow:
+//   1. farms              → farm context (name, county_fips, state, acres)
+//   2. sellscore_recommendations → today's recommendation (if compute ran)
+//   3. sellscore_elevators (is_primary=true) → reference elevator info
+//   4. grain_positions    → per-crop expected/contracted for pace calc
 //
-// Composition: reuses the existing SellScoreScreen component (already polished
-// and shipped in the polish commit) with real recommendation data.
+// If no recommendation exists, shows "Preparing your first Sell Score"
+// empty state. Onboard attempts inline compute; if Barchart fails, the
+// 4 AM cron writes the row.
 // =============================================================================
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SellScoreScreen from '@/components/sellscore/SellScoreScreen';
+import { getTargetPaceForDate, type Crop } from '@/lib/sellscore/pace-calendar';
 import type {
   SellScoreScreenData,
   FarmDisplayContext,
@@ -40,6 +44,8 @@ import type {
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+const V1_ENGINE_CROPS = new Set<Crop>(['corn', 'soybeans']);
+
 export default async function SellScoreMePage() {
   const supabase = await createClient();
   const {
@@ -52,7 +58,7 @@ export default async function SellScoreMePage() {
   const { data: farm } = await supabase
     .from('farms')
     .select(
-      'id, name, owner_id, county_fips, state, total_acres, sellscore_setup_complete, sellscore_primary_crops, sellscore_active'
+      'id, name, owner_id, county_fips, state, total_acres, sellscore_setup_complete, sellscore_primary_crops, sellscore_active',
     )
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
@@ -60,18 +66,17 @@ export default async function SellScoreMePage() {
     .maybeSingle();
 
   if (!farm) {
-    // No farm record at all — webhook hasn't fired yet or this isn't a
-    // Sell Score subscriber. Send them to pricing to convert.
+    // No farm record — webhook hasn't fired or this isn't a Sell Score
+    // subscriber. Send them to pricing to convert.
     redirect('/pricing');
   }
 
   if (!farm.sellscore_setup_complete) {
-    // Has a farm but onboarding not done — finish that first
+    // Has a farm but onboarding not done. Finish that first.
     redirect('/onboard');
   }
 
-  // Fetch the latest recommendation for any of the farm's crops
-  // We pick the most recent one across all crops for the headline.
+  // Latest recommendation across any crop for this farm
   const { data: latestRec } = await supabase
     .from('sellscore_recommendations')
     .select('*')
@@ -81,7 +86,7 @@ export default async function SellScoreMePage() {
     .limit(1)
     .maybeSingle();
 
-  // Fetch primary elevator
+  // Primary elevator
   const { data: primaryElevator } = await supabase
     .from('sellscore_elevators')
     .select('*')
@@ -89,15 +94,28 @@ export default async function SellScoreMePage() {
     .eq('is_primary', true)
     .maybeSingle();
 
-  // No recommendation yet → show the "preparing your first Sell Score" state.
-  // This happens when the daily cron hasn't run for this farm yet (just
-  // onboarded) or if cron hasn't been wired yet.
+  // All positions for this farm. Used for real pace numbers and position
+  // cards instead of synthesizing from total_acres × yield.
+  const { data: positionRows } = await supabase
+    .from('grain_positions')
+    .select(
+      'commodity, crop_year, expected_bushels, bushels_contracted, breakeven_dollars_per_bu',
+    )
+    .eq('farm_id', farm.id)
+    .order('crop_year', { ascending: false });
+
+  // No recommendation yet → empty state
   if (!latestRec) {
     return <PreparingFirstScore farmName={farm.name} userEmail={user.email ?? ''} />;
   }
 
-  // Compose the display data shape that SellScoreScreen expects.
-  const screenData = composeScreenData(farm, latestRec, primaryElevator, user.email ?? '');
+  const screenData = composeScreenData(
+    farm,
+    latestRec,
+    primaryElevator,
+    positionRows ?? [],
+    user.email ?? '',
+  );
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f0d' }}>
@@ -110,11 +128,20 @@ export default async function SellScoreMePage() {
 // Display data composition
 // =============================================================================
 
+interface PositionRow {
+  commodity: string;
+  crop_year: number;
+  expected_bushels: number | null;
+  bushels_contracted: number | null;
+  breakeven_dollars_per_bu: number | null;
+}
+
 function composeScreenData(
   farm: any,
   rec: any,
   elevator: any,
-  userEmail: string
+  positionRows: PositionRow[],
+  userEmail: string,
 ): SellScoreScreenData {
   // ── Farm context ─────────────────────────────────────────────────────────
   const firstName = farmerFirstName(userEmail);
@@ -125,11 +152,16 @@ function composeScreenData(
     day: 'numeric',
   });
 
+  const elevatorCity = elevator?.elevator_city ?? '';
+
   const context: FarmDisplayContext = {
     farmer_first_name: firstName,
     date_label: dateLabel,
     farm_name: farm.name,
-    county: countyNameFromFips(farm.county_fips, farm.state) ?? farm.state ?? 'Your',
+    // Show the elevator city as "where your market is" since farms can be
+    // anywhere in the US and we map them to the nearest of 25 supported
+    // elevators. v1.1 adds a separate "your home county: X" line.
+    county: elevatorCity || farm.state || 'Your',
     state: farm.state ?? '',
   };
 
@@ -163,44 +195,93 @@ function composeScreenData(
           cash_price_per_bu: rec.recommended_cash_bid,
           basis_cents: Math.round((rec.current_basis ?? 0) * 100),
           basis_percentile: Math.round(rec.basis_3yr_percentile ?? 0),
-          profit_per_acre: estimatePerAcreProfit(rec, farm),
+          profit_per_acre: estimatePerAcreProfit(rec, farm, positionRows),
         }
       : null;
 
-  // ── Pace context ─────────────────────────────────────────────────────────
-  // Pace fields are not currently persisted on sellscore_recommendations
-  // (a future migration). For now, derive sensible defaults from the
-  // pace_signal classification.
+  // ── Real pace (ytd + target) for the recommendation's crop ───────────────
+  const recCrop = rec.crop as string;
+  const recPosition = positionRows.find((p) => p.commodity === recCrop);
+  const expectedForRec = Number(recPosition?.expected_bushels ?? 0);
+  const contractedForRec = Number(recPosition?.bushels_contracted ?? 0);
+
+  const ytdPct =
+    expectedForRec > 0
+      ? Math.round((contractedForRec / expectedForRec) * 100)
+      : 0;
+
+  // Target pace from calendar. Only meaningful for v1 engine crops. Wheat
+  // and sorghum get 0 because pace-calendar models corn/soybeans MY only.
+  let targetPct = 0;
+  if (isV1Crop(recCrop)) {
+    targetPct = Math.round(getTargetPaceForDate(recCrop as Crop, today));
+  }
+
   const pace: PaceDisplay = {
-    ytd_pct: 0, // TODO: persist on recommendations row in v1.1
-    target_pct: 0,
-    target_date_label: today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    ytd_pct: ytdPct,
+    target_pct: targetPct,
+    target_date_label: today.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    }),
     status: paceStatusFromSignal(recommendation.pace_signal),
     status_label: paceStatusLabelFromSignal(recommendation.pace_signal),
   };
 
-  // ── Position (one card per primary crop) ─────────────────────────────────
-  // For v1, position cards show static "expected vs unsold" placeholders
-  // computed from total_acres × county yield. The cron-computed values will
-  // populate properly in v1.1 when sellscore_position is added to the
-  // recommendation persistence step.
-  const positions: CropPosition[] = (farm.sellscore_primary_crops ?? ['corn', 'soybeans']).map(
-    (crop: string) => {
-      // Crude expected-bushel estimate: total_acres × default county yield
-      const expectedBu = estimateExpectedBushels(crop, farm.total_acres ?? 0);
-      const unsoldBu = expectedBu; // v1: assume nothing priced yet
+  // ── Positions (one card per primary crop) ────────────────────────────────
+  // Prefer real grain_positions rows. Fall back to synthesized data for
+  // crops on the farm without a position row (wheat or sorghum pre-v1.1).
+  // All 14 CropPosition fields populated explicitly; ARC/PLC and insurance
+  // fields get v1 defaults that the v1.1 position editor will replace.
+  const primaryCrops: string[] = farm.sellscore_primary_crops ?? [];
+  const positions: CropPosition[] = primaryCrops.map((crop): CropPosition => {
+    const row = positionRows.find((p) => p.commodity === crop);
+    if (row) {
+      const expected = Number(row.expected_bushels ?? 0);
+      const contracted = Number(row.bushels_contracted ?? 0);
+      const unsold = Math.max(0, expected - contracted);
+      const pacePct = expected > 0 ? Math.round((contracted / expected) * 100) : 0;
+      const targetForCrop = isV1Crop(crop)
+        ? Math.round(getTargetPaceForDate(crop as Crop, today))
+        : 0;
       return {
-        crop,
-        crop_year: today.getFullYear().toString(),
-        expected_bushels: expectedBu,
-        unsold_bushels: unsoldBu,
-        pricing_pace_pct: 0,
-        target_pace_pct: 0,
-        breakeven_dollars_per_bu: defaultBreakevenForCrop(crop),
-        breakeven_source: 'county_default' as const,
+        crop: crop as Crop,
+        crop_year: Number(row.crop_year),
+        expected_bushels: expected,
+        unsold_bushels: unsold,
+        pricing_pace_pct: pacePct,
+        target_pace_pct: targetForCrop,
+        breakeven_dollars_per_bu: Number(
+          row.breakeven_dollars_per_bu ?? defaultBreakevenForCrop(crop),
+        ),
+        breakeven_source: 'county_default',
+        arc_plc_election: 'unknown',
+        insurance_coverage_level: null,
+        insurance_has_sco: false,
+        insurance_has_eco: false,
+        insurance_eco_level: null,
+        effective_floor_dollars_per_bu: null,
       };
     }
-  );
+    // Fallback: synthesized for crops without a position row
+    const expectedBu = estimateExpectedBushels(crop, farm.total_acres ?? 0);
+    return {
+      crop: crop as Crop,
+      crop_year: today.getUTCFullYear(),
+      expected_bushels: expectedBu,
+      unsold_bushels: expectedBu,
+      pricing_pace_pct: 0,
+      target_pace_pct: 0,
+      breakeven_dollars_per_bu: defaultBreakevenForCrop(crop),
+      breakeven_source: 'county_default',
+      arc_plc_election: 'unknown',
+      insurance_coverage_level: null,
+      insurance_has_sco: false,
+      insurance_has_eco: false,
+      insurance_eco_level: null,
+      effective_floor_dollars_per_bu: null,
+    };
+  });
 
   // ── Breakevens (one per crop, mirrors positions) ─────────────────────────
   const breakevens: BreakevenDisplay[] = positions.map((p) => ({
@@ -215,7 +296,7 @@ function composeScreenData(
     source_label: 'PLC reference + 85% RP + SCO',
   };
 
-  // ── Headline / summary text from rationale_text ──────────────────────────
+  // ── Headline from rationale_text ─────────────────────────────────────────
   const headline = extractHeadline(rec.rationale_text, recommendation);
 
   return {
@@ -237,18 +318,12 @@ function composeScreenData(
 
 function farmerFirstName(email: string): string {
   const local = email.split('@')[0];
-  // capitalize first letter of email local-part for the greeting
   if (!local) return 'farmer';
   return local.charAt(0).toUpperCase() + local.slice(1).toLowerCase();
 }
 
-function countyNameFromFips(fips: string | null, state: string | null): string | null {
-  if (!fips || !state) return null;
-  // v1 simplification: FIPS may be state-level only (per onboard/submit
-  // lookupZip). Just return null if we can't resolve a county name —
-  // SellScoreScreen falls back to state.
-  if (fips.length === 2) return null;
-  return null; // TODO v1.1: HUD ZIP-county crosswalk integration
+function isV1Crop(crop: string): crop is Crop {
+  return V1_ENGINE_CROPS.has(crop as Crop);
 }
 
 function paceStatusFromSignal(s: SignalStatus): 'on_pace' | 'behind' | 'ahead' {
@@ -264,8 +339,6 @@ function paceStatusLabelFromSignal(s: SignalStatus): string {
 }
 
 function estimateExpectedBushels(crop: string, acres: number): number {
-  // Conservative county-default yields — v1 placeholder until
-  // county_breakeven_defaults integration in /sellscore/me data flow.
   const yieldsPerAcre: Record<string, number> = {
     corn: 180,
     soybeans: 55,
@@ -287,7 +360,7 @@ function defaultBreakevenForCrop(crop: string): number {
 }
 
 function defaultFloorForCrop(crop: string): number {
-  // OBBBA effective reference prices, 2026 (per project memory)
+  // OBBBA effective reference prices, 2026
   const floors: Record<string, number> = {
     corn: 4.42,
     soybeans: 10.71,
@@ -297,11 +370,18 @@ function defaultFloorForCrop(crop: string): number {
   return floors[crop] ?? 4.0;
 }
 
-function estimatePerAcreProfit(rec: any, farm: any): number {
-  // Per-acre profit on the recommended bushels at current cash bid vs breakeven
+function estimatePerAcreProfit(
+  rec: any,
+  farm: any,
+  positionRows: PositionRow[],
+): number {
   const bushels = rec.recommended_bushels ?? 0;
   const cashBid = rec.recommended_cash_bid ?? 0;
-  const breakeven = defaultBreakevenForCrop(rec.crop);
+  const positionRow = positionRows.find((p) => p.commodity === rec.crop);
+  const breakeven =
+    positionRow && positionRow.breakeven_dollars_per_bu != null
+      ? Number(positionRow.breakeven_dollars_per_bu)
+      : defaultBreakevenForCrop(rec.crop);
   const acres = farm.total_acres ?? 1;
   if (acres <= 0) return 0;
   return Math.round((bushels * (cashBid - breakeven)) / acres);
@@ -309,18 +389,15 @@ function estimatePerAcreProfit(rec: any, farm: any): number {
 
 function extractHeadline(
   rationaleText: string | null,
-  recommendation: Recommendation
+  recommendation: Recommendation,
 ): string {
   if (rationaleText) {
-    // rationale_text format from rationale.ts is multi-line; take the first
-    // non-empty line as the headline.
     const firstLine = rationaleText
       .split('\n')
       .map((l) => l.trim())
       .find((l) => l.length > 0);
     if (firstLine) return firstLine;
   }
-  // Fallbacks by recommendation type
   switch (recommendation.recommendation_type) {
     case 'sell':
       return 'Sell today.';

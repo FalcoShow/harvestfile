@@ -1,20 +1,36 @@
 // app/api/onboard/submit/route.ts
 // =============================================================================
-// HarvestFile Sell Score — Onboarding Submission Handler
+// HarvestFile Sell Score — Onboarding Submission Handler (Deploy 2)
 //
 // Receives the four-field form payload and performs:
 //   1. Validates input
 //   2. Verifies the authenticated user owns farmId
-//   3. Looks up county_fips and state from ZIP via Zippopotam.us
-//   4. Calls Barchart getGrainBids to find the nearest elevator
-//   5. Updates farms record with crops, acres, county, state
-//   6. Inserts sellscore_elevators record (is_primary=true)
-//   7. Marks farm sellscore_setup_complete=true, sellscore_active=true
+//   3. Looks up lat/lng + city/state from ZIP via Zippopotam.us
+//   4. Maps the farm to the nearest of 25 reference elevators via
+//      findClosestReference (Haversine great-circle distance). This gives
+//      every US ZIP a supported elevator and engine-ready 5-digit county
+//      FIPS in one step. Nation-wide coverage with v1 market backbone.
+//   5. Updates farms record with crops, acres, REAL 5-digit county FIPS
+//      (from the reference elevator), and the farmer's home state.
+//   6. Inserts sellscore_elevators record (is_primary=true) pointing at
+//      the matched reference elevator.
+//   7. Seeds grain_positions rows for v1-supported crops (corn, soybeans)
+//      with county-default yields and breakevens. Wheat and sorghum are
+//      stored on the farm as primary_crops but do NOT get position rows
+//      in v1 (engine support lands in v1.1).
+//   8. Marks farm sellscore_setup_complete=true, sellscore_active=true.
+//   9. Best-effort inline Sell Score compute via computeAndPersistForFarm.
+//      Failures are non-fatal: onboard still returns ok, the farmer lands
+//      on /sellscore/me with the "Preparing..." empty state, and the
+//      4 AM cron picks it up tomorrow morning.
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { findClosestReference } from '@/lib/sellscore/reference-elevators';
+import { marketingYearStart } from '@/lib/sellscore/pace-calendar';
+import { computeAndPersistForFarm } from '@/lib/sellscore/persist';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +43,28 @@ interface SubmitBody {
   crops?: string[];
 }
 
+// All crops the form accepts. Wheat and sorghum get stored as primary crops
+// on the farm but do NOT receive Sell Score recommendations in v1 — the
+// engine only supports corn and soybeans this release.
 const VALID_CROPS = new Set(['corn', 'soybeans', 'wheat', 'sorghum']);
+const V1_ENGINE_CROPS = new Set(['corn', 'soybeans']);
+
+// County-default yields (bushels per acre) for Eastern Corn Belt service area.
+// Conservative central-tendency values. Position editor (v1.1) lets farmers
+// override per-crop.
+const DEFAULT_YIELDS: Record<string, number> = {
+  corn: 180,
+  soybeans: 55,
+};
+
+// County-default breakevens ($/bu). Iowa State / Purdue extension benchmarks
+// for full-cost production in Eastern Corn Belt counties, 2026 input prices.
+// These are starting points; the farmer's actual breakeven goes in via the
+// position editor (v1.1).
+const DEFAULT_BREAKEVENS: Record<string, number> = {
+  corn: 4.0,
+  soybeans: 10.5,
+};
 
 export async function POST(request: NextRequest) {
   // ── Parse + validate body ─────────────────────────────────────────────────
@@ -49,7 +86,7 @@ export async function POST(request: NextRequest) {
   if (!zipCode || !/^\d{5}$/.test(zipCode)) {
     return NextResponse.json(
       { error: 'zipCode must be 5 digits' },
-      { status: 400 }
+      { status: 400 },
     );
   }
   if (
@@ -60,7 +97,7 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json(
       { error: 'totalAcres must be a number between 1 and 100,000' },
-      { status: 400 }
+      { status: 400 },
     );
   }
   if (!Array.isArray(crops) || crops.length === 0) {
@@ -104,34 +141,44 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ── Look up county_fips and state from ZIP ────────────────────────────────
-  const geo = await lookupZip(zipCode);
+  // ── Look up lat/lng + state from ZIP ─────────────────────────────────────
+  const geo = await lookupZipCoords(zipCode);
   if (!geo) {
     return NextResponse.json(
-      { error: `Could not resolve county for ZIP ${zipCode}. Please verify the ZIP and try again.` },
-      { status: 400 }
+      {
+        error: `Could not resolve location for ZIP ${zipCode}. Please verify the ZIP and try again.`,
+      },
+      { status: 400 },
     );
   }
 
-  // ── Find nearest elevator via Barchart getGrainBids ───────────────────────
-  const elevator = await findNearestElevator(zipCode, validatedCrops[0]);
-
-  // ── All checks passed; do the writes via service-role client ─────────────
-  // Service client bypasses RLS so we can write to farms + sellscore_elevators
-  // in one go without juggling cookies. The previous user-ownership check
-  // already gated this write to the authenticated user.
-  const adminClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  // ── Map farm to nearest reference elevator (real 5-digit county FIPS) ────
+  // findClosestReference uses Haversine distance against the 25 supported
+  // elevators in OH/IN/IL/MI/eastern IA. Every US ZIP gets a deterministic
+  // mapping. The farmer's display is "Your nearest supported market: [city],
+  // [state] (X miles)" — honest, defensible, and shipping today.
+  const referenceElevator = findClosestReference(geo.lat, geo.lng);
+  const distanceMiles = haversineMiles(
+    geo.lat,
+    geo.lng,
+    referenceElevator.lat,
+    referenceElevator.lng,
   );
 
-  // Update farm record
+  // ── All checks passed; do the writes via service-role client ─────────────
+  const adminClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
+  // Update farm record. county_fips is the REFERENCE elevator's 5-digit
+  // county code (engine-ready). farms.state is the farmer's home state.
   const { error: farmUpdateError } = await adminClient
     .from('farms')
     .update({
       name: farmName.trim().slice(0, 64),
-      county_fips: geo.countyFips,
-      state: geo.state,
+      county_fips: referenceElevator.countyFips,
+      state: geo.stateAbbr,
       total_acres: totalAcres,
       sellscore_primary_crops: validatedCrops,
       sellscore_setup_complete: true,
@@ -144,46 +191,124 @@ export async function POST(request: NextRequest) {
     console.error('[onboard/submit] farm update failed:', farmUpdateError);
     return NextResponse.json(
       { error: 'Failed to save farm details. Please try again.' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
-  // Insert primary elevator (if we found one)
-  if (elevator) {
-    // Defensive: only one is_primary per farm. Clear any existing primaries first.
-    await adminClient
-      .from('sellscore_elevators')
-      .update({ is_primary: false })
-      .eq('farm_id', farmId);
+  // ── Insert primary elevator ──────────────────────────────────────────────
+  // Clear any existing primaries first to maintain one-is_primary-per-farm.
+  await adminClient
+    .from('sellscore_elevators')
+    .update({ is_primary: false })
+    .eq('farm_id', farmId);
 
-    const { error: elevatorInsertError } = await adminClient
-      .from('sellscore_elevators')
+  const { error: elevatorInsertError } = await adminClient
+    .from('sellscore_elevators')
+    .insert({
+      farm_id: farmId,
+      barchart_elevator_id: referenceElevator.elevatorId,
+      elevator_name: referenceElevator.elevatorName,
+      elevator_city: referenceElevator.city,
+      elevator_state: referenceElevator.elevatorState,
+      distance_miles: Math.round(distanceMiles * 10) / 10,
+      is_primary: true,
+    });
+
+  if (elevatorInsertError) {
+    console.error('[onboard/submit] elevator insert failed:', elevatorInsertError);
+    // Non-fatal: farm is set up; elevator can be retried later.
+  }
+
+  // ── Seed grain_positions for v1-supported crops ──────────────────────────
+  // Split total acres evenly across supported crops the farmer selected.
+  // v1.1: replace with a position editor where farmers enter per-crop acres,
+  // yield, and breakeven.
+  const today = new Date();
+  const cropYear = marketingYearStart('corn', today).getUTCFullYear();
+  const engineCrops = validatedCrops.filter((c) => V1_ENGINE_CROPS.has(c));
+  const acresPerCrop =
+    engineCrops.length > 0 ? totalAcres / engineCrops.length : 0;
+
+  for (const crop of engineCrops) {
+    const expectedBushels = Math.round(
+      acresPerCrop * (DEFAULT_YIELDS[crop] ?? 0),
+    );
+    const breakeven = DEFAULT_BREAKEVENS[crop] ?? 0;
+
+    // Check-then-insert: avoid duplicate position rows. The setup_complete
+    // short-circuit at the top already prevents this in practice, but
+    // defense in depth costs nothing.
+    const { data: existingPos } = await adminClient
+      .from('grain_positions')
+      .select('id')
+      .eq('farm_id', farmId)
+      .eq('commodity', crop)
+      .eq('crop_year', cropYear)
+      .maybeSingle();
+
+    if (existingPos) continue;
+
+    const { error: positionErr } = await adminClient
+      .from('grain_positions')
       .insert({
         farm_id: farmId,
-        barchart_elevator_id: elevator.locationId,
-        elevator_name: elevator.elevatorName,
-        elevator_city: elevator.city,
-        elevator_state: elevator.state,
-        distance_miles: elevator.distanceMiles,
-        is_primary: true,
+        commodity: crop,
+        crop_year: cropYear,
+        expected_bushels: expectedBushels,
+        breakeven_dollars_per_bu: breakeven,
+        breakeven_source: 'county_default',
+        bushels_contracted: 0,
+        bushels_stored: 0,
+        pricing_pace_pct: 0,
       });
 
-    if (elevatorInsertError) {
-      // Non-fatal: farm setup is complete; elevator can be added later.
-      console.error('[onboard/submit] elevator insert failed:', elevatorInsertError);
+    if (positionErr) {
+      console.error(
+        `[onboard/submit] position insert failed for ${crop}:`,
+        positionErr,
+      );
+      // Non-fatal: farm setup is complete; compute can be retried manually.
     }
-  } else {
-    console.warn(
-      `[onboard/submit] No elevator found for ZIP ${zipCode}. Farm ${farmId} created without primary elevator.`
+  }
+
+  // ── Best-effort inline Sell Score compute ────────────────────────────────
+  // Typical wall time: 4-7 seconds for two crops. Wrapped in try/catch so a
+  // Barchart outage or missing basis history doesn't break onboarding. If
+  // this fails, the user lands on /sellscore/me with the "Preparing your
+  // first Sell Score" empty state and the 4 AM cron picks it up tomorrow.
+  let computeOutcome: { written: number; errors: number } | null = null;
+  try {
+    const result = await computeAndPersistForFarm(adminClient, farmId, today);
+    computeOutcome = {
+      written: result.written,
+      errors: result.errors.length,
+    };
+    if (result.errors.length > 0) {
+      console.warn(
+        `[onboard/submit] partial compute for farm ${farmId}:`,
+        result.errors,
+      );
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[onboard/submit] inline compute failed (non-fatal) for ${farmId}:`,
+      msg,
     );
   }
 
   return NextResponse.json({
     ok: true,
     farmId,
-    countyFips: geo.countyFips,
-    state: geo.state,
-    elevatorAttached: !!elevator,
+    countyFips: referenceElevator.countyFips,
+    state: geo.stateAbbr,
+    elevator: {
+      name: referenceElevator.elevatorName,
+      city: referenceElevator.city,
+      state: referenceElevator.elevatorState,
+      distanceMiles: Math.round(distanceMiles * 10) / 10,
+    },
+    compute: computeOutcome,
   });
 }
 
@@ -191,26 +316,19 @@ export async function POST(request: NextRequest) {
 // Helpers
 // =============================================================================
 
-interface GeoResult {
-  countyFips: string;
-  state: string;
+interface ZipGeoResult {
+  lat: number;
+  lng: number;
   city: string;
+  stateAbbr: string; // e.g. 'OH'
 }
 
 /**
- * Look up county FIPS and state from a US ZIP code.
- *
- * Uses Zippopotam.us (free, no key) for ZIP → city/state, then maps state
- * abbreviation to FIPS state code via a hardcoded table. County resolution
- * within state requires an additional lookup; for v1 we accept that the
- * county_fips will be the state-level code only when ZIP doesn't uniquely
- * map to a single county. The Sell Score engine handles state-level
- * fallbacks when county-specific data is missing.
- *
- * NOTE: This is a v1 simplification. v1.1 should use the project's
- * /api/geo/detect endpoint or a dedicated ZIP→county database.
+ * Look up coordinates + city/state from a US ZIP code via Zippopotam.us
+ * (free, no key required). Returns null on any failure; caller surfaces a
+ * friendly error.
  */
-async function lookupZip(zip: string): Promise<GeoResult | null> {
+async function lookupZipCoords(zip: string): Promise<ZipGeoResult | null> {
   try {
     const response = await fetch(`https://api.zippopotam.us/us/${zip}`, {
       next: { revalidate: 86400 }, // cache 24h
@@ -230,138 +348,39 @@ async function lookupZip(zip: string): Promise<GeoResult | null> {
     const place = data.places?.[0];
     if (!place) return null;
 
-    const stateFips = STATE_FIPS[place['state abbreviation']];
-    if (!stateFips) return null;
+    const lat = parseFloat(place.latitude);
+    const lng = parseFloat(place.longitude);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
 
-    // For v1, county_fips is set to the state-level FIPS as a placeholder.
-    // The engine will fall back to state-level breakeven and basis defaults
-    // when county-specific data isn't available. v1.1: integrate proper
-    // ZIP→county lookup (HUD ZIP-County crosswalk or paid Geocodio API).
     return {
-      countyFips: stateFips,
-      state: place['state abbreviation'],
+      lat,
+      lng,
       city: place['place name'],
+      stateAbbr: place['state abbreviation'],
     };
   } catch (err) {
-    console.error('[lookupZip] failed:', err);
+    console.error('[lookupZipCoords] failed:', err);
     return null;
   }
-}
-
-interface ElevatorMatch {
-  locationId: string;
-  elevatorName: string;
-  city: string;
-  state: string;
-  distanceMiles: number | null;
 }
 
 /**
- * Find the nearest grain elevator to a ZIP code that bids on the given crop.
- * Returns the closest match (smallest distance from ZIP centroid).
+ * Haversine great-circle distance in miles between two lat/lng points.
+ * Used to populate sellscore_elevators.distance_miles for the matched
+ * reference elevator.
  */
-async function findNearestElevator(
-  zip: string,
-  crop: string
-): Promise<ElevatorMatch | null> {
-  const apiKey = process.env.BARCHART_API_KEY;
-  if (!apiKey) {
-    console.error('[findNearestElevator] BARCHART_API_KEY not set');
-    return null;
-  }
-
-  const commodityName = crop === 'corn'
-    ? 'Corn (#2 Yellow)'
-    : crop === 'soybeans'
-      ? 'Soybeans'
-      : crop === 'wheat'
-        ? 'Wheat'
-        : 'Corn (#2 Yellow)'; // sorghum etc. fall back to corn for elevator search
-
-  const url =
-    `https://ondemand.websol.barchart.com/getGrainBids.json` +
-    `?apikey=${apiKey}` +
-    `&zipCode=${zip}` +
-    `&maxDistance=50` +
-    `&commodityName=${encodeURIComponent(commodityName)}`;
-
-  try {
-    const response = await fetch(url, {
-      next: { revalidate: 3600 }, // cache 1h
-    });
-    if (!response.ok) {
-      console.error(`[findNearestElevator] Barchart returned ${response.status}`);
-      return null;
-    }
-    const data = (await response.json()) as {
-      status?: { code?: number; message?: string };
-      results?: { bids?: Array<any> };
-    };
-
-    if (data.status?.code !== 200 || !data.results?.bids?.length) {
-      return null;
-    }
-
-    // Bids include the elevator info we need. Pick the first bid per unique
-    // location, sorted by distance.
-    const seen = new Set<string>();
-    const candidates: Array<{
-      locationId: string;
-      elevatorName: string;
-      city: string;
-      state: string;
-      distance: number;
-    }> = [];
-
-    for (const bid of data.results.bids) {
-      const locationId = bid.locationId ?? bid.location_id ?? null;
-      if (!locationId || seen.has(String(locationId))) continue;
-      seen.add(String(locationId));
-
-      const distanceRaw =
-        bid.distance ?? bid.locationDistance ?? bid.distance_miles;
-      const distance =
-        typeof distanceRaw === 'string'
-          ? parseFloat(distanceRaw)
-          : typeof distanceRaw === 'number'
-            ? distanceRaw
-            : Number.MAX_SAFE_INTEGER;
-
-      candidates.push({
-        locationId: String(locationId),
-        elevatorName: bid.elevator ?? bid.locationName ?? bid.location ?? 'Unknown',
-        city: bid.city ?? '',
-        state: bid.state ?? '',
-        distance: distance,
-      });
-    }
-
-    if (candidates.length === 0) return null;
-
-    candidates.sort((a, b) => a.distance - b.distance);
-    const nearest = candidates[0];
-
-    return {
-      locationId: nearest.locationId,
-      elevatorName: nearest.elevatorName,
-      city: nearest.city,
-      state: nearest.state,
-      distanceMiles: isFinite(nearest.distance) ? nearest.distance : null,
-    };
-  } catch (err) {
-    console.error('[findNearestElevator] failed:', err);
-    return null;
-  }
+function haversineMiles(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 3959; // Earth radius (miles)
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
-// State abbreviation → 2-digit FIPS state code
-const STATE_FIPS: Record<string, string> = {
-  AL: '01', AK: '02', AZ: '04', AR: '05', CA: '06', CO: '08', CT: '09',
-  DE: '10', DC: '11', FL: '12', GA: '13', HI: '15', ID: '16', IL: '17',
-  IN: '18', IA: '19', KS: '20', KY: '21', LA: '22', ME: '23', MD: '24',
-  MA: '25', MI: '26', MN: '27', MS: '28', MO: '29', MT: '30', NE: '31',
-  NV: '32', NH: '33', NJ: '34', NM: '35', NY: '36', NC: '37', ND: '38',
-  OH: '39', OK: '40', OR: '41', PA: '42', RI: '44', SC: '45', SD: '46',
-  TN: '47', TX: '48', UT: '49', VT: '50', VA: '51', WA: '53', WV: '54',
-  WI: '55', WY: '56',
-};
