@@ -17,6 +17,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import SellScoreCTA from "@/components/pricing/SellScoreCTA";
 
 // ---------------------------------------------------------------------------
 // Feature comparison data — "Free = WHAT, Founding Farmer = WHAT TO DO"
@@ -507,6 +508,207 @@ export default function PricingPage() {
           </ScrollReveal>
         </div>
       </section>
+
+// =============================================================================
+// SELL SCORE HERO BAND — Add this section ABOVE the existing 2-tier grid
+//
+// INSERTION POINT: In app/(marketing)/pricing/page.tsx, find the comment:
+//   {/* TWO-TIER PRICING CARDS */}
+// and insert this entire block IMMEDIATELY BEFORE that comment line.
+//
+// REQUIRED ADDITION at the top of the file (around line 17, after the other
+// imports):
+//
+//   import SellScoreCTA from "@/components/pricing/SellScoreCTA";
+//
+// Zero existing content is modified. The Founding Farmer tier remains
+// exactly as it is below this new hero band.
+// =============================================================================
+
+{/* ================================================================ */}
+{/* SELL SCORE HERO BAND — Primary offer, added above 4-tier grid    */}
+{/* ================================================================ */}
+<section className="relative z-10 mx-auto max-w-[900px] px-5 sm:px-6 pb-12 sm:pb-16">
+  <ScrollReveal>
+    <div
+      className="relative rounded-[24px] overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 38, 28, 0.4) 100%)",
+        border: "1.5px solid rgba(52, 211, 153, 0.22)",
+        boxShadow: "0 0 100px -20px rgba(52, 211, 153, 0.18)",
+      }}
+    >
+      {/* Subtle radial glow */}
+      <div
+        className="absolute top-0 right-0 w-[400px] h-[400px] pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle at 70% 30%, rgba(52, 211, 153, 0.10) 0%, transparent 60%)",
+        }}
+      />
+
+      <div className="relative grid lg:grid-cols-[1.4fr_1fr] gap-8 lg:gap-12 p-8 sm:p-10 lg:p-12">
+        {/* Left column: copy */}
+        <div>
+          {/* Eyebrow */}
+          <div
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-5"
+            style={{
+              background: "rgba(52, 211, 153, 0.10)",
+              border: "1px solid rgba(52, 211, 153, 0.20)",
+            }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-[#34D399] animate-pulse" />
+            <span className="text-[11px] font-bold text-[#34D399] uppercase tracking-wider">
+              New · Daily Personalized Recommendation
+            </span>
+          </div>
+
+          {/* Headline */}
+          <h2
+            className="text-[clamp(28px,4.5vw,42px)] font-extrabold text-white tracking-[-0.035em] leading-[1.08] mb-4"
+            style={{
+              fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+            }}
+          >
+            One number every morning.{" "}
+            <span
+              className="text-[#34D399]"
+              style={{
+                fontFamily: "'Instrument Serif', Georgia, serif",
+                fontStyle: "italic",
+                fontWeight: 400,
+              }}
+            >
+              Sell, hold, or wait.
+            </span>
+          </h2>
+
+          {/* Subhead */}
+          <p className="text-[15px] sm:text-[16px] text-white/55 leading-relaxed mb-7 max-w-[540px]">
+            Sell Score reads your unsold position, breakeven, local elevator
+            basis, and ARC/PLC floor every morning at 5 AM — and tells you
+            exactly how many bushels of which crop to price today.
+          </p>
+
+          {/* Three-feature row */}
+          <ul className="space-y-2.5 mb-8">
+            {[
+              "Daily personalized recommendation for your farm",
+              "Live cash bids from your nearest elevator",
+              "Three-minute setup. Ready tomorrow morning.",
+            ].map((line) => (
+              <li
+                key={line}
+                className="flex items-start gap-2.5 text-[14px] text-white/70 leading-relaxed"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#34D399"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0 mt-0.5"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {line}
+              </li>
+            ))}
+          </ul>
+
+          {/* CTA */}
+          <SellScoreCTA label="Get started — $149/yr" />
+
+          <p className="text-[12px] text-white/30 mt-4">
+            Annual billing · Cancel anytime · Money-back if it doesn&apos;t pay
+            for itself in 30 days
+          </p>
+        </div>
+
+        {/* Right column: price card */}
+        <div className="lg:border-l lg:border-white/[0.06] lg:pl-12 flex flex-col justify-center">
+          <div className="text-[11px] font-bold text-[#34D399]/70 uppercase tracking-wider mb-3">
+            HarvestFile Sell Score
+          </div>
+          <div className="flex items-baseline gap-1.5 mb-1">
+            <span
+              className="text-[56px] font-extrabold text-white tracking-[-0.04em] leading-none"
+              style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              $149
+            </span>
+            <span className="text-[16px] text-white/35 font-medium">/year</span>
+          </div>
+          <p className="text-[13px] text-white/35 mb-6">
+            That&apos;s $0.41/day for a decision tool that pays for itself with{" "}
+            <span className="text-white/60 font-semibold">
+              one priced bushel.
+            </span>
+          </p>
+
+          {/* Math callout */}
+          <div
+            className="rounded-[12px] p-4"
+            style={{
+              background: "rgba(255,255,255,0.025)",
+              border: "1px solid rgba(255,255,255,0.06)",
+            }}
+          >
+            <div className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">
+              The math
+            </div>
+            <div className="space-y-1.5 text-[13px]">
+              <div className="flex justify-between text-white/55">
+                <span>500 acres of corn</span>
+                <span className="tabular-nums">90,000 bu</span>
+              </div>
+              <div className="flex justify-between text-white/55">
+                <span>$0.05 better basis</span>
+                <span className="tabular-nums">+$4,500/yr</span>
+              </div>
+              <div
+                className="flex justify-between pt-2 mt-2 text-[#34D399] font-bold"
+                style={{ borderTop: "1px solid rgba(52, 211, 153, 0.15)" }}
+              >
+                <span>Return</span>
+                <span className="tabular-nums">30×</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom border accent */}
+      <div
+        className="h-[1px]"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.30), transparent)",
+        }}
+      />
+    </div>
+  </ScrollReveal>
+
+  {/* "Or choose a different plan" separator */}
+  <div className="flex items-center justify-center mt-12 sm:mt-16 mb-2">
+    <div className="flex items-center gap-4 text-[12px] font-bold text-white/30 uppercase tracking-wider">
+      <div
+        className="w-12 h-px"
+        style={{ background: "rgba(255,255,255,0.08)" }}
+      />
+      <span>Or choose a different plan</span>
+      <div
+        className="w-12 h-px"
+        style={{ background: "rgba(255,255,255,0.08)" }}
+      />
+    </div>
+  </div>
+</section>
 
       {/* ================================================================ */}
       {/* TWO-TIER PRICING CARDS */}

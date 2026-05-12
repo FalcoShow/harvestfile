@@ -158,6 +158,15 @@ export async function POST(request: Request) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
 
+        // ── SELL SCORE: $149/yr subscription, SHORT chain ────────────────
+        // Detected by metadata.product === 'sellscore_annual' (set by
+        // /api/stripe/checkout/sellscore). Routes through farms table only,
+        // never touches organizations or professionals.
+        if (session.metadata?.product === 'sellscore_annual') {
+          await provisionSellScoreFarmer(session, event.id);
+          break;
+        }
+
         // ── FOUNDING FARMER: No-auth provisioning path ───────────────────
         // Detected by metadata.tier === 'founding' (set by /api/stripe/checkout/founding)
         // This path runs BEFORE the standard auth check because founding
@@ -980,6 +989,266 @@ function buildWelcomeEmailHtml(magicLink: string, priceLabel: string, isNewAccou
                 </p>
                 <p style="margin: 0; font-size: 13px; color: #6B6852; text-align: center;">
                   Need help? Just reply to this email — it goes straight to me.<br>
+                  <span style="color: #A8A48C;">Andrew Angerstien, Founder</span>
+                </p>
+              </div>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 24px 0 0 0; font-size: 12px; color: #6B6852; text-align: center;">
+          HarvestFile LLC · Akron, Ohio · <a href="https://www.harvestfile.com" style="color: #6B6852; text-decoration: none;">harvestfile.com</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELL SCORE PROVISIONING — SHORT-chain (farms.owner_id) tenant creation
+// ─────────────────────────────────────────────────────────────────────────────
+// Called from checkout.session.completed when metadata.product === 'sellscore_annual'.
+// Creates the auth user, creates the farms record (SHORT chain), and sends a
+// magic-link email so the new farmer can complete onboarding.
+//
+// Idempotent: safe to call multiple times for the same email/customer. Three
+// scenarios handled:
+//   1. Existing farm with this stripe_customer_id (rare — duplicate webhook)
+//   2. Existing auth user with this email (manual link case)
+//   3. Brand new user (most common path)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function provisionSellScoreFarmer(
+  session: Stripe.Checkout.Session,
+  eventId: string
+): Promise<void> {
+  const email = session.customer_details?.email?.toLowerCase().trim();
+  const customerId = typeof session.customer === 'string'
+    ? session.customer
+    : (session.customer as any)?.id;
+  const subscriptionId = typeof session.subscription === 'string'
+    ? session.subscription
+    : (session.subscription as any)?.id;
+
+  if (!email) {
+    console.error('[SellScore] No email on checkout session');
+    return;
+  }
+  if (!customerId || !subscriptionId) {
+    console.error('[SellScore] Missing customer or subscription ID');
+    return;
+  }
+
+  console.log(`[SellScore] Provisioning ${email} (customer=${customerId})`);
+
+  // Fetch full subscription state from Stripe API
+  const rawSub = await stripe.subscriptions.retrieve(subscriptionId);
+  const sub = getSubFields(rawSub);
+
+  // ── SCENARIO 1: Existing farm by stripe_customer_id ──────────────────────
+  // Means a duplicate webhook is firing — safe to skip provisioning, just
+  // confirm the subscription state is up-to-date.
+  const { data: existingFarm } = await supabaseAdmin
+    .from('farms')
+    .select('id, owner_id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+
+  if (existingFarm) {
+    console.log(`[SellScore] Existing farm by customer_id: ${existingFarm.id}`);
+    await supabaseAdmin
+      .from('farms')
+      .update({
+        stripe_subscription_id: subscriptionId,
+        stripe_price_id: sub.priceId || null,
+        subscription_status: sub.status,
+        current_period_end: sub.currentPeriodEnd
+          ? new Date(sub.currentPeriodEnd * 1000).toISOString()
+          : null,
+        cancel_at_period_end: sub.cancelAtPeriodEnd || false,
+      })
+      .eq('id', existingFarm.id);
+    return;
+  }
+
+  // ── SCENARIO 2: Existing auth user, no farm yet ──────────────────────────
+  // Could happen if user previously created an auth account some other way
+  // (e.g. signed up for the free tools, then later subscribed to Sell Score).
+  const { data: existingAuth } = await supabaseAdmin.auth.admin.listUsers({
+    page: 1,
+    perPage: 200,
+  });
+  const authUsers = (existingAuth?.users ?? []) as Array<{ id: string; email?: string | null }>;
+  const matchedAuthUser = authUsers.find(
+    (u) => u.email?.toLowerCase() === email
+  );
+
+  let authUserId: string;
+
+  if (matchedAuthUser) {
+    authUserId = matchedAuthUser.id;
+    console.log(`[SellScore] Found existing auth user: ${authUserId}`);
+  } else {
+    // ── SCENARIO 3: Brand new user — create the auth account ─────────────
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: {
+          source: 'sellscore_annual',
+          stripe_customer_id: customerId,
+          subscribed_at: new Date().toISOString(),
+        },
+      });
+
+    if (authError || !authData?.user) {
+      console.error('[SellScore] Failed to create auth user:', authError);
+      throw new Error(`Failed to create auth user: ${authError?.message}`);
+    }
+    authUserId = authData.user.id;
+    console.log(`[SellScore] Created auth user: ${authUserId}`);
+  }
+
+  // ── Create the farm record (SHORT chain: farms.owner_id -> auth.users.id) ─
+  // Lean defaults: farmer fills in county, state, acres, crops via /onboard.
+  // sellscore_setup_complete=false until they finish onboarding.
+  const farmName = `${email.split('@')[0]}'s Farm`;
+
+  const { data: farm, error: farmError } = await supabaseAdmin
+    .from('farms')
+    .insert({
+      name: farmName,
+      owner_id: authUserId,
+      sellscore_setup_complete: false,
+      sellscore_active: false,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscriptionId,
+      stripe_price_id: sub.priceId || null,
+      subscription_status: sub.status,
+      current_period_end: sub.currentPeriodEnd
+        ? new Date(sub.currentPeriodEnd * 1000).toISOString()
+        : null,
+      cancel_at_period_end: false,
+    })
+    .select('id')
+    .single();
+
+  if (farmError || !farm) {
+    console.error('[SellScore] Failed to create farm:', farmError);
+    throw new Error(`Failed to create farm: ${farmError?.message}`);
+  }
+
+  console.log(`[SellScore] Created farm ${farm.id} for ${email}`);
+
+  // Send the magic-link welcome email. Redirect target is /onboard.
+  await sendSellScoreWelcomeEmail(email, !matchedAuthUser);
+
+  console.log(`[SellScore] Provisioning complete for ${email}`);
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELL SCORE WELCOME EMAIL — magic link to /onboard
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function sendSellScoreWelcomeEmail(
+  email: string,
+  isNewAccount: boolean
+): Promise<void> {
+  try {
+    const { data: linkData, error: linkError } =
+      await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: {
+          redirectTo: 'https://www.harvestfile.com/onboard?welcome=sellscore',
+        },
+      });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error('[SellScore] Failed to generate magic link:', linkError);
+      return;
+    }
+
+    const magicLink = linkData.properties.action_link;
+
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: EMAIL_FROM.onboarding,
+      to: [email],
+      subject: isNewAccount
+        ? "Welcome to HarvestFile — Let's set up your Sell Score"
+        : "You're upgraded — Let's set up your Sell Score",
+      html: buildSellScoreWelcomeEmailHtml(magicLink, isNewAccount),
+    });
+
+    if (emailError) {
+      console.error('[SellScore] Failed to send welcome email:', emailError);
+    } else {
+      console.log(`[SellScore] Welcome email sent to ${email}: ${emailData?.id}`);
+    }
+  } catch (err) {
+    console.error('[SellScore] Error in sendSellScoreWelcomeEmail:', err);
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELL SCORE WELCOME EMAIL HTML — brand-aligned, dark theme, emerald CTA
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildSellScoreWelcomeEmailHtml(
+  magicLink: string,
+  isNewAccount: boolean
+): string {
+  const heading = isNewAccount ? "You're in." : "You're upgraded.";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to HarvestFile Sell Score</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0f0d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #0a0f0d;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #0F261C; border-radius: 16px; border: 1px solid rgba(201, 168, 76, 0.10);">
+          <tr>
+            <td style="padding: 48px 40px 32px 40px;">
+              <div style="text-align: center; margin-bottom: 32px;">
+                <div style="display: inline-block; width: 56px; height: 56px; background: #1B4332; border-radius: 14px; line-height: 56px; font-size: 24px; font-weight: 800; color: #C9A84C;">HF</div>
+              </div>
+              <h1 style="margin: 0 0 16px 0; font-size: 32px; font-weight: 800; color: #F2F0E8; text-align: center; letter-spacing: -0.02em;">
+                ${heading}
+              </h1>
+              <p style="margin: 0 0 8px 0; font-size: 18px; color: #34D399; text-align: center; font-weight: 600;">
+                Welcome to Sell Score.
+              </p>
+              <p style="margin: 0 0 28px 0; font-size: 16px; color: #A8A48C; text-align: center; line-height: 1.6;">
+                Your subscription is active. Click below to finish setting up your farm — it takes about three minutes. Once you're done, your first Sell Score is ready.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td align="center" style="padding: 16px 0 24px 0;">
+                    <a href="${magicLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #34D399 0%, #10B981 100%); color: #0a0f0d; text-decoration: none; font-size: 16px; font-weight: 700; border-radius: 12px; letter-spacing: -0.01em;">
+                      Set up your farm →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <div style="background-color: rgba(255,255,255,0.03); border-left: 3px solid #C9A84C; padding: 16px 20px; margin: 16px 0 24px 0; border-radius: 4px;">
+                <p style="margin: 0; font-size: 14px; color: #A8A48C; line-height: 1.55;">
+                  <strong style="color: #F2F0E8;">What you'll need:</strong> your farm's nearest ZIP code, total acres, and which crops you grow. That's it — we handle the rest from county data.
+                </p>
+              </div>
+              <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 24px; margin-top: 8px;">
+                <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B6852; text-align: center; line-height: 1.6;">
+                  This setup link expires in 1 hour. If it expires, you can request a new one from <a href="https://www.harvestfile.com/login" style="color: #C9A84C; text-decoration: none;">harvestfile.com/login</a>.
+                </p>
+                <p style="margin: 0; font-size: 13px; color: #6B6852; text-align: center;">
+                  Questions? Just reply to this email — it goes straight to me.<br>
                   <span style="color: #A8A48C;">Andrew Angerstien, Founder</span>
                 </p>
               </div>
