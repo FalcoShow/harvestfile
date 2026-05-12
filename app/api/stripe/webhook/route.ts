@@ -910,7 +910,7 @@ async function sendFoundingFarmerWelcomeEmail(
       type: 'magiclink',
       email,
       options: {
-        redirectTo: 'https://www.harvestfile.com/dashboard?welcome=founding',
+        redirectTo: 'https://www.harvestfile.com/auth/callback?welcome=founding',
       },
     });
 
@@ -1163,7 +1163,7 @@ async function sendSellScoreWelcomeEmail(
         type: 'magiclink',
         email,
         options: {
-          redirectTo: 'https://www.harvestfile.com/onboard?welcome=sellscore',
+          redirectTo: 'https://www.harvestfile.com/auth/callback?welcome=sellscore',
         },
       });
 
