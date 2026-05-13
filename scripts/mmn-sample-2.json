@@ -1,0 +1,34 @@
+﻿{
+    "reportSection":  "Report Header",
+    "reportSections":  [
+                           "Report Header",
+                           "Report Detail"
+                       ],
+    "stats":  {
+                  "returnedRows":  1,
+                  "userAllowedRows":  100000,
+                  "totalRows":  1
+              },
+    "results":  [
+                    {
+                        "office_name":  "Des Moines, IA",
+                        "office_code":  "LS-NW",
+                        "office_city":  "Des Moines",
+                        "office_state":  "IA",
+                        "report_begin_date":  "05/12/2026",
+                        "report_end_date":  "05/12/2026",
+                        "published_date":  "05/12/2026 15:03:43",
+                        "market_location_name":  "N/A",
+                        "market_location_city":  "N/A",
+                        "market_location_state":  "N/A",
+                        "market_type":  "Point of Sale - Grain",
+                        "slug_id":  2850,
+                        "slug_name":  "AMS_2850",
+                        "report_title":  "Iowa Daily Cash Grain Bids",
+                        "final_ind":  "Final",
+                        "report_date":  "05/12/2026",
+                        "special_notes":  null,
+                        "report_narrative":  "State Average Price: Corn -- $4.39 (-.42N) Up 5 cents | Soybeans -- $11.56 (-.71N) Up 15 cents\nTerminal Elevators: Southwest Region - Council Bluffs locations"
+                    }
+                ]
+}

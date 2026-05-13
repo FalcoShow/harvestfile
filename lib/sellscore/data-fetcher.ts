@@ -1,17 +1,21 @@
 // lib/sellscore/data-fetcher.ts
 //
 // Reads farm state from Supabase, pulls historical basis (seasonally
-// filtered), fetches a live cash bid from Barchart, and returns a
-// SellScoreRecommendation wrapped with freshness metadata.
+// filtered), fetches a live cash bid from Barchart (with USDA MMN fallback),
+// and returns a SellScoreRecommendation wrapped with freshness metadata.
 //
 // Pure read function — does NOT persist to sellscore_recommendations.
 // Callers can persist separately if they want an audit trail.
 //
 // Data sources:
-//   - Cash bid          → Barchart getGrainBids (live, today)
-//   - Today's basis     → county_basis_history (most recent observation)
-//   - Historical basis  → county_basis_history (3-year ±14 day same-date
-//                         seasonal window, via fetchSeasonalBasis)
+//   - Cash bid (primary)   → Barchart getGrainBids (live, today)
+//   - Cash bid (fallback)  → USDA AMS MARS API (state average, prior day)
+//                            Triggered automatically on Barchart failure,
+//                            or unconditionally when SELLSCORE_FORCE_MMN=true.
+//                            See lib/sellscore/mmn-client.ts.
+//   - Today's basis        → county_basis_history (most recent observation)
+//   - Historical basis     → county_basis_history (3-year ±14 day same-date
+//                            seasonal window, via fetchSeasonalBasis)
 //
 // Why "today's basis" comes from the database, not Barchart:
 // Barchart's getGrainBids returns basis="0.00" for every bid in the
@@ -30,6 +34,16 @@
 // lib/sellscore/seasonal-basis.ts) restricts the comparison set to the
 // same calendar window in the prior 3 years, making the percentile
 // semantically honest.
+//
+// Deploy 4b: cash bid fallback architecture
+// fetchLiveCashBidFromBarchart is the Barchart-specific implementation.
+// fetchLiveCashBidWithFallback is the orchestrator that tries Barchart
+// first, falls back to MMN on any error, and returns the bid along with
+// source metadata (which API supplied it, what date the bid applies to,
+// whether MI proxied through OH). The orchestrator throws only if BOTH
+// sources fail — that throw propagates up through computeAndPersistForFarm
+// into the Inngest worker, where codified learning #15's "throw on total
+// failure" surfaces it red in the dashboard.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Crop } from './pace-calendar';
@@ -44,8 +58,10 @@ import {
   getReferenceForCounty,
   type ReferenceElevator,
 } from './reference-elevators';
+import { getCashBidFromMMN } from './mmn-client';
 
 const BARCHART_BASE_URL = 'https://ondemand.websol.barchart.com/getGrainBids.json';
+const BARCHART_FETCH_TIMEOUT_MS = 7000;
 
 // ─────────────────────────────────────────────────────────────────────────
 // Internal: farm state from the database
@@ -162,7 +178,7 @@ async function fetchLatestBasis(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Internal: live cash bid from Barchart
+// Internal: live cash bid from Barchart (primary source)
 // ─────────────────────────────────────────────────────────────────────────
 
 interface BarchartBid {
@@ -177,7 +193,7 @@ interface BarchartLocation {
   bids?: BarchartBid[];
 }
 
-async function fetchLiveCashBid(
+async function fetchLiveCashBidFromBarchart(
   elevator: ReferenceElevator,
   crop: Crop,
   apiKey: string,
@@ -189,7 +205,9 @@ async function fetchLiveCashBid(
   url.searchParams.set('totalLocations', '25');
   url.searchParams.set('bidsPerCom', '5');
 
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    signal: AbortSignal.timeout(BARCHART_FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(
       `Barchart getGrainBids HTTP ${res.status} for elevator ${elevator.elevatorId}`,
@@ -231,6 +249,66 @@ async function fetchLiveCashBid(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Internal: cash bid orchestrator with USDA MMN fallback (Deploy 4b)
+// ─────────────────────────────────────────────────────────────────────────
+
+interface CashBidWithSource {
+  cashBid: number;
+  source: 'barchart' | 'mmn';
+  bidAsOf: string;            // ISO 'YYYY-MM-DD'
+  isProxy?: boolean;          // true if MMN served via a different state's report
+  proxyOfState?: string;      // e.g. 'OH' when MI is being served via Ohio
+}
+
+async function fetchLiveCashBidWithFallback(
+  elevator: ReferenceElevator,
+  crop: Crop,
+  barchartApiKey: string,
+): Promise<CashBidWithSource> {
+  const forceMMN = process.env.SELLSCORE_FORCE_MMN === 'true';
+
+  if (!forceMMN) {
+    try {
+      const bid = await fetchLiveCashBidFromBarchart(elevator, crop, barchartApiKey);
+      return {
+        cashBid: bid,
+        source: 'barchart',
+        bidAsOf: new Date().toISOString().slice(0, 10),
+      };
+    } catch (err) {
+      const msg = (err as Error).message ?? 'unknown error';
+      console.warn(
+        `[SellScore] Barchart cash bid failed for ${elevator.elevatorName}/${crop}: ${msg}. ` +
+        `Falling back to USDA MMN.`,
+      );
+      // fall through to MMN
+    }
+  } else {
+    console.info(
+      `[SellScore] SELLSCORE_FORCE_MMN=true; using USDA MMN for ${elevator.elevatorName}/${crop}`,
+    );
+  }
+
+  // MMN fallback (or primary if forced)
+  try {
+    const mmnResult = await getCashBidFromMMN(elevator.elevatorState, crop);
+    return {
+      cashBid: mmnResult.cashBid,
+      source: 'mmn',
+      bidAsOf: mmnResult.reportDate,
+      isProxy: mmnResult.isProxy,
+      proxyOfState: mmnResult.proxyOfState,
+    };
+  } catch (mmnErr) {
+    const msg = (mmnErr as Error).message ?? 'unknown error';
+    throw new Error(
+      `Both Barchart and USDA MMN failed for ${elevator.elevatorName}/${crop}. ` +
+      `MMN error: ${msg}`,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Public: orchestrator
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -261,13 +339,31 @@ export interface SellScoreResult {
      *   e.g. "3-year ±14 day same-date window"
      */
     basisWindowDescription: string;
+    /**
+     * Deploy 4b: which data source supplied the cash bid for this
+     * recommendation. 'barchart' is the primary source; 'mmn' indicates
+     * the USDA AMS MARS API fallback was used (Barchart failed or the
+     * SELLSCORE_FORCE_MMN kill-switch was set).
+     */
+    cashBidSource: 'barchart' | 'mmn';
+    /** ISO 'YYYY-MM-DD' — date the cash bid applies to. */
+    cashBidAsOf: string;
+    /**
+     * True when MMN is serving data from a different state's report.
+     * Currently only Michigan (MI), which proxies through Ohio (OH 2851)
+     * because USDA AMS does not publish a Michigan daily grain bid report.
+     */
+    cashBidIsProxy?: boolean;
+    /** The state code whose report is being used as a proxy, e.g. 'OH' for MI farms. */
+    cashBidProxyOfState?: string;
   };
 }
 
 /**
  * Computes a complete Sell Score recommendation for a single crop at a
- * single farm on a given date. Reads from Supabase, calls Barchart for
- * a live cash bid, runs the engine, returns the result with metadata.
+ * single farm on a given date. Reads from Supabase, calls Barchart (with
+ * USDA MMN fallback on failure) for a live cash bid, runs the engine,
+ * returns the result with metadata.
  *
  * @param supabase  Authenticated Supabase client (typically server-side, service role)
  * @param farmId    The farm uuid to score
@@ -297,15 +393,16 @@ export async function getSellScoreForFarm(
   }
 
   // Three independent fetches in parallel: seasonal basis distribution,
-  // latest observation, live cash bid. Cuts wall-time vs sequential by ~50%.
-  const [seasonal, latestBasis, cashBid] = await Promise.all([
+  // latest observation, live cash bid (with MMN fallback inside).
+  // Cuts wall-time vs sequential by ~50%.
+  const [seasonal, latestBasis, cashBidResult] = await Promise.all([
     fetchSeasonalBasis(supabase, countyFips, crop, date),
     fetchLatestBasis(supabase, countyFips, crop),
-    fetchLiveCashBid(elevator, crop, apiKey),
+    fetchLiveCashBidWithFallback(elevator, crop, apiKey),
   ]);
 
   const marketState: MarketState = {
-    cashBid,
+    cashBid: cashBidResult.cashBid,
     todayBasis: latestBasis.basis,
     historicalBasis: seasonal.values,
     elevatorName: elevator.city, // 'DeWitt', 'Bowling Green', etc — clean for headline
@@ -323,6 +420,10 @@ export async function getSellScoreForFarm(
       basisDataAsOf: latestBasis.asOf,
       historicalSampleSize: seasonal.sampleSize,
       basisWindowDescription: seasonal.windowDescription,
+      cashBidSource: cashBidResult.source,
+      cashBidAsOf: cashBidResult.bidAsOf,
+      cashBidIsProxy: cashBidResult.isProxy,
+      cashBidProxyOfState: cashBidResult.proxyOfState,
     },
   };
 }
