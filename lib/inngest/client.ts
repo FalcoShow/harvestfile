@@ -5,6 +5,7 @@
 // Deploy 4: Added farm-brief event types for 5 AM Farm Brief digest system
 // Build 18 Deploy 6B: Added leads/analysis.saved event for enrollment drip
 // Phase 19: Added SMS alert event types
+// B2: Added sellscore/compute.requested event for Sell Score daily compute
 // =============================================================================
 
 import { Inngest } from 'inngest';
@@ -84,6 +85,18 @@ export type HarvestFileEvents = {
       recommendation: string | null;
       arcPerAcre: number;
       plcPerAcre: number;
+    };
+  };
+
+  // ── B2: Sell Score daily compute ────────────────────────────────────────
+  // Fired by sellscore-compute-cron (4 AM ET) for each active farm.
+  // Handled by sellscore-compute-worker, which calls computeAndPersistForFarm.
+  // recommendationDate is set ONCE by the cron and propagated to every worker
+  // event in the same run, eliminating UTC-vs-ET drift between executions.
+  'sellscore/compute.requested': {
+    data: {
+      farmId: string;
+      recommendationDate: string; // YYYY-MM-DD in ET, set by cron
     };
   };
 

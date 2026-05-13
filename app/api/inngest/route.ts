@@ -5,6 +5,7 @@
 // Deploy 4: Added Farm Brief cron functions (4 timezone crons + 1 worker)
 // Build 18 Deploy 6B: Added enrollmentDripCampaign function
 // Phase 19: Added SMS alert functions (send-sms-alert, sms-price-check crons)
+// B2: Added Sell Score daily compute (cron + worker)
 //
 // All Inngest functions must be registered here. When adding new functions:
 // 1. Import the function
@@ -12,7 +13,7 @@
 // 3. Run `npx inngest-cli dev` locally to test
 // 4. Deploy — Inngest syncs against www.harvestfile.com automatically
 //
-// Total functions: 16 (was 11, added 5 for Farm Brief)
+// Total functions: 18 (was 16, added 2 for Sell Score B2)
 // =============================================================================
 
 import { serve } from 'inngest/next';
@@ -33,6 +34,10 @@ import {
   farmBriefCronPT,
 } from '@/lib/inngest/functions/farm-brief-cron';
 import { sendFarmBrief } from '@/lib/inngest/functions/send-farm-brief';
+
+// B2: Sell Score daily compute (cron fans out events, worker handles each farm)
+import { sellscoreComputeCron } from '@/lib/inngest/functions/sellscore-compute-cron';
+import { sellscoreComputeWorker } from '@/lib/inngest/functions/sellscore-compute-worker';
 
 // Allow up to 5 minutes for Inngest handler (cron functions fetch external APIs)
 export const maxDuration = 300;
@@ -59,5 +64,8 @@ export const { GET, POST, PUT } = serve({
     farmBriefCronMT,
     farmBriefCronPT,
     sendFarmBrief,
+    // ── B2: Sell Score daily compute ─────────────────────────────────────
+    sellscoreComputeCron,
+    sellscoreComputeWorker,
   ],
 });
