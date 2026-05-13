@@ -1,6 +1,6 @@
-// app/sellscore/me/page.tsx
+﻿// app/sellscore/me/page.tsx
 // =============================================================================
-// HarvestFile Sell Score — Live Personalized Score (server component, Deploy 2)
+// HarvestFile Sell Score â€” Live Personalized Score (server component, Deploy 2)
 //
 // Renders the live Sell Score for the authenticated user's setup-complete
 // farm. Reads from sellscore_recommendations (the daily/manual compute
@@ -11,10 +11,10 @@
 //   auth.uid() -> farms.owner_id
 //
 // Data flow:
-//   1. farms              → farm context (name, county_fips, state, acres)
-//   2. sellscore_recommendations → today's recommendation (if compute ran)
-//   3. sellscore_elevators (is_primary=true) → reference elevator info
-//   4. grain_positions    → per-crop expected/contracted for pace calc
+//   1. farms              â†’ farm context (name, county_fips, state, acres)
+//   2. sellscore_recommendations â†’ today's recommendation (if compute ran)
+//   3. sellscore_elevators (is_primary=true) â†’ reference elevator info
+//   4. grain_positions    â†’ per-crop expected/contracted for pace calc
 //
 // If no recommendation exists, shows "Preparing your first Sell Score"
 // empty state. Onboard attempts inline compute; if Barchart fails, the
@@ -25,6 +25,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SellScoreScreen from '@/components/sellscore/SellScoreScreen';
 import { getTargetPaceForDate, type Crop } from '@/lib/sellscore/pace-calendar';
+import { REFERENCE_ELEVATORS } from '@/lib/sellscore/reference-elevators';
 import type {
   SellScoreScreenData,
   FarmDisplayContext,
@@ -66,7 +67,7 @@ export default async function SellScoreMePage() {
     .maybeSingle();
 
   if (!farm) {
-    // No farm record — webhook hasn't fired or this isn't a Sell Score
+    // No farm record â€” webhook hasn't fired or this isn't a Sell Score
     // subscriber. Send them to pricing to convert.
     redirect('/pricing');
   }
@@ -95,7 +96,7 @@ export default async function SellScoreMePage() {
     .maybeSingle();
 
   // All positions for this farm. Used for real pace numbers and position
-  // cards instead of synthesizing from total_acres × yield.
+  // cards instead of synthesizing from total_acres Ã— yield.
   const { data: positionRows } = await supabase
     .from('grain_positions')
     .select(
@@ -104,7 +105,7 @@ export default async function SellScoreMePage() {
     .eq('farm_id', farm.id)
     .order('crop_year', { ascending: false });
 
-  // No recommendation yet → empty state
+  // No recommendation yet â†’ empty state
   if (!latestRec) {
     return <PreparingFirstScore farmName={farm.name} userEmail={user.email ?? ''} />;
   }
@@ -143,7 +144,7 @@ function composeScreenData(
   positionRows: PositionRow[],
   userEmail: string,
 ): SellScoreScreenData {
-  // ── Farm context ─────────────────────────────────────────────────────────
+  // â”€â”€ Farm context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const firstName = farmerFirstName(userEmail);
   const today = new Date(rec.recommendation_date);
   const dateLabel = today.toLocaleDateString('en-US', {
@@ -153,6 +154,10 @@ function composeScreenData(
   });
 
   const elevatorCity = elevator?.elevator_city ?? '';
+  const referenceMatch = REFERENCE_ELEVATORS.find(
+    (e) => e.countyFips === farm.county_fips,
+  );
+  const countyName = referenceMatch?.countyName ?? '';
 
   const context: FarmDisplayContext = {
     farmer_first_name: firstName,
@@ -161,11 +166,11 @@ function composeScreenData(
     // Show the elevator city as "where your market is" since farms can be
     // anywhere in the US and we map them to the nearest of 25 supported
     // elevators. v1.1 adds a separate "your home county: X" line.
-    county: elevatorCity || farm.state || 'Your',
+    county: countyName || elevatorCity || farm.state || 'Your',
     state: farm.state ?? '',
   };
 
-  // ── Recommendation ───────────────────────────────────────────────────────
+  // â”€â”€ Recommendation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const recommendation: Recommendation = {
     crop: rec.crop,
     recommendation_type: (rec.recommendation_type as RecommendationType) ?? 'hold',
@@ -178,7 +183,7 @@ function composeScreenData(
     pace_signal: (rec.pace_signal as SignalStatus) ?? 'yellow',
   } as Recommendation;
 
-  // ── Elevator ─────────────────────────────────────────────────────────────
+  // â”€â”€ Elevator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const elevatorDisplay: ElevatorDisplay | null = elevator
     ? {
         name: rec.recommended_elevator_name ?? elevator.elevator_name,
@@ -188,7 +193,7 @@ function composeScreenData(
       }
     : null;
 
-  // ── Supporting figures (only meaningful for SELL) ────────────────────────
+  // â”€â”€ Supporting figures (only meaningful for SELL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const supporting: SupportingFigure | null =
     recommendation.recommendation_type === 'sell' && rec.recommended_cash_bid
       ? {
@@ -199,7 +204,7 @@ function composeScreenData(
         }
       : null;
 
-  // ── Real pace (ytd + target) for the recommendation's crop ───────────────
+  // â”€â”€ Real pace (ytd + target) for the recommendation's crop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const recCrop = rec.crop as string;
   const recPosition = positionRows.find((p) => p.commodity === recCrop);
   const expectedForRec = Number(recPosition?.expected_bushels ?? 0);
@@ -228,7 +233,7 @@ function composeScreenData(
     status_label: paceStatusLabelFromSignal(recommendation.pace_signal),
   };
 
-  // ── Positions (one card per primary crop) ────────────────────────────────
+  // â”€â”€ Positions (one card per primary crop) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Prefer real grain_positions rows. Fall back to synthesized data for
   // crops on the farm without a position row (wheat or sorghum pre-v1.1).
   // All 14 CropPosition fields populated explicitly; ARC/PLC and insurance
@@ -283,20 +288,20 @@ function composeScreenData(
     };
   });
 
-  // ── Breakevens (one per crop, mirrors positions) ─────────────────────────
+  // â”€â”€ Breakevens (one per crop, mirrors positions) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const breakevens: BreakevenDisplay[] = positions.map((p) => ({
     crop: p.crop,
     dollars_per_bu: p.breakeven_dollars_per_bu,
     source: 'county_default' as const,
   }));
 
-  // ── Floor ────────────────────────────────────────────────────────────────
+  // â”€â”€ Floor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const floor: FloorDisplay = {
     dollars_per_bu: rec.effective_floor ?? defaultFloorForCrop(rec.crop),
     source_label: 'PLC reference + 85% RP + SCO',
   };
 
-  // ── Headline from rationale_text ─────────────────────────────────────────
+  // â”€â”€ Headline from rationale_text â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const headline = extractHeadline(rec.rationale_text, recommendation);
 
   return {
