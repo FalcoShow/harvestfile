@@ -55,11 +55,13 @@ export default function RecommendationHeadline({
         )}
       </h2>
 
-      <div
-        className="mt-10 h-px w-14"
-        style={{ backgroundColor: accent }}
-        aria-hidden="true"
-      />
+      {accent && (
+        <div
+          className="mt-10 h-px w-14"
+          style={{ backgroundColor: accent }}
+          aria-hidden="true"
+        />
+      )}
     </section>
   );
 }
@@ -105,10 +107,10 @@ function getEyebrow(type: Recommendation['recommendation_type']): string {
   }
 }
 
-function getAccentColor(type: Recommendation['recommendation_type']): string {
+function getAccentColor(type: Recommendation['recommendation_type']): string | null {
   switch (type) {
     case 'sell': return colors.emerald;
-    case 'hold': return colors.borderEmphasis;
+    case 'hold': return null;
     case 'pace_alert': return colors.amber;
     case 'out_of_season': return colors.gold;
   }
