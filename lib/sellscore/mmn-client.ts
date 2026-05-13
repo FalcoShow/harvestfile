@@ -1,34 +1,37 @@
 // =============================================================================
-// HarvestFile — USDA AMS MARS API Client (Deploy 4b)
+// HarvestFile — USDA AMS MARS API Client (Deploy 4b, revised)
 // lib/sellscore/mmn-client.ts
 //
-// Fallback cash bid source when Barchart is unavailable. Pulls state-level
-// average cash grain bids from USDA Agricultural Marketing Service's
-// MARS API (formerly "MyMarketNews API").
+// Fallback cash bid source when Barchart is unavailable. Pulls per-delivery-
+// point bid records from USDA AMS MARS API's Report Detail section for the
+// target state's daily grain report, then computes a state average.
 //
-// Why USDA MMN as the fallback:
-//   - Free, requires only a registered API key
-//   - Daily updates, late afternoon ET (our 4 AM ET cron reads yesterday's
-//     report — explicitly surfaced in the meta object)
-//   - State-level coverage for OH, IN, IL, IA. Michigan has no published
-//     MMN report, so MI elevators proxy through Ohio's report (geographic
-//     proxy; eastern Corn Belt basis tracks closely between OH and MI).
+// History:
+//   - Initial Deploy 4b (May 13, 2026 morning) parsed the Report Header
+//     narrative for state average price. Worked for IA. Failed for OH/IN
+//     (header has no narrative) and would have failed for IL (different
+//     format). Caught by SELLSCORE_FORCE_MMN kill-switch verification.
+//   - Revised approach (this file): always pull Report Detail records and
+//     compute the state average ourselves. Uniform across all states, no
+//     dependence on USDA's narrative formatting which varies by office.
 //
-// Why parse the report_narrative instead of fetching Report Detail:
-//   - The narrative explicitly contains "State Average Price: Corn -- $X.XX"
-//     in a consistent format across all 5 state reports we use
-//   - One API call instead of two (header + detail)
-//   - State average is the right granularity for our use case — when
-//     Barchart is down, a state average is far more accurate than nothing,
-//     and validates within $0.03 of elevator-specific Barchart bids in
-//     verification testing (May 13, 2026)
+// Architecture:
+//   1. Hit Report Header to discover the most recent published report date
+//      (one row per date; response is small and fast)
+//   2. Hit Report Detail filtered to that date (dozens of bid records, one
+//      per delivery point × commodity × contract month)
+//   3. Filter records to:
+//        - commodity = target crop ('Corn' or 'Soybeans')
+//        - current = 'Yes' (nearby contracts only, excludes deferreds)
+//        - avg_price within sanity bounds ($2.00-$20.00)
+//   4. Compute mean of avg_price across qualifying records → state average
 //
-// Verified report slugs (from scripts/mmn-recon.ps1, May 13, 2026):
+// State to slug mapping (verified May 13, 2026):
 //   OH → 2851 (Ohio Daily Grain Bids)
 //   IN → 3463 (Indiana Grain Bids)
 //   IL → 3192 (Illinois Grain Bids)
 //   IA → 2850 (Iowa Daily Cash Grain Bids)
-//   MI → 2851 (Ohio proxy — no MI report published by USDA AMS)
+//   MI → 2851 (Ohio proxy — USDA does not publish a Michigan grain report)
 // =============================================================================
 
 import type { Crop } from './pace-calendar';
@@ -55,12 +58,13 @@ const STATE_TO_MMN_SLUG: Record<string, MMNSlugMapping> = {
 export interface MMNCashBidResult {
   cashBid: number;
   reportDate: string;       // ISO 'YYYY-MM-DD' — the date the bid applies to
-  publishedAt: string;      // ISO timestamp from MARS API
+  publishedAt: string;      // ISO timestamp of USDA's publication
   source: 'mmn';
   sourceSlug: number;
   isProxy: boolean;
   proxyOfState?: string;
-  rawNarrative: string;
+  sampleSize: number;       // count of records that contributed to the average
+  summary: string;          // human-readable description of the computation
 }
 
 export type MMNErrorReason =
@@ -79,10 +83,139 @@ export class MMNError extends Error {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Internal HTTP helpers
+// ─────────────────────────────────────────────────────────────────────────
+
+function authHeaders(apiKey: string): Record<string, string> {
+  const basicAuth = Buffer.from(`${apiKey}:`).toString('base64');
+  return {
+    Authorization: `Basic ${basicAuth}`,
+    Accept: 'application/json',
+  };
+}
+
+async function fetchMMN<T = unknown>(url: string, apiKey: string): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: authHeaders(apiKey),
+      signal: AbortSignal.timeout(MMN_FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const e = err as Error;
+    if (e.name === 'TimeoutError' || e.name === 'AbortError') {
+      throw new MMNError(
+        'timeout',
+        `MARS API request timed out after ${MMN_FETCH_TIMEOUT_MS}ms for ${url}`,
+      );
+    }
+    throw new MMNError(
+      'http_error',
+      `MARS API request failed for ${url}: ${e.message}`,
+    );
+  }
+
+  if (!res.ok) {
+    throw new MMNError(
+      'http_error',
+      `MARS API returned HTTP ${res.status} for ${url}`,
+    );
+  }
+
+  return (await res.json()) as T;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Step 1: Get the most recent report date from the Header section
+// ─────────────────────────────────────────────────────────────────────────
+
+interface MMNHeaderResponse {
+  results?: Array<{
+    report_begin_date?: string;
+    published_date?: string;
+  }>;
+}
+
+async function getMostRecentReportDate(
+  slug: number,
+  apiKey: string,
+): Promise<{ reportDate: string; publishedAt: string }> {
+  const url = `${MMN_BASE_URL}/${slug}`;
+  const data = await fetchMMN<MMNHeaderResponse>(url, apiKey);
+
+  if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
+    throw new MMNError(
+      'no_results',
+      `MARS API Header returned no results for slug ${slug}`,
+    );
+  }
+
+  // Default sort is report_begin_date DESC; results[0] is most recent
+  const latest = data.results[0];
+  const reportDate = latest.report_begin_date;
+  if (typeof reportDate !== 'string' || reportDate.length === 0) {
+    throw new MMNError(
+      'parse_failure',
+      `MARS API Header record missing report_begin_date for slug ${slug}`,
+    );
+  }
+
+  return {
+    reportDate, // 'MM/DD/YYYY'
+    publishedAt: latest.published_date ?? new Date().toISOString(),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Step 2: Get the bid records from Report Detail for a specific date
+// ─────────────────────────────────────────────────────────────────────────
+
+interface MMNBidRecord {
+  commodity?: string;
+  current?: string;        // 'Yes' or 'No'
+  avg_price?: number | string | null;
+  price_unit?: string;
+  delivery_point?: string;
+  trade_loc?: string;
+  market_location_city?: string;
+}
+
+interface MMNDetailResponse {
+  results?: MMNBidRecord[];
+}
+
+async function getDetailBidsForDate(
+  slug: number,
+  reportDate: string,
+  apiKey: string,
+): Promise<MMNBidRecord[]> {
+  // MARS API accepts unencoded slashes in the date filter per their docs
+  const url = `${MMN_BASE_URL}/${slug}/Report%20Detail?q=report_begin_date=${reportDate}`;
+  const data = await fetchMMN<MMNDetailResponse>(url, apiKey);
+
+  if (!data.results || !Array.isArray(data.results)) {
+    throw new MMNError(
+      'no_results',
+      `MARS API Report Detail returned no results for slug ${slug} date ${reportDate}`,
+    );
+  }
+
+  return data.results;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Public: compute state-average cash bid for the given state + crop
+// ─────────────────────────────────────────────────────────────────────────
+
 /**
  * Fetches a state-level average cash grain bid from USDA AMS MARS API.
- * Returns the most recent reporting day's state average for the given crop.
- * Throws MMNError on any failure mode.
+ * Uses the Report Detail section to compute a uniform state average across
+ * all delivery points, filtered to nearby (current=Yes) contracts only.
+ *
+ * Throws MMNError on any failure: missing API key, unsupported state,
+ * HTTP errors, timeouts, empty results, parse failures, or prices outside
+ * sanity bounds.
  */
 export async function getCashBidFromMMN(
   state: string,
@@ -105,108 +238,65 @@ export async function getCashBidFromMMN(
     );
   }
 
-  // HTTP Basic auth: API key as username, blank password
-  const basicAuth = Buffer.from(`${apiKey}:`).toString('base64');
-  const url = `${MMN_BASE_URL}/${mapping.slug}`;
+  // Step 1: Find the most recent report date
+  const { reportDate, publishedAt } = await getMostRecentReportDate(
+    mapping.slug,
+    apiKey,
+  );
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        Accept: 'application/json',
-      },
-      signal: AbortSignal.timeout(MMN_FETCH_TIMEOUT_MS),
-    });
-  } catch (err) {
-    const e = err as Error;
-    if (e.name === 'TimeoutError' || e.name === 'AbortError') {
-      throw new MMNError(
-        'timeout',
-        `MARS API request timed out after ${MMN_FETCH_TIMEOUT_MS}ms for slug ${mapping.slug}`,
-      );
+  // Step 2: Pull the bid records for that date
+  const bidRecords = await getDetailBidsForDate(mapping.slug, reportDate, apiKey);
+
+  // Step 3: Filter to target crop + nearby contracts + valid prices
+  const cropName = crop === 'corn' ? 'Corn' : 'Soybeans';
+  const validBids: number[] = [];
+
+  for (const record of bidRecords) {
+    if (record.commodity !== cropName) continue;
+    if (record.current !== 'Yes') continue; // nearby contracts only
+    const price = Number(record.avg_price);
+    if (!isFinite(price) || price < SANITY_MIN_BID || price > SANITY_MAX_BID) {
+      continue;
     }
-    throw new MMNError(
-      'http_error',
-      `MARS API request failed for slug ${mapping.slug}: ${e.message}`,
-    );
+    validBids.push(price);
   }
 
-  if (!res.ok) {
-    throw new MMNError(
-      'http_error',
-      `MARS API returned HTTP ${res.status} for slug ${mapping.slug}`,
-    );
-  }
-
-  const data = (await res.json()) as {
-    results?: Array<{
-      report_begin_date?: string;
-      published_date?: string;
-      report_narrative?: string;
-    }>;
-  };
-
-  if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
-    throw new MMNError(
-      'no_results',
-      `MARS API returned no results for slug ${mapping.slug}`,
-    );
-  }
-
-  // Default sort is report_begin_date DESC, so results[0] is the most recent
-  const latest = data.results[0];
-  const narrative = latest.report_narrative;
-  if (typeof narrative !== 'string' || narrative.length === 0) {
+  if (validBids.length === 0) {
     throw new MMNError(
       'parse_failure',
-      `MARS API record missing report_narrative for slug ${mapping.slug}`,
+      `No valid nearby ${cropName} bids found in slug ${mapping.slug} for date ${reportDate}. ` +
+      `Inspected ${bidRecords.length} total records. ` +
+      `This may indicate a USDA reporting gap or schema change.`,
     );
   }
 
-  // Parse the state average price from the narrative.
-  // Format (verified across all 5 state reports, May 13, 2026):
-  //   "State Average Price: Corn -- $4.39 (-.42N) Up 5 cents | Soybeans -- $11.56 (-.71N) Up 15 cents\n..."
-  const cropPattern =
-    crop === 'corn'
-      ? /Corn\s*--\s*\$(\d+\.\d{1,2})/i
-      : /Soybeans?\s*--\s*\$(\d+\.\d{1,2})/i;
+  // Compute mean and round to 4 decimal places to match Barchart precision
+  const stateAverage =
+    validBids.reduce((sum, p) => sum + p, 0) / validBids.length;
+  const cashBid = Math.round(stateAverage * 10000) / 10000;
 
-  const match = narrative.match(cropPattern);
-  if (!match) {
-    throw new MMNError(
-      'parse_failure',
-      `Could not parse ${crop} price from narrative for slug ${mapping.slug}. ` +
-      `Narrative head: "${narrative.substring(0, 200)}"`,
-    );
-  }
-
-  const cashBid = Number(match[1]);
-
-  // Sanity bounds — corn/soybean cash bids should always be within this range.
-  // Outside this range, it's almost certainly a parse error.
-  if (cashBid < SANITY_MIN_BID || cashBid > SANITY_MAX_BID) {
-    throw new MMNError(
-      'sanity_failure',
-      `Parsed ${crop} bid $${cashBid.toFixed(2)} is outside sanity range ` +
-      `($${SANITY_MIN_BID}-$${SANITY_MAX_BID}) for slug ${mapping.slug}`,
-    );
-  }
-
-  // Convert MM/DD/YYYY → YYYY-MM-DD
-  const dateMatch = latest.report_begin_date?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  const reportDate = dateMatch
+  // Convert MM/DD/YYYY → YYYY-MM-DD for the meta object
+  const dateMatch = reportDate.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const isoDate = dateMatch
     ? `${dateMatch[3]}-${dateMatch[1]}-${dateMatch[2]}`
-    : latest.report_begin_date ?? 'unknown';
+    : reportDate;
+
+  const summary =
+    `Mean of ${validBids.length} nearby ${cropName} bid records from USDA AMS ` +
+    `slug ${mapping.slug} on ${reportDate}: $${cashBid.toFixed(2)}`;
+
+  // Log for Inngest dashboard visibility during force-MMN test runs
+  console.info(`[SellScore][MMN] ${summary}`);
 
   return {
     cashBid,
-    reportDate,
-    publishedAt: latest.published_date ?? new Date().toISOString(),
+    reportDate: isoDate,
+    publishedAt,
     source: 'mmn',
     sourceSlug: mapping.slug,
     isProxy: mapping.isProxy,
     proxyOfState: mapping.proxyOfState,
-    rawNarrative: narrative,
+    sampleSize: validBids.length,
+    summary,
   };
 }
