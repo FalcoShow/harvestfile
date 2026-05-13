@@ -8,20 +8,29 @@
 // Each worker:
 //   1. Parses the recommendation date passed from the cron (UTC noon anchor)
 //   2. Calls computeAndPersistForFarm via service-role Supabase client
-//   3. Returns outcome summary for Inngest dashboard observability
+//   3. Throws on total failure (no writes, any errors) so Inngest retries
+//      and the run surfaces red in the dashboard
+//   4. Returns outcome summary for Inngest dashboard observability
+//
+// Codified learning #15 (May 13, 2026):
+//   A worker that returns { written: 0, errors: [...] } without throwing
+//   is logged as a successful run by Inngest and does NOT trigger retries.
+//   We caught this on the first B2 cron run when a pre-Deploy-2 farm with
+//   malformed county_fips silently produced zero writes. The throw below
+//   forces Inngest to retry up to 3x AND turns the run red in the dashboard.
+//
+//   Partial success (some crops wrote, others errored) does NOT throw —
+//   retrying won't help with permanent per-crop data issues, and partial
+//   writes are still useful to the farmer for the crops that succeeded.
 //
 // Idempotency: computeAndPersistForFarm has check-then-write semantics
 // (one row per farm/crop/recommendation_date). Re-running for the same
-// date overwrites the row. Safe under retries.
+// date overwrites the data fields but preserves created_at. Safe under
+// retries.
 //
 // Concurrency: 3 to bound Barchart sandbox API rate. Each compute takes
 // 4-7 seconds for two crops; three concurrent workers process roughly
-// 30 farms per minute. Tune up once we measure real Barchart rate limits.
-//
-// Inngest retries: 3 attempts with exponential backoff. Transient Barchart
-// errors (5xx, timeouts) get retried automatically; persistent errors
-// (missing position rows, county not in reference set) fail permanently
-// after 3 attempts and surface in the dashboard.
+// 30 farms per minute.
 // =============================================================================
 
 import { inngest } from '../client';
@@ -52,6 +61,18 @@ export const sellscoreComputeWorker = inngest.createFunction(
     const outcome = await step.run('compute-and-persist', async () => {
       return computeAndPersistForFarm(adminClient, farmId, date);
     });
+
+    // Codified learning #15: surface total compute failure so Inngest
+    // retries (3x) and the run shows red in the dashboard. Without this,
+    // a farm with malformed data silently produces zero recommendations
+    // every day and we never see it.
+    if (outcome.written === 0 && outcome.errors.length > 0) {
+      throw new Error(
+        `Sell Score compute produced no writes for farm ${farmId} on ${recommendationDate}. ` +
+        `All ${outcome.errors.length} crop computation(s) errored. ` +
+        `Errors: ${JSON.stringify(outcome.errors)}`,
+      );
+    }
 
     // Return value shows up in Inngest dashboard for observability.
     return {
