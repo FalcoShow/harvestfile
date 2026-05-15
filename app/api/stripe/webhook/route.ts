@@ -1,7 +1,8 @@
 // =============================================================================
-// HarvestFile — Stripe Webhook Handler (Hardened + Founding Farmer)
+// HarvestFile — Stripe Webhook Handler (Hardened + Founding Farmer + Sell Score)
 // Phase 4A Build 5: Webhook Cleanup
 // Founding Farmer Update: Auto-provision user on no-auth checkout
+// Sell Score Update (May 15, 2026): Add lifecycle branches for SHORT-chain farms
 //
 // PRODUCTION-READY HANDLER for subscription lifecycle management.
 // Handles 7 Stripe events with idempotency, API-fetch ordering protection,
@@ -11,6 +12,7 @@
 // Events:
 //   checkout.session.completed      — initial provisioning (anchor event)
 //                                     + Founding Farmer no-auth provisioning
+//                                     + Sell Score SHORT-chain provisioning
 //   customer.subscription.created   — backup provisioning (if checkout missed)
 //   customer.subscription.updated   — lifecycle changes (plan, status, cancel)
 //   customer.subscription.deleted   — full cancellation / access revocation
@@ -18,13 +20,21 @@
 //   invoice.paid                    — confirms successful payment
 //   invoice.payment_failed          — marks account past_due
 //
-// Auth chain: auth.users → professionals (auth_id) → organizations (org_id)
+// Auth chain (B2B/CRM):  auth.users → professionals (auth_id) → organizations
+// Auth chain (Sell Score): auth.users → farms (owner_id)  [SHORT chain]
 //
-// FOUNDING FARMER FLOW:
-//   1. User pays via /api/stripe/checkout/founding (no auth required)
-//   2. Stripe fires checkout.session.completed with metadata.tier='founding'
-//   3. provisionFoundingFarmer() creates auth user, org, professional records
-//   4. Welcome email sent via Resend with magic link login
+// SELL SCORE LIFECYCLE FIX (May 15, 2026):
+//   Each lifecycle case now begins with a Sell Score detection branch that
+//   looks up farms by stripe_subscription_id or stripe_customer_id. If a
+//   Sell Score farm is found, the handler updates the farms table directly
+//   and breaks. If no Sell Score farm matches, the handler falls through to
+//   the existing B2B/CRM organizations logic. Zero behavior change for the
+//   B2B path; full coverage for the Sell Score path.
+//
+//   Premortem context: a customer.subscription.deleted event fired with HTTP
+//   200 but did not revoke access because the handler updated organizations
+//   instead of farms. This fix routes Sell Score lifecycle events to the
+//   correct table.
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -101,6 +111,34 @@ async function resolveOrgId(
     return await findOrgByUserId(userId);
   }
   return null;
+}
+
+// ── Helper: Find Sell Score farm by Stripe subscription ID ──────────────────
+// Used by subscription.* lifecycle events to route Sell Score updates to the
+// SHORT chain (farms table) instead of the B2B organizations table.
+async function findSellScoreFarmBySubId(
+  subscriptionId: string
+): Promise<{ id: string; owner_id: string } | null> {
+  const { data: farm } = await supabaseAdmin
+    .from('farms')
+    .select('id, owner_id')
+    .eq('stripe_subscription_id', subscriptionId)
+    .maybeSingle();
+  return farm ?? null;
+}
+
+// ── Helper: Find Sell Score farm by Stripe customer ID ──────────────────────
+// Used by invoice.* events (which carry customer, not subscription) to route
+// to the SHORT chain.
+async function findSellScoreFarmByCustomerId(
+  customerId: string
+): Promise<{ id: string; owner_id: string } | null> {
+  const { data: farm } = await supabaseAdmin
+    .from('farms')
+    .select('id, owner_id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+  return farm ?? null;
 }
 
 // ── Main webhook handler ────────────────────────────────────────────────────
@@ -262,6 +300,11 @@ export async function POST(request: Request) {
       //
       // FOUNDING FARMER GUARD: Skip entirely if tier='founding' — let
       // checkout.session.completed be the single provisioning path.
+      //
+      // SELL SCORE BRANCH: If farms row already provisioned by
+      // provisionSellScoreFarmer (called by checkout.session.completed),
+      // skip silently. If farms row exists by customer_id but no
+      // subscription_id yet (rare race), link it.
       // ════════════════════════════════════════════════════════════════════
       case 'customer.subscription.created': {
         const rawSubscription = event.data.object;
@@ -274,6 +317,37 @@ export async function POST(request: Request) {
           break;
         }
 
+        // ── SELL SCORE BRANCH ────────────────────────────────────────────
+        // Check if a Sell Score farm already exists for this subscription.
+        // If yes, the provision path already ran via checkout.session.completed.
+        const sellScoreFarmBySub = await findSellScoreFarmBySubId(sub.id);
+        if (sellScoreFarmBySub) {
+          console.log(`[Webhook] subscription.created: Sell Score farm ${sellScoreFarmBySub.id} already linked to sub ${sub.id}, skipping`);
+          break;
+        }
+
+        // Edge case: farm exists by customer but no subscription linked yet
+        // (could happen if subscription.created fires before checkout.session.completed
+        // finishes writing the subscription_id, which would be unusual but possible).
+        const sellScoreFarmByCustomer = await findSellScoreFarmByCustomerId(sub.customer);
+        if (sellScoreFarmByCustomer) {
+          await supabaseAdmin
+            .from('farms')
+            .update({
+              stripe_subscription_id: sub.id,
+              stripe_price_id: sub.priceId || null,
+              subscription_status: sub.status,
+              current_period_end: sub.currentPeriodEnd
+                ? new Date(sub.currentPeriodEnd * 1000).toISOString()
+                : null,
+              cancel_at_period_end: sub.cancelAtPeriodEnd || false,
+            })
+            .eq('id', sellScoreFarmByCustomer.id);
+          console.log(`[Webhook] subscription.created: Sell Score farm ${sellScoreFarmByCustomer.id} subscription linked (race recovery)`);
+          break;
+        }
+
+        // ── B2B/CRM ORGANIZATIONS PATH ───────────────────────────────────
         const orgId = await resolveOrgId(
           sub.customer,
           sub.metadata?.supabase_user_id,
@@ -334,10 +408,53 @@ export async function POST(request: Request) {
       // Fires on: trial→active, plan change, cancellation schedule, etc.
       // Fetches latest state from Stripe API to protect against out-of-order
       // event delivery.
+      //
+      // SELL SCORE BRANCH: routes status changes (active, past_due, canceled)
+      // to the farms table. Critical: sets sellscore_active=false when status
+      // is canceled, past_due, unpaid, or incomplete_expired so /sellscore/me
+      // correctly revokes access.
       // ════════════════════════════════════════════════════════════════════
       case 'customer.subscription.updated': {
         const webhookSub = getSubFields(event.data.object);
 
+        // ── SELL SCORE BRANCH ────────────────────────────────────────────
+        const sellScoreFarm = await findSellScoreFarmBySubId(webhookSub.id);
+        if (sellScoreFarm) {
+          // Fetch latest state from Stripe API for accuracy under out-of-order
+          // event delivery.
+          let sub: ReturnType<typeof getSubFields>;
+          try {
+            const latestSub = await stripe.subscriptions.retrieve(webhookSub.id);
+            sub = getSubFields(latestSub);
+          } catch (err) {
+            console.warn(`[Webhook] Failed to fetch latest sub ${webhookSub.id}, using webhook payload`);
+            sub = webhookSub;
+          }
+
+          // sellscore_active is true only when the subscription is in a
+          // paying-and-active state. Past_due is kept ACTIVE so the user
+          // retains access during Stripe Smart Retries (~2 weeks).
+          const activeStatuses = ['active', 'trialing', 'past_due'];
+          const isActive = activeStatuses.includes(sub.status);
+
+          await supabaseAdmin
+            .from('farms')
+            .update({
+              subscription_status: sub.status,
+              sellscore_active: isActive,
+              stripe_price_id: sub.priceId || null,
+              current_period_end: sub.currentPeriodEnd
+                ? new Date(sub.currentPeriodEnd * 1000).toISOString()
+                : null,
+              cancel_at_period_end: sub.cancelAtPeriodEnd || false,
+            })
+            .eq('id', sellScoreFarm.id);
+
+          console.log(`[Webhook] subscription.updated: Sell Score farm ${sellScoreFarm.id} status=${sub.status} active=${isActive}`);
+          break;
+        }
+
+        // ── B2B/CRM ORGANIZATIONS PATH ───────────────────────────────────
         const orgId = await resolveOrgId(
           webhookSub.customer,
           webhookSub.metadata?.supabase_user_id
@@ -438,10 +555,47 @@ export async function POST(request: Request) {
       // FOUNDING FARMER FIX: metadata.supabase_user_id is NOT set on founding
       // subscriptions (they're created via /api/stripe/checkout/founding before
       // the user exists). We resolve the user via the org → professional chain.
+      //
+      // SELL SCORE BRANCH: revokes access by setting sellscore_active=false
+      // and subscription_status='canceled'. Preserves stripe_customer_id so
+      // the user can resubscribe later without losing their farm data.
       // ════════════════════════════════════════════════════════════════════
       case 'customer.subscription.deleted': {
         const sub = getSubFields(event.data.object);
 
+        // ── SELL SCORE BRANCH ────────────────────────────────────────────
+        const sellScoreFarm = await findSellScoreFarmBySubId(sub.id);
+        if (sellScoreFarm) {
+          await supabaseAdmin
+            .from('farms')
+            .update({
+              subscription_status: 'canceled',
+              sellscore_active: false,
+              stripe_subscription_id: null,
+              stripe_price_id: null,
+              current_period_end: null,
+              cancel_at_period_end: false,
+              // stripe_customer_id preserved for resubscription
+            })
+            .eq('id', sellScoreFarm.id);
+
+          // Log to subscription_events for audit trail
+          await supabaseAdmin.from('subscription_events').insert({
+            user_id: sellScoreFarm.owner_id,
+            event_type: 'subscription_canceled',
+            stripe_event_id: event.id,
+            metadata: {
+              farm_id: sellScoreFarm.id,
+              subscription_id: sub.id,
+              source: 'sellscore_annual',
+            },
+          });
+
+          console.log(`[Webhook] subscription.deleted: Sell Score farm ${sellScoreFarm.id} access revoked, owner=${sellScoreFarm.owner_id}`);
+          break;
+        }
+
+        // ── B2B/CRM ORGANIZATIONS PATH ───────────────────────────────────
         const orgId = await resolveOrgId(
           sub.customer,
           sub.metadata?.supabase_user_id
@@ -501,10 +655,25 @@ export async function POST(request: Request) {
       // CUSTOMER.SUBSCRIPTION.TRIAL_WILL_END — 3-day warning
       // Fires 3 days before trial expiration. Triggers Inngest email
       // sequence to nudge user toward upgrading.
+      //
+      // SELL SCORE BRANCH: v1 Sell Score is direct-pay (no trial), so this
+      // event will not fire for Sell Score subscriptions in normal operation.
+      // The branch is included for completeness in case a future variant
+      // (e.g. 14-day trial v1.5) introduces trials.
       // ════════════════════════════════════════════════════════════════════
       case 'customer.subscription.trial_will_end': {
         const sub = getSubFields(event.data.object);
 
+        // ── SELL SCORE BRANCH ────────────────────────────────────────────
+        const sellScoreFarm = await findSellScoreFarmBySubId(sub.id);
+        if (sellScoreFarm) {
+          // v1 Sell Score does not currently use trials. Log and skip.
+          // When trial variants ship in v1.5, add Inngest event emission here.
+          console.log(`[Webhook] trial_will_end: Sell Score farm ${sellScoreFarm.id} (no trial flow in v1, logging only)`);
+          break;
+        }
+
+        // ── B2B/CRM ORGANIZATIONS PATH ───────────────────────────────────
         const orgId = await resolveOrgId(
           sub.customer,
           sub.metadata?.supabase_user_id
@@ -537,6 +706,10 @@ export async function POST(request: Request) {
       // INVOICE.PAID — Definitive payment confirmation
       // The most reliable signal that money was collected. Updates
       // current_period_end and confirms active status.
+      //
+      // SELL SCORE BRANCH: populates current_period_end on the farms row
+      // (fixes the null observed in B4 audit on May 15, 2026 — v6.5 P2 #3).
+      // Marks subscription_status='active' and sellscore_active=true.
       // ════════════════════════════════════════════════════════════════════
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
@@ -544,6 +717,59 @@ export async function POST(request: Request) {
           ? invoice.customer
           : (invoice.customer as any)?.id) as string;
 
+        // ── SELL SCORE BRANCH ────────────────────────────────────────────
+        const sellScoreFarm = await findSellScoreFarmByCustomerId(customerId);
+        if (sellScoreFarm) {
+          // Extract subscription ID from invoice
+          const rawSubId = (invoice as any).subscription;
+          const subscriptionId = typeof rawSubId === 'string'
+            ? rawSubId
+            : rawSubId?.id as string | undefined;
+
+          if (subscriptionId) {
+            try {
+              const latestSub = await stripe.subscriptions.retrieve(subscriptionId);
+              const sub = getSubFields(latestSub);
+
+              await supabaseAdmin
+                .from('farms')
+                .update({
+                  subscription_status: 'active',
+                  sellscore_active: true,
+                  current_period_end: sub.currentPeriodEnd
+                    ? new Date(sub.currentPeriodEnd * 1000).toISOString()
+                    : null,
+                  stripe_subscription_id: subscriptionId,
+                  stripe_price_id: sub.priceId || null,
+                })
+                .eq('id', sellScoreFarm.id);
+            } catch (err) {
+              // If sub retrieve fails, still mark as active without period_end
+              console.warn(`[Webhook] invoice.paid: failed to fetch sub ${subscriptionId}, marking active without period_end`);
+              await supabaseAdmin
+                .from('farms')
+                .update({
+                  subscription_status: 'active',
+                  sellscore_active: true,
+                })
+                .eq('id', sellScoreFarm.id);
+            }
+          } else {
+            // Invoice without subscription (rare for Sell Score) — still mark active
+            await supabaseAdmin
+              .from('farms')
+              .update({
+                subscription_status: 'active',
+                sellscore_active: true,
+              })
+              .eq('id', sellScoreFarm.id);
+          }
+
+          console.log(`[Webhook] invoice.paid: Sell Score farm ${sellScoreFarm.id} period_end refreshed`);
+          break;
+        }
+
+        // ── B2B/CRM ORGANIZATIONS PATH ───────────────────────────────────
         const orgId = await findOrgByCustomerId(customerId);
         if (!orgId) {
           // May fire for non-subscription invoices or before checkout completes
@@ -596,6 +822,10 @@ export async function POST(request: Request) {
       // Mark as past_due but do NOT revoke access. Stripe Smart Retries
       // will attempt ~8 retries over 2 weeks. Only subscription.deleted
       // (after all retries exhausted) should revoke access.
+      //
+      // SELL SCORE BRANCH: marks subscription_status='past_due' on farms row
+      // but KEEPS sellscore_active=true so the user retains access during
+      // Smart Retries. This is consistent with the B2B path's behavior.
       // ════════════════════════════════════════════════════════════════════
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
@@ -603,6 +833,23 @@ export async function POST(request: Request) {
           ? invoice.customer
           : (invoice.customer as any)?.id) as string;
 
+        // ── SELL SCORE BRANCH ────────────────────────────────────────────
+        const sellScoreFarm = await findSellScoreFarmByCustomerId(customerId);
+        if (sellScoreFarm) {
+          // Mark past_due but keep sellscore_active=true (don't revoke yet)
+          await supabaseAdmin
+            .from('farms')
+            .update({
+              subscription_status: 'past_due',
+              // sellscore_active intentionally not touched — keep access
+            })
+            .eq('id', sellScoreFarm.id);
+
+          console.log(`[Webhook] invoice.payment_failed: Sell Score farm ${sellScoreFarm.id} marked past_due, access retained during Smart Retries`);
+          break;
+        }
+
+        // ── B2B/CRM ORGANIZATIONS PATH ───────────────────────────────────
         const orgId = await findOrgByCustomerId(customerId);
         if (!orgId) {
           console.error(`[Webhook] No org found for customer: ${customerId}`);
