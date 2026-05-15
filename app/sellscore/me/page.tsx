@@ -1,6 +1,6 @@
-﻿// app/sellscore/me/page.tsx
+// app/sellscore/me/page.tsx
 // =============================================================================
-// HarvestFile Sell Score â€” Live Personalized Score (server component, Deploy 2)
+// HarvestFile Sell Score — Live Personalized Score (server component, Deploy 2)
 //
 // Renders the live Sell Score for the authenticated user's setup-complete
 // farm. Reads from sellscore_recommendations (the daily/manual compute
@@ -11,14 +11,21 @@
 //   auth.uid() -> farms.owner_id
 //
 // Data flow:
-//   1. farms              â†’ farm context (name, county_fips, state, acres)
-//   2. sellscore_recommendations â†’ today's recommendation (if compute ran)
-//   3. sellscore_elevators (is_primary=true) â†’ reference elevator info
-//   4. grain_positions    â†’ per-crop expected/contracted for pace calc
+//   1. farms              → farm context (name, county_fips, state, acres)
+//   2. sellscore_recommendations → today's recommendation (if compute ran)
+//   3. sellscore_elevators (is_primary=true) → reference elevator info
+//   4. grain_positions    → per-crop expected/contracted for pace calc
 //
 // If no recommendation exists, shows "Preparing your first Sell Score"
 // empty state. Onboard attempts inline compute; if Barchart fails, the
 // 4 AM cron writes the row.
+//
+// ACCESS CONTROL (May 15, 2026 fix):
+// Page now enforces farm.sellscore_active. When the webhook flips
+// sellscore_active=false (subscription canceled or past_due with Smart
+// Retries exhausted), this page redirects the user to /pricing instead
+// of rendering recommendations. Premortem failure 2 part B fix —
+// refunded customers no longer retain product access.
 // =============================================================================
 
 import { redirect } from 'next/navigation';
@@ -59,7 +66,7 @@ export default async function SellScoreMePage() {
   const { data: farm } = await supabase
     .from('farms')
     .select(
-      'id, name, owner_id, county_fips, state, total_acres, sellscore_setup_complete, sellscore_primary_crops, sellscore_active',
+      'id, name, owner_id, county_fips, state, total_acres, sellscore_setup_complete, sellscore_primary_crops, sellscore_active, subscription_status',
     )
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
@@ -67,8 +74,16 @@ export default async function SellScoreMePage() {
     .maybeSingle();
 
   if (!farm) {
-    // No farm record â€” webhook hasn't fired or this isn't a Sell Score
+    // No farm record — webhook hasn't fired or this isn't a Sell Score
     // subscriber. Send them to pricing to convert.
+    redirect('/pricing');
+  }
+
+  if (!farm.sellscore_active) {
+    // Subscription canceled, unpaid, or otherwise inactive. The farm row
+    // and stripe_customer_id are preserved for one-click resubscription —
+    // when the user pays again, the webhook will flip sellscore_active
+    // back to true and access is restored. Send to pricing in the meantime.
     redirect('/pricing');
   }
 
@@ -96,7 +111,7 @@ export default async function SellScoreMePage() {
     .maybeSingle();
 
   // All positions for this farm. Used for real pace numbers and position
-  // cards instead of synthesizing from total_acres Ã— yield.
+  // cards instead of synthesizing from total_acres × yield.
   const { data: positionRows } = await supabase
     .from('grain_positions')
     .select(
@@ -105,7 +120,7 @@ export default async function SellScoreMePage() {
     .eq('farm_id', farm.id)
     .order('crop_year', { ascending: false });
 
-  // No recommendation yet â†’ empty state
+  // No recommendation yet → empty state
   if (!latestRec) {
     return <PreparingFirstScore farmName={farm.name} userEmail={user.email ?? ''} />;
   }
@@ -144,7 +159,7 @@ function composeScreenData(
   positionRows: PositionRow[],
   userEmail: string,
 ): SellScoreScreenData {
-  // â”€â”€ Farm context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Farm context ───────────────────────────────────────────────────────
   const firstName = farmerFirstName(userEmail);
   const today = new Date(rec.recommendation_date);
   const dateLabel = today.toLocaleDateString('en-US', {
@@ -170,7 +185,7 @@ function composeScreenData(
     state: farm.state ?? '',
   };
 
-  // â”€â”€ Recommendation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Recommendation ─────────────────────────────────────────────────────
   const recommendation: Recommendation = {
     crop: rec.crop,
     recommendation_type: (rec.recommendation_type as RecommendationType) ?? 'hold',
@@ -183,7 +198,7 @@ function composeScreenData(
     pace_signal: (rec.pace_signal as SignalStatus) ?? 'yellow',
   } as Recommendation;
 
-  // â”€â”€ Elevator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Elevator ───────────────────────────────────────────────────────────
   const elevatorDisplay: ElevatorDisplay | null = elevator
     ? {
         name: rec.recommended_elevator_name ?? elevator.elevator_name,
@@ -193,7 +208,7 @@ function composeScreenData(
       }
     : null;
 
-  // â”€â”€ Supporting figures (only meaningful for SELL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Supporting figures (only meaningful for SELL) ──────────────────────
   const supporting: SupportingFigure | null =
     recommendation.recommendation_type === 'sell' && rec.recommended_cash_bid
       ? {
@@ -204,7 +219,7 @@ function composeScreenData(
         }
       : null;
 
-  // â”€â”€ Real pace (ytd + target) for the recommendation's crop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Real pace (ytd + target) for the recommendation's crop ─────────────
   const recCrop = rec.crop as string;
   const recPosition = positionRows.find((p) => p.commodity === recCrop);
   const expectedForRec = Number(recPosition?.expected_bushels ?? 0);
@@ -233,7 +248,7 @@ function composeScreenData(
     status_label: paceStatusLabelFromSignal(recommendation.pace_signal),
   };
 
-  // â”€â”€ Positions (one card per primary crop) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Positions (one card per primary crop) ──────────────────────────────
   // Prefer real grain_positions rows. Fall back to synthesized data for
   // crops on the farm without a position row (wheat or sorghum pre-v1.1).
   // All 14 CropPosition fields populated explicitly; ARC/PLC and insurance
@@ -288,20 +303,20 @@ function composeScreenData(
     };
   });
 
-  // â”€â”€ Breakevens (one per crop, mirrors positions) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Breakevens (one per crop, mirrors positions) ───────────────────────
   const breakevens: BreakevenDisplay[] = positions.map((p) => ({
     crop: p.crop,
     dollars_per_bu: p.breakeven_dollars_per_bu,
     source: 'county_default' as const,
   }));
 
-  // â”€â”€ Floor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Floor ──────────────────────────────────────────────────────────────
   const floor: FloorDisplay = {
     dollars_per_bu: rec.effective_floor ?? defaultFloorForCrop(rec.crop),
     source_label: 'PLC reference + 85% RP + SCO',
   };
 
-  // â”€â”€ Headline from rationale_text â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Headline from rationale_text ───────────────────────────────────────
   const headline = extractHeadline(rec.rationale_text, recommendation);
 
   return {
