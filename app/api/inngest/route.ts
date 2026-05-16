@@ -6,6 +6,7 @@
 // Build 18 Deploy 6B: Added enrollmentDripCampaign function
 // Phase 19: Added SMS alert functions (send-sms-alert, sms-price-check crons)
 // B2: Added Sell Score daily compute (cron + worker)
+// Item B (May 16, 2026): Added Signup Funnel Health Check cron
 //
 // All Inngest functions must be registered here. When adding new functions:
 // 1. Import the function
@@ -13,7 +14,7 @@
 // 3. Run `npx inngest-cli dev` locally to test
 // 4. Deploy — Inngest syncs against www.harvestfile.com automatically
 //
-// Total functions: 18 (was 16, added 2 for Sell Score B2)
+// Total functions: 18 (was 17, added 1 for Item B signup funnel monitor)
 // =============================================================================
 
 import { serve } from 'inngest/next';
@@ -38,6 +39,9 @@ import { sendFarmBrief } from '@/lib/inngest/functions/send-farm-brief';
 // B2: Sell Score daily compute (cron fans out events, worker handles each farm)
 import { sellscoreComputeCron } from '@/lib/inngest/functions/sellscore-compute-cron';
 import { sellscoreComputeWorker } from '@/lib/inngest/functions/sellscore-compute-worker';
+
+// Item B (May 16, 2026): Signup funnel health check cron
+import { signupFunnelHealthCheck } from '@/lib/inngest/functions/signup-funnel-health-check';
 
 // Allow up to 5 minutes for Inngest handler (cron functions fetch external APIs)
 export const maxDuration = 300;
@@ -67,5 +71,7 @@ export const { GET, POST, PUT } = serve({
     // ── B2: Sell Score daily compute ─────────────────────────────────────
     sellscoreComputeCron,
     sellscoreComputeWorker,
+    // ── Item B: Signup funnel health check (May 16, 2026) ────────────────
+    signupFunnelHealthCheck,
   ],
 });
