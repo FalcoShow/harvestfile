@@ -5,6 +5,13 @@
 // Informational closing card. The downside floor that ARC/PLC + crop
 // insurance protect, regardless of where cash markets go. This is the trust
 // anchor: "here's what you keep no matter what." Never triggers an action.
+//
+// May 16, 2026 voice-spec update:
+//   Subject phrase changed from "{crop} markets" to "{crop} prices" so the
+//   sentence "Even if soybean prices fall further..." reads correctly
+//   regardless of crop. Plural crop names (soybeans) normalize to singular
+//   nouns (soybean) for natural reading. Also tightened "for the marketing
+//   year" → "through the marketing year".
 // =============================================================================
 
 import type { FloorDisplay } from '@/lib/sellscore/display-types';
@@ -12,12 +19,19 @@ import { colors, fonts, formatters, tabularNums } from './_tokens';
 
 interface FloorStatementProps {
   floor: FloorDisplay;
-  /** Optional crop name to anchor the statement, e.g. "corn" */
+  /** Optional crop name to anchor the statement, e.g. "corn" or "soybeans" */
   cropContext?: string;
 }
 
 export default function FloorStatement({ floor, cropContext }: FloorStatementProps) {
-  const subjectPhrase = cropContext ? `${cropContext} markets` : 'cash markets';
+  // Normalize plural crop names to singular so "soybeans prices" reads
+  // naturally as "soybean prices". Most crop names are already singular
+  // (corn, wheat, sorghum). Add new mappings here if v1.1 expands crops.
+  const cropSingular =
+    cropContext === 'soybeans' ? 'soybean' :
+    cropContext === 'beans' ? 'bean' :
+    cropContext;
+  const subjectPhrase = cropSingular ? `${cropSingular} prices` : 'cash prices';
 
   return (
     <section
@@ -93,7 +107,7 @@ export default function FloorStatement({ floor, cropContext }: FloorStatementPro
         }}
       >
         Even if {subjectPhrase} fall further, this is the price your election protects
-        for the marketing year.
+        through the marketing year.
       </p>
 
       <p

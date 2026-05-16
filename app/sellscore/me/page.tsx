@@ -26,6 +26,16 @@
 // Retries exhausted), this page redirects the user to /pricing instead
 // of rendering recommendations. Premortem failure 2 part B fix —
 // refunded customers no longer retain product access.
+//
+// May 16, 2026 voice-spec update:
+//   - extractHeadline PACE_ALERT fallback now reads as a full sentence
+//     instead of the fragment "Behind pace."
+//   - PreparingFirstScore empty state adds the discipline-aid one-liner
+//     ("We don't predict prices. We enforce the same checklist...")
+//   - paceStatusLabelFromSignal intentionally left alone; the
+//     GREEN/AMBER/RED → label mapping is inverted relative to
+//     rationale.ts paceDetail and needs its own commit after a deeper
+//     signals.ts audit.
 // =============================================================================
 
 import { redirect } from 'next/navigation';
@@ -424,7 +434,7 @@ function extractHeadline(
     case 'hold':
       return 'Hold today.';
     case 'pace_alert':
-      return 'Behind pace.';
+      return "Hold today. You're behind pace.";
     case 'out_of_season':
       return 'Marketing year complete.';
     default:
@@ -548,8 +558,9 @@ function PreparingFirstScore({
           >
             <strong style={{ color: '#E2C366' }}>What happens next:</strong> Every
             morning we pull live cash bids from your nearest elevator, compare against
-            your breakeven, and tell you whether to price more bushels today. You'll
-            get a daily email at {userEmail} and can check in here any time.
+            your breakeven, and tell you whether to price more bushels today. We don't
+            predict prices. We enforce the same checklist top grain marketers run every
+            morning. You'll get a daily email at {userEmail} and can check in here any time.
           </p>
         </div>
       </div>

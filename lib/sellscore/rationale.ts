@@ -22,6 +22,13 @@
 // Basis copy uses spec language verbatim: GREEN reads "top quartile",
 // RED reads "unusually weak" (the spec's own phrase from §4.4 RED
 // description) and references the 25th percentile threshold.
+//
+// May 16, 2026 voice-spec update:
+//   WATCH branch previously surfaced "Hold off. Close to a sell day."
+//   which violated the discipline-aid voice spec (adjectival hedging,
+//   no specific blocker named). Replaced with "Hold today." headline +
+//   buildWatchSummary that names the blocker signal explicitly. Farmers
+//   now see WHICH signal is missing, not just that something is "off".
 
 import type { Crop } from './pace-calendar';
 import type {
@@ -231,6 +238,17 @@ function buildSellSummary(): string {
   return `All three signals line up today. Basis is in the top quartile of recent prices, you're behind sales pace with room to catch up, and the cash bid clears your margin target.`;
 }
 
+// May 16, 2026 voice-spec update: rewrite to name the blocker explicitly.
+// Old behavior: "Margin and basis look good, but pace is off. Wait for
+// full alignment." — vague, doesn't tell the farmer what specifically
+// needs to flip. New behavior: "Margin and basis say sell. Pace is the
+// blocker. Wait for the third signal." — names the blocker by signal
+// name, gives the farmer a concrete thing to watch.
+//
+// Invariant: in the WATCH branch, greenCount === 2 (the >= 2 check in
+// determineAction comes after the === 3 check), and margin.level !== RED
+// (RED margin forces HOLD before WATCH can fire). So greens always has
+// exactly 2 entries and off has exactly 1 entry.
 function buildWatchSummary(signals: SignalSet): string {
   const greens: string[] = [];
   const off: string[] = [];
@@ -239,7 +257,7 @@ function buildWatchSummary(signals: SignalSet): string {
   if (signals.pace.level === 'GREEN') greens.push('pace'); else off.push('pace');
   const greenList = greens.join(' and ');
   const offOne = off[0];
-  return `${capitalize(greenList)} look good, but ${offOne} is off. Wait for full alignment.`;
+  return `${capitalize(greenList)} say sell. ${capitalize(offOne)} is the blocker. Wait for the third signal.`;
 }
 
 function buildHoldSummary(signals: SignalSet): string {
@@ -309,7 +327,7 @@ export function generateRationale(input: RationaleInput): Rationale {
     headline = buildSellHeadline(input);
     signalSummary = buildSellSummary();
   } else if (action === 'WATCH') {
-    headline = `Hold off. Close to a sell day.`;
+    headline = `Hold today.`;
     signalSummary = buildWatchSummary(input.signals);
   } else {
     headline = `Hold today.`;
