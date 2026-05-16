@@ -123,43 +123,66 @@ const nextConfig = {
       },
 
       // ═══════════════════════════════════════════════════════════════════
-      // Surface 2 Deploy 1: Tool Consolidation Redirects — Farm Command Center
-      // Surface 2 (/morning) absorbs 5 standalone tools:
-      //   /markets  → commodity futures + ARC/PLC payment projections
-      //   /grain    → Marketing Score + grain position tracker
-      //   /weather  → ag weather + GDD + soil + planting windows
-      //   /calendar → USDA report calendar (was standalone page)
-      //   /spray-window → spray window calculator
+      // Phase 1 Migration (May 16, 2026): Sell Score Architecture Cleanup
       //
-      // Redirect to /morning (NOT /morning#section — Google ignores # fragments).
-      // Each section will have <h2 id="markets"> etc. for scroll-to-section
-      // linking from the floating nav and email digest deep links.
+      // /dashboard sunset — legacy B2B/CRM for insurance agents archived to
+      // app/_archive/dashboard/. Authed Sell Score users land on their
+      // daily product. Anon users get bounced to /login by middleware on
+      // /sellscore/me, which is correct cohesive behavior.
       //
-      // Keep these redirects active permanently per Google guidance.
+      // /morning sunset — legacy free public dashboard archived to
+      // app/_archive/morning/. Its daily-use components (commodity prices,
+      // basis tracker, weather forecast) port to /sellscore/markets and a
+      // /sellscore/weather widget in Phase 1 build (May 19 → Jul 15 launch).
+      //
+      // The five Surface 2 redirects (/markets, /grain, /weather, /calendar,
+      // /spray-window) previously pointed at /morning. To avoid chained
+      // 301s (which Google handles but degrades for SEO), they now point at
+      // /advisor — the free public ag intelligence Q&A surface. /advisor
+      // handles commodity, weather, grain marketing, USDA timing, and spray
+      // window questions in plain English with live data, and surfaces the
+      // Sell Score as the personalized upgrade path.
+      //
+      // See docs/sellscore-migration-plan.md for full Phase 1-4 sequencing.
       // ═══════════════════════════════════════════════════════════════════
       {
+        source: '/dashboard',
+        destination: '/sellscore/me',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/:path*',
+        destination: '/sellscore/me',
+        permanent: true,
+      },
+      {
+        source: '/morning',
+        destination: '/pricing',
+        permanent: true,
+      },
+      {
         source: '/markets',
-        destination: '/morning',
+        destination: '/advisor',
         permanent: true,
       },
       {
         source: '/grain',
-        destination: '/morning',
+        destination: '/advisor',
         permanent: true,
       },
       {
         source: '/weather',
-        destination: '/morning',
+        destination: '/advisor',
         permanent: true,
       },
       {
         source: '/calendar',
-        destination: '/morning',
+        destination: '/advisor',
         permanent: true,
       },
       {
         source: '/spray-window',
-        destination: '/morning',
+        destination: '/advisor',
         permanent: true,
       },
 
