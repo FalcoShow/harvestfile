@@ -1,18 +1,18 @@
 // =============================================================================
 // HarvestFile — /pricing Layout (SEO Metadata)
-// Phase 11 Build 2: Updated for 4-tier pricing
+// Phase 1 Migration (May 16, 2026): Updated for Sell Score + Founding Farmer
 // =============================================================================
 
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing — Plans from $29/mo + Free Calculator | HarvestFile",
+  title: "Sell Score Pricing — $79/yr Founding or $149/yr Standard | HarvestFile",
   description:
-    "Free ARC/PLC calculator for every farmer. Starter plans from $29/month, Pro at $59/month with unlimited reports and scenario modeling. 14-day free trial, no credit card required.",
+    "Daily grain marketing recommendation for row crop farmers. Free ARC/PLC calculator and AI Farm Advisor. Sell Score $149/yr standard, or $79/yr lifetime for the first 500 Founding Farmers.",
   openGraph: {
-    title: "HarvestFile Pricing — Plans for Every Farm",
+    title: "HarvestFile Pricing — Sell Score for Row Crop Farmers",
     description:
-      "Free calculator forever. Pro dashboard starting at $29/mo with 14-day trial. Team and Enterprise plans for ag consultants and Farm Credit lenders.",
+      "Free ARC/PLC calculator and AI Farm Advisor. Sell Score $149/yr — one number every morning telling you when to price grain. First 500 farmers get lifetime $79/yr Founding pricing.",
     url: "https://www.harvestfile.com/pricing",
   },
   alternates: {

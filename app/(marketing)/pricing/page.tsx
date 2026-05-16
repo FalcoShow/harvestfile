@@ -2,7 +2,32 @@
 
 // =============================================================================
 // HarvestFile — /pricing Page
-// Pricing Restructure: 2-Tier (Free + Founding Farmer $9/mo or $79/yr)
+// Phase 1 Migration Update (May 16, 2026): Sell Score Architecture Cohesion
+//
+// Changes from prior version:
+//   - FEATURES array: removed Morning Dashboard, Ag Weather, Marketing Score
+//     references (all archived in Phase 1 cleanup). Replaced with honest
+//     Phase 1 product features.
+//   - FAQ #1, #2, #4 updated for current product structure.
+//   - Future Price pill: changed from "$29/mo" (pre-pivot Pro tier) to
+//     "Standard Sell Score: $149/yr" to reflect what Founding Farmer locks
+//     against.
+//   - Founding Farmer card subtitle clarifies it is the lifetime-locked
+//     version of Sell Score for the first 500 farmers, same product.
+//   - Hero subtitle expanded to mention Sell Score alongside Founding Farmer.
+//   - "Or choose a different plan" separator changed to "Or lock in Founding
+//     Farmer pricing" — honest framing since Founding IS Sell Score, just
+//     locked at lifetime $79/yr for first 500.
+//   - Free Tools for Every Farmer section: lists only tools that actually
+//     exist as dedicated surfaces (no archived references).
+//
+// Known follow-ups (NOT fixed in this commit, documented for Sunday audit):
+//   - Auth state detection queries professionals/organizations (legacy chain).
+//     Will not detect Sell Score users (farms.owner_id chain) as active.
+//     Fix on Sunday with nav audit.
+//   - Hero text "The right election is worth $12,000" still anchors on ARC/PLC
+//     framing. Sell Score is grain marketing, different value prop. Reframe
+//     in Phase 4 polish.
 //
 // Auth-aware CTAs:
 //   - Not logged in → "Become a Founding Farmer" → /signup
@@ -20,46 +45,50 @@ import { createClient } from "@/lib/supabase/client";
 import SellScoreCTA from "@/components/pricing/SellScoreCTA";
 
 // ---------------------------------------------------------------------------
-// Feature comparison data — "Free = WHAT, Founding Farmer = WHAT TO DO"
+// Feature comparison data — Free vs Founding Farmer
+// Reflects Phase 1 product reality (Sell Score + Markets + Settings).
 // ---------------------------------------------------------------------------
 const FEATURES = [
+  // Free tier — what /check, /advisor, /programs, county pages, and 5 AM email provide
   { name: "ARC/PLC decision calculator", free: true, paid: true, category: "analysis" },
-  { name: "County payment data (3,000+ counties)", free: true, paid: true, category: "analysis" },
+  { name: "AI Farm Advisor — commodity, weather, basis Q&A", free: true, paid: true, category: "analysis" },
+  { name: "County payment data (3,143 counties)", free: true, paid: true, category: "analysis" },
   { name: "Side-by-side ARC vs PLC comparison", free: true, paid: true, category: "analysis" },
   { name: "Historical payment lookups", free: true, paid: true, category: "analysis" },
-  { name: "Morning Dashboard & commodity prices", free: true, paid: true, category: "analysis" },
-  { name: "Ag weather & spray conditions", free: true, paid: true, category: "analysis" },
   { name: "USDA program guides (ARC, PLC, CRP, EQIP)", free: true, paid: true, category: "analysis" },
   { name: "5 AM Farm Brief daily email", free: true, paid: true, category: "analysis" },
-  { name: "Personalized election recommendation", free: false, paid: true, category: "action" },
-  { name: "Dollar-impact projections for your farm", free: false, paid: true, category: "action" },
-  { name: "Multi-year scenario modeling", free: false, paid: true, category: "action" },
-  { name: "Exportable PDF reports for your FSA visit", free: false, paid: true, category: "action" },
-  { name: "Election deadline alerts & reminders", free: false, paid: true, category: "action" },
-  { name: "Grain marketing score & basis tracking", free: false, paid: true, category: "action" },
-  { name: "Priority support & expert Q&A", free: false, paid: true, category: "action" },
+
+  // Paid only — Sell Score / Founding Farmer
+  { name: "Daily Sell Score with sell, hold, or wait recommendation", free: false, paid: true, category: "action" },
+  { name: "Personalized breakeven and position tracking", free: false, paid: true, category: "action" },
+  { name: "Live cash bids from your nearest elevators", free: false, paid: true, category: "action" },
+  { name: "Basis tracker vs 3-year norm", free: false, paid: true, category: "action" },
+  { name: "Marketing pace tracking vs target", free: false, paid: true, category: "action" },
+  { name: "Downside protection display (PLC + crop insurance floor)", free: false, paid: true, category: "action" },
+  { name: "Live commodity markets and MYA tracker", free: false, paid: true, category: "action" },
+  { name: "Priority support and expert Q&A", free: false, paid: true, category: "action" },
   { name: "Price locked forever — never increases", free: false, paid: true, category: "action" },
 ];
 
 // ---------------------------------------------------------------------------
-// FAQ data — updated for 2-tier structure
+// FAQ data — updated for Phase 1 product structure
 // ---------------------------------------------------------------------------
 const FAQS = [
   {
     q: "Is HarvestFile really free?",
-    a: "Yes. All analysis tools, USDA county data, the Morning Dashboard, commodity prices, weather, and the 5 AM Farm Brief are 100% free, forever. No account required for most tools. The Founding Farmer plan adds personalized election recommendations and action-oriented features.",
+    a: "Yes. The ARC/PLC calculator, AI Farm Advisor, USDA county data for 3,143 counties, program guides, and the 5 AM Farm Brief daily email are 100% free, forever. No account required for most tools. Sell Score ($149/yr standard, or $79/yr lifetime for the first 500 Founding Farmers) adds the daily personalized grain marketing recommendation.",
   },
   {
     q: "What does 'Founding Farmer' mean?",
-    a: "The first 500 subscribers become Founding Farmers — early supporters who lock in $9/mo (or $79/yr) forever, even when the price increases to $29/mo. You also get direct access to the founder, input on the product roadmap, and a Founding Farmer badge on your profile.",
+    a: "The first 500 farmers get Sell Score at $79/yr lifetime — locked forever, never increasing. After the 500 spots fill, the standard Sell Score price is $149/yr. Founding Farmers also get a numbered certificate, their name on the Founders Wall at harvestfile.com, direct access to the founder, and first access to new features as they ship. Same product as standard Sell Score. The price lock and the perks are the difference.",
   },
   {
     q: "Where does HarvestFile get its data?",
-    a: "Official USDA Farm Service Agency data via the NASS Quick Stats API, updated as new county-level information is published. Commodity prices from real-time market feeds. Weather from NOAA and Open-Meteo. We source from the same data your FSA county office uses.",
+    a: "Official USDA Farm Service Agency data via the NASS Quick Stats API, updated as new county-level information is published. Commodity prices from Barchart's market data feed. Weather from NOAA and Open-Meteo. Cash bids and basis from elevator networks. We source from the same data your FSA county office uses for ARC/PLC, plus real-time grain marketing inputs your local elevator board posts.",
   },
   {
     q: "How much can HarvestFile actually save me?",
-    a: "The average mid-size row crop farmer leaves $12,000+ on the table from suboptimal ARC/PLC elections. A single correct election decision on 500 base acres can be worth $2,000–$15,000 per year depending on commodity prices and county yields. At $79/year, that's a 152:1 return.",
+    a: "Two ways. (1) ARC/PLC: the average mid-size row crop farmer leaves $12,000+ on the table from suboptimal elections. A single correct decision on 500 base acres can be worth $2,000–$15,000 per year. (2) Grain marketing: capturing $0.05 better basis on 90,000 bushels of corn is $4,500/yr. Top-third grain marketers consistently outearn bottom-third marketers by $40–$200 per acre annually. At $79/yr Founding or $149/yr standard, one good decision pays for years of subscription.",
   },
   {
     q: "Do I need a credit card for the free plan?",
@@ -75,7 +104,7 @@ const FAQS = [
   },
   {
     q: "What makes this different from university spreadsheets?",
-    a: "University tools require you to find USDA data yourself and input it manually into Excel. HarvestFile pulls data automatically for 3,000+ counties, runs every scenario in seconds, gives you a clear recommendation, and generates a PDF you can take to your FSA office. Plus daily market intelligence, weather, and alerts — no spreadsheet does that.",
+    a: "University tools require you to find USDA data yourself and input it manually into Excel. HarvestFile pulls data automatically for 3,143 counties, runs every scenario in seconds, gives you a clear recommendation, and generates a PDF you can take to your FSA office. Plus daily grain marketing decisions through Sell Score — no spreadsheet does that.",
   },
   {
     q: "Can I cancel anytime?",
@@ -226,6 +255,9 @@ export default function PricingPage() {
 
   // -------------------------------------------------------------------------
   // Auth state detection
+  // NOTE: This queries the legacy professionals/organizations chain and will
+  // not correctly detect Sell Score users (farms.owner_id chain). Sell Score
+  // users will appear as "anon" until Sunday's auth-chain unification.
   // -------------------------------------------------------------------------
   useEffect(() => {
     async function checkAuth() {
@@ -399,7 +431,7 @@ export default function PricingPage() {
   const annualPrice = 79;
   const displayPrice = billing === "annual" ? annualPrice : monthlyPrice;
   const billingLabel = billing === "annual" ? "/yr" : "/mo";
-  const futureMonthlyPrice = 29;
+  const standardAnnualPrice = 149;
 
   return (
     <div className="min-h-screen" style={{ background: "#0C1F17" }}>
@@ -452,9 +484,10 @@ export default function PricingPage() {
             </h1>
           </ScrollReveal>
           <ScrollReveal delay={160}>
-            <p className="text-[16px] sm:text-[18px] text-white/35 leading-relaxed max-w-[580px] mx-auto mb-10">
-              Free tools show your county data. Founding Farmer tells you
-              exactly what to elect — and why.
+            <p className="text-[16px] sm:text-[18px] text-white/35 leading-relaxed max-w-[640px] mx-auto mb-10">
+              Free tools show your county data. Sell Score reads your farm
+              every morning and tells you when to price. Founding Farmer locks
+              that pricing at $79/yr for life.
             </p>
           </ScrollReveal>
           <ScrollReveal delay={240}>
@@ -509,206 +542,191 @@ export default function PricingPage() {
         </div>
       </section>
 
-// =============================================================================
-// SELL SCORE HERO BAND — Add this section ABOVE the existing 2-tier grid
-//
-// INSERTION POINT: In app/(marketing)/pricing/page.tsx, find the comment:
-//   {/* TWO-TIER PRICING CARDS */}
-// and insert this entire block IMMEDIATELY BEFORE that comment line.
-//
-// REQUIRED ADDITION at the top of the file (around line 17, after the other
-// imports):
-//
-//   import SellScoreCTA from "@/components/pricing/SellScoreCTA";
-//
-// Zero existing content is modified. The Founding Farmer tier remains
-// exactly as it is below this new hero band.
-// =============================================================================
-
-{/* ================================================================ */}
-{/* SELL SCORE HERO BAND — Primary offer, added above 4-tier grid    */}
-{/* ================================================================ */}
-<section className="relative z-10 mx-auto max-w-[900px] px-5 sm:px-6 pb-12 sm:pb-16">
-  <ScrollReveal>
-    <div
-      className="relative rounded-[24px] overflow-hidden"
-      style={{
-        background:
-          "linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 38, 28, 0.4) 100%)",
-        border: "1.5px solid rgba(52, 211, 153, 0.22)",
-        boxShadow: "0 0 100px -20px rgba(52, 211, 153, 0.18)",
-      }}
-    >
-      {/* Subtle radial glow */}
-      <div
-        className="absolute top-0 right-0 w-[400px] h-[400px] pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(circle at 70% 30%, rgba(52, 211, 153, 0.10) 0%, transparent 60%)",
-        }}
-      />
-
-      <div className="relative grid lg:grid-cols-[1.4fr_1fr] gap-8 lg:gap-12 p-8 sm:p-10 lg:p-12">
-        {/* Left column: copy */}
-        <div>
-          {/* Eyebrow */}
+      {/* ================================================================ */}
+      {/* SELL SCORE HERO BAND — Primary offer                             */}
+      {/* ================================================================ */}
+      <section className="relative z-10 mx-auto max-w-[900px] px-5 sm:px-6 pb-12 sm:pb-16">
+        <ScrollReveal>
           <div
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-5"
+            className="relative rounded-[24px] overflow-hidden"
             style={{
-              background: "rgba(52, 211, 153, 0.10)",
-              border: "1px solid rgba(52, 211, 153, 0.20)",
+              background:
+                "linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 38, 28, 0.4) 100%)",
+              border: "1.5px solid rgba(52, 211, 153, 0.22)",
+              boxShadow: "0 0 100px -20px rgba(52, 211, 153, 0.18)",
             }}
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-[#34D399] animate-pulse" />
-            <span className="text-[11px] font-bold text-[#34D399] uppercase tracking-wider">
-              New · Daily Personalized Recommendation
-            </span>
-          </div>
-
-          {/* Headline */}
-          <h2
-            className="text-[clamp(28px,4.5vw,42px)] font-extrabold text-white tracking-[-0.035em] leading-[1.08] mb-4"
-            style={{
-              fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
-            }}
-          >
-            One number every morning.{" "}
-            <span
-              className="text-[#34D399]"
+            {/* Subtle radial glow */}
+            <div
+              className="absolute top-0 right-0 w-[400px] h-[400px] pointer-events-none"
               style={{
-                fontFamily: "'Instrument Serif', Georgia, serif",
-                fontStyle: "italic",
-                fontWeight: 400,
+                background:
+                  "radial-gradient(circle at 70% 30%, rgba(52, 211, 153, 0.10) 0%, transparent 60%)",
               }}
-            >
-              Sell, hold, or wait.
-            </span>
-          </h2>
+            />
 
-          {/* Subhead */}
-          <p className="text-[15px] sm:text-[16px] text-white/55 leading-relaxed mb-7 max-w-[540px]">
-            Sell Score reads your unsold position, breakeven, local elevator
-            basis, and ARC/PLC floor every morning at 5 AM — and tells you
-            exactly how many bushels of which crop to price today.
-          </p>
-
-          {/* Three-feature row */}
-          <ul className="space-y-2.5 mb-8">
-            {[
-              "Daily personalized recommendation for your farm",
-              "Live cash bids from your nearest elevator",
-              "Three-minute setup. Ready tomorrow morning.",
-            ].map((line) => (
-              <li
-                key={line}
-                className="flex items-start gap-2.5 text-[14px] text-white/70 leading-relaxed"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#34D399"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0 mt-0.5"
+            <div className="relative grid lg:grid-cols-[1.4fr_1fr] gap-8 lg:gap-12 p-8 sm:p-10 lg:p-12">
+              {/* Left column: copy */}
+              <div>
+                {/* Eyebrow */}
+                <div
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-5"
+                  style={{
+                    background: "rgba(52, 211, 153, 0.10)",
+                    border: "1px solid rgba(52, 211, 153, 0.20)",
+                  }}
                 >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                {line}
-              </li>
-            ))}
-          </ul>
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#34D399] animate-pulse" />
+                  <span className="text-[11px] font-bold text-[#34D399] uppercase tracking-wider">
+                    New · Daily Personalized Recommendation
+                  </span>
+                </div>
 
-          {/* CTA */}
-          <SellScoreCTA label="Get started — $149/yr" />
+                {/* Headline */}
+                <h2
+                  className="text-[clamp(28px,4.5vw,42px)] font-extrabold text-white tracking-[-0.035em] leading-[1.08] mb-4"
+                  style={{
+                    fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+                  }}
+                >
+                  One number every morning.{" "}
+                  <span
+                    className="text-[#34D399]"
+                    style={{
+                      fontFamily: "'Instrument Serif', Georgia, serif",
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                    }}
+                  >
+                    Sell, hold, or wait.
+                  </span>
+                </h2>
 
-          <p className="text-[12px] text-white/30 mt-4">
-            Annual billing · Cancel anytime · Money-back if it doesn&apos;t pay
-            for itself in 30 days
-          </p>
-        </div>
+                {/* Subhead */}
+                <p className="text-[15px] sm:text-[16px] text-white/55 leading-relaxed mb-7 max-w-[540px]">
+                  Sell Score reads your unsold position, breakeven, local
+                  elevator basis, and ARC/PLC floor every morning at 5 AM —
+                  and tells you exactly how many bushels of which crop to
+                  price today.
+                </p>
 
-        {/* Right column: price card */}
-        <div className="lg:border-l lg:border-white/[0.06] lg:pl-12 flex flex-col justify-center">
-          <div className="text-[11px] font-bold text-[#34D399]/70 uppercase tracking-wider mb-3">
-            HarvestFile Sell Score
-          </div>
-          <div className="flex items-baseline gap-1.5 mb-1">
-            <span
-              className="text-[56px] font-extrabold text-white tracking-[-0.04em] leading-none"
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              $149
-            </span>
-            <span className="text-[16px] text-white/35 font-medium">/year</span>
-          </div>
-          <p className="text-[13px] text-white/35 mb-6">
-            That&apos;s $0.41/day for a decision tool that pays for itself with{" "}
-            <span className="text-white/60 font-semibold">
-              one priced bushel.
-            </span>
-          </p>
+                {/* Three-feature row */}
+                <ul className="space-y-2.5 mb-8">
+                  {[
+                    "Daily personalized recommendation for your farm",
+                    "Live cash bids from your nearest elevator",
+                    "Three-minute setup. Ready tomorrow morning.",
+                  ].map((line) => (
+                    <li
+                      key={line}
+                      className="flex items-start gap-2.5 text-[14px] text-white/70 leading-relaxed"
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#34D399"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0 mt-0.5"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
 
-          {/* Math callout */}
-          <div
-            className="rounded-[12px] p-4"
-            style={{
-              background: "rgba(255,255,255,0.025)",
-              border: "1px solid rgba(255,255,255,0.06)",
-            }}
-          >
-            <div className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">
-              The math
+                {/* CTA */}
+                <SellScoreCTA label="Get started — $149/yr" />
+
+                <p className="text-[12px] text-white/30 mt-4">
+                  Annual billing · Cancel anytime · Money-back if it doesn&apos;t pay
+                  for itself in 30 days
+                </p>
+              </div>
+
+              {/* Right column: price card */}
+              <div className="lg:border-l lg:border-white/[0.06] lg:pl-12 flex flex-col justify-center">
+                <div className="text-[11px] font-bold text-[#34D399]/70 uppercase tracking-wider mb-3">
+                  HarvestFile Sell Score
+                </div>
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <span
+                    className="text-[56px] font-extrabold text-white tracking-[-0.04em] leading-none"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    $149
+                  </span>
+                  <span className="text-[16px] text-white/35 font-medium">/year</span>
+                </div>
+                <p className="text-[13px] text-white/35 mb-6">
+                  That&apos;s $0.41/day for a decision tool that pays for itself with{" "}
+                  <span className="text-white/60 font-semibold">
+                    one priced bushel.
+                  </span>
+                </p>
+
+                {/* Math callout */}
+                <div
+                  className="rounded-[12px] p-4"
+                  style={{
+                    background: "rgba(255,255,255,0.025)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <div className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">
+                    The math
+                  </div>
+                  <div className="space-y-1.5 text-[13px]">
+                    <div className="flex justify-between text-white/55">
+                      <span>500 acres of corn</span>
+                      <span className="tabular-nums">90,000 bu</span>
+                    </div>
+                    <div className="flex justify-between text-white/55">
+                      <span>$0.05 better basis</span>
+                      <span className="tabular-nums">+$4,500/yr</span>
+                    </div>
+                    <div
+                      className="flex justify-between pt-2 mt-2 text-[#34D399] font-bold"
+                      style={{ borderTop: "1px solid rgba(52, 211, 153, 0.15)" }}
+                    >
+                      <span>Return</span>
+                      <span className="tabular-nums">30×</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5 text-[13px]">
-              <div className="flex justify-between text-white/55">
-                <span>500 acres of corn</span>
-                <span className="tabular-nums">90,000 bu</span>
-              </div>
-              <div className="flex justify-between text-white/55">
-                <span>$0.05 better basis</span>
-                <span className="tabular-nums">+$4,500/yr</span>
-              </div>
-              <div
-                className="flex justify-between pt-2 mt-2 text-[#34D399] font-bold"
-                style={{ borderTop: "1px solid rgba(52, 211, 153, 0.15)" }}
-              >
-                <span>Return</span>
-                <span className="tabular-nums">30×</span>
-              </div>
-            </div>
+
+            {/* Bottom border accent */}
+            <div
+              className="h-[1px]"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.30), transparent)",
+              }}
+            />
+          </div>
+        </ScrollReveal>
+
+        {/* "Or lock in Founding Farmer pricing" separator */}
+        <div className="flex items-center justify-center mt-12 sm:mt-16 mb-2">
+          <div className="flex items-center gap-4 text-[12px] font-bold text-white/30 uppercase tracking-wider">
+            <div
+              className="w-12 h-px"
+              style={{ background: "rgba(255,255,255,0.08)" }}
+            />
+            <span>Or lock in Founding Farmer pricing</span>
+            <div
+              className="w-12 h-px"
+              style={{ background: "rgba(255,255,255,0.08)" }}
+            />
           </div>
         </div>
-      </div>
-
-      {/* Bottom border accent */}
-      <div
-        className="h-[1px]"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.30), transparent)",
-        }}
-      />
-    </div>
-  </ScrollReveal>
-
-  {/* "Or choose a different plan" separator */}
-  <div className="flex items-center justify-center mt-12 sm:mt-16 mb-2">
-    <div className="flex items-center gap-4 text-[12px] font-bold text-white/30 uppercase tracking-wider">
-      <div
-        className="w-12 h-px"
-        style={{ background: "rgba(255,255,255,0.08)" }}
-      />
-      <span>Or choose a different plan</span>
-      <div
-        className="w-12 h-px"
-        style={{ background: "rgba(255,255,255,0.08)" }}
-      />
-    </div>
-  </div>
-</section>
+      </section>
 
       {/* ================================================================ */}
       {/* TWO-TIER PRICING CARDS */}
@@ -727,8 +745,9 @@ export default function PricingPage() {
               <div className="mb-6">
                 <h3 className="text-white font-bold text-[20px] mb-2">Free</h3>
                 <p className="text-[13px] text-white/30 leading-relaxed">
-                  Every analysis tool, every county, every commodity — free
-                  forever. No account required.
+                  ARC/PLC calculator, AI Farm Advisor, county data, USDA
+                  program guides, and the 5 AM Farm Brief — free forever. No
+                  account required.
                 </p>
               </div>
 
@@ -806,8 +825,8 @@ export default function PricingPage() {
                   Founding Farmer
                 </h3>
                 <p className="text-[13px] text-white/30 leading-relaxed">
-                  Everything free, plus personalized recommendations and
-                  action-ready reports. Price locked for life.
+                  Same Sell Score product. Locked at $79/yr for life — never
+                  increases. First 500 farmers only.
                 </p>
               </div>
 
@@ -840,7 +859,7 @@ export default function PricingPage() {
                   }}
                 >
                   <span className="text-[11px] text-white/25 line-through">
-                    Future price: ${futureMonthlyPrice}/mo
+                    Standard Sell Score: ${standardAnnualPrice}/yr
                   </span>
                 </div>
               </div>
@@ -898,7 +917,7 @@ export default function PricingPage() {
                 The math speaks for itself
               </h2>
               <p className="text-[14px] text-white/30 max-w-[480px] mx-auto">
-                One correct ARC/PLC election decision is worth thousands. Here's
+                One correct ARC/PLC election decision is worth thousands. Here&apos;s
                 how HarvestFile compares to every alternative.
               </p>
             </div>
@@ -1094,10 +1113,10 @@ export default function PricingPage() {
               Free Tools for Every Farmer
             </h3>
             <p className="text-[14px] text-white/30 leading-relaxed max-w-[520px] mx-auto mb-6">
-              ARC/PLC Calculator, Morning Dashboard, Commodity Markets, Ag
-              Weather, Spray Window, Grain Marketing, USDA Program Guides, 5 AM
-              Farm Brief, 3,000+ County Pages, and Election Optimizer &mdash;
-              all free, forever.
+              ARC/PLC Calculator, AI Farm Advisor, USDA Program Guides, 3,143
+              County Pages, and the 5 AM Farm Brief daily email &mdash; all
+              free, forever. No credit card. No account required for most
+              tools.
             </p>
             <Link
               href="/check"
