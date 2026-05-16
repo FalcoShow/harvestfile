@@ -13,7 +13,7 @@
 // Called by:
 //   1. app/api/onboard/submit  — inline after farm setup completes
 //   2. app/api/sellscore/compute  — manual recompute endpoint
-//   3. Inngest cron at 4 AM ET (B2, future)
+//   3. Inngest cron at 4 AM ET (B2)
 //
 // All three paths use the same code path, same upsert semantics.
 //
@@ -21,6 +21,29 @@
 // Re-running for the same date overwrites the previous row via check-then-write
 // (no Postgres-level unique constraint on this tuple yet; v1.1 migration adds
 // it and switches to ON CONFLICT).
+//
+// Item C (May 16, 2026): Multi-crop priority writer
+// =================================================
+//   Previous behavior wrote one recommendation row per primary crop per
+//   day. That's correct as data, but /sellscore/me's headline query is
+//   `order by recommendation_date DESC, created_at DESC, limit 1` —
+//   meaning whichever crop got persisted LAST silently masked the other
+//   on the screen. A farmer with corn AND soybeans in SELL would only
+//   see one of them.
+//
+//   New behavior: compute every supported crop in memory first, sort by
+//   priority (highest dollar-of-opportunity, ties broken by largest
+//   unsold position), then persist only the winner. Skipped crops do
+//   not write today; tomorrow's compute may surface them when market
+//   dynamics shift. Their last successful row remains in the DB but
+//   ages out of the latest-by-date query.
+//
+//   Priority calculation:
+//     dollarOfOpportunity = max(0, (cashBid - breakeven) × recommendedBushels)
+//     unsoldBushels       = expected_bushels - bushels_contracted (from grain_positions)
+//
+//   For HOLD / OUT_OF_SEASON, recommendedBushels = 0, so opportunity is
+//   $0 and the comparison falls through to the unsold tiebreaker.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSellScoreForFarm, type SellScoreResult } from './data-fetcher';
@@ -39,17 +62,20 @@ export interface PersistOutcome {
 
 /**
  * Run the Sell Score engine for every v1-supported primary crop on this
- * farm and persist the results to sellscore_recommendations.
+ * farm, pick a single winner deterministically, and persist its row to
+ * sellscore_recommendations.
+ *
+ * Item C policy: only the winner's row is written today. Skipped crops
+ * remain in the DB at their last successful date but do not render as
+ * today's recommendation on /sellscore/me.
  *
  * Always uses a service-role Supabase client so it can read
  * county_basis_history (a public reference table) and write
  * sellscore_recommendations regardless of the caller's auth context.
  *
- * Returns a summary even on partial failure: if corn succeeds and soybeans
- * fails, you get { written: 1, errors: [{crop:'soybeans', ...}] }. Callers
- * decide whether partial success is acceptable; the onboard handler treats
- * any compute outcome (including zero successes) as non-fatal, while the
- * cron should re-queue failures for retry.
+ * Returns a summary even on partial failure. If all crops fail, you get
+ * { written: 0, errors: [...] }; if at least one crop computes, the
+ * winner is selected from the surviving set.
  */
 export async function computeAndPersistForFarm(
   supabase: SupabaseClient,
@@ -97,10 +123,23 @@ export async function computeAndPersistForFarm(
     return outcome;
   }
 
-  // Compute one crop at a time. Sequential, not parallel: Barchart sandbox
-  // rate-limits aggressive bursts, and the total wall time is roughly
-  // 4-7 seconds for two crops, which is acceptable inside an onboarding
-  // submit handler.
+  // Pull unsold bushels per crop for the priority tiebreaker. v1.1 will
+  // expose unsold on the engine result directly; for v1, one short query
+  // before the compute loop is the lowest-risk implementation.
+  const unsoldByCrop = await loadUnsoldByCrop(supabase, farmId);
+
+  // ── Phase 1: Compute every supported crop in memory (no persist yet) ─
+  // Sequential, not parallel: Barchart sandbox rate-limits aggressive
+  // bursts, and the total wall time is roughly 4-7 seconds for two crops,
+  // which is acceptable inside an onboarding submit handler.
+  interface ComputedCrop {
+    crop: Crop;
+    result: SellScoreResult;
+    dollarOfOpportunity: number;
+    unsoldBushels: number;
+  }
+  const computed: ComputedCrop[] = [];
+
   for (const crop of enginereadyCrops) {
     try {
       const result = await getSellScoreForFarm(
@@ -110,11 +149,19 @@ export async function computeAndPersistForFarm(
         date,
         apiKey,
       );
-
-      const row = mapToRecommendationRow(farmId, result);
-      const persistedId = await upsertRecommendation(supabase, row);
-      outcome.written += 1;
-      outcome.recommendationIds.push(persistedId);
+      const r = result.recommendation;
+      // Dollar-of-opportunity = (cash bid - breakeven) × recommended bushels.
+      // For HOLD / OUT_OF_SEASON, recommendedBushels is 0 → opportunity is 0
+      // and the comparison falls through to the unsold tiebreaker.
+      // For SELL / WATCH, this is the dollar value of executing today's rec.
+      const margin = r.signals.margin.cashBid - r.signals.margin.breakeven;
+      const dollarOfOpportunity = Math.max(0, margin * r.recommendedBushels);
+      computed.push({
+        crop,
+        result,
+        dollarOfOpportunity,
+        unsoldBushels: unsoldByCrop.get(crop) ?? 0,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-console
@@ -126,12 +173,95 @@ export async function computeAndPersistForFarm(
     }
   }
 
+  if (computed.length === 0) {
+    // No crops computed successfully. Return errors-only outcome. The
+    // Inngest worker treats { written: 0, errors: [...] } as a retry
+    // signal (codified learning #15).
+    return outcome;
+  }
+
+  // ── Phase 2: Pick the winner ────────────────────────────────────────
+  // Priority: highest dollar-of-opportunity first, ties broken by
+  // largest unsold position. Skipped crops will surface naturally on
+  // future days when market conditions shift the priority order.
+  computed.sort((a, b) => {
+    if (a.dollarOfOpportunity !== b.dollarOfOpportunity) {
+      return b.dollarOfOpportunity - a.dollarOfOpportunity;
+    }
+    return b.unsoldBushels - a.unsoldBushels;
+  });
+  const winner = computed[0];
+  const skipped = computed.slice(1);
+
+  // ── Phase 3: Persist only the winner ────────────────────────────────
+  try {
+    const row = mapToRecommendationRow(farmId, winner.result);
+    const persistedId = await upsertRecommendation(supabase, row);
+    outcome.written = 1;
+    outcome.recommendationIds.push(persistedId);
+
+    // Diagnostic log so the priority resolution is visible in Vercel /
+    // Inngest logs. Helps confirm the right crop won when investigating
+    // "why am I seeing corn when I expected soybeans" reports.
+    if (skipped.length > 0) {
+      const skipDetail = skipped
+        .map(
+          (s) =>
+            `${s.crop} ($${s.dollarOfOpportunity.toFixed(2)} opp, ${s.unsoldBushels} bu unsold)`,
+        )
+        .join(', ');
+      // eslint-disable-next-line no-console
+      console.log(
+        `[sellscore/persist] farm=${farmId} winner=${winner.crop} ` +
+          `($${winner.dollarOfOpportunity.toFixed(2)} opp, ${winner.unsoldBushels} bu unsold). ` +
+          `Skipped: ${skipDetail}`,
+      );
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // eslint-disable-next-line no-console
+    console.error(
+      `[sellscore/persist] persist failed for farm=${farmId} crop=${winner.crop}:`,
+      msg,
+    );
+    outcome.errors.push({ crop: winner.crop, error: msg });
+  }
+
   return outcome;
 }
 
 // =============================================================================
 // Internal helpers
 // =============================================================================
+
+/**
+ * Load unsold bushels per crop for this farm, keyed by commodity name.
+ * Returns an empty map if no positions exist; callers default missing
+ * entries to 0.
+ */
+async function loadUnsoldByCrop(
+  supabase: SupabaseClient,
+  farmId: string,
+): Promise<Map<string, number>> {
+  const { data: positionRows } = await supabase
+    .from('grain_positions')
+    .select('commodity, expected_bushels, bushels_contracted')
+    .eq('farm_id', farmId);
+
+  const unsoldByCrop = new Map<string, number>();
+  for (const p of (positionRows ?? []) as Array<{
+    commodity: string | null;
+    expected_bushels: number | null;
+    bushels_contracted: number | null;
+  }>) {
+    if (!p.commodity) continue;
+    const expected = Number(p.expected_bushels ?? 0);
+    const contracted = Number(p.bushels_contracted ?? 0);
+    unsoldByCrop.set(p.commodity, Math.max(0, expected - contracted));
+  }
+
+  return unsoldByCrop;
+}
 
 interface RecommendationRow {
   farm_id: string;
