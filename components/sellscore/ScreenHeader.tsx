@@ -1,4 +1,13 @@
 // components/sellscore/ScreenHeader.tsx
+// =============================================================================
+// Sell Score screen header (server-renderable).
+//
+// M-03 (May 18, 2026) typography pass:
+//   - Farm context label bumped from text-[11px] sm:text-xs to
+//     text-[14px] sm:text-[15px] for legibility on 58+ readers.
+//     Tracked-out caps treatment retained.
+// =============================================================================
+
 import type { FarmDisplayContext } from '@/lib/sellscore/display-types';
 import { colors, fonts } from './_tokens';
 import Greeting from './Greeting';
@@ -31,7 +40,7 @@ export default function ScreenHeader({ context }: ScreenHeaderProps) {
         </div>
 
         <div
-          className="text-[11px] sm:text-xs uppercase shrink-0"
+          className="text-[14px] sm:text-[15px] uppercase shrink-0"
           style={{
             color: colors.textTertiary,
             letterSpacing: '0.18em',

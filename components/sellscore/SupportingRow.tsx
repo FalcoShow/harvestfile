@@ -1,4 +1,10 @@
 // components/sellscore/SupportingRow.tsx
+// =============================================================================
+// M-03 (May 18, 2026) typography pass:
+//   - Figure label bumped from text-[10px] to text-[14px].
+//   - Figure subtitle bumped from text-[13px] to text-[16px].
+// =============================================================================
+
 import type { SupportingFigure } from '@/lib/sellscore/display-types';
 import { colors, fonts, formatters, tabularNums } from './_tokens';
 
@@ -45,7 +51,7 @@ function Figure({
   return (
     <div className="min-w-[88px]">
       <div
-        className="text-[10px] uppercase mb-2"
+        className="text-[14px] uppercase mb-2"
         style={{
           color: colors.textTertiary,
           letterSpacing: '0.22em',
@@ -70,7 +76,7 @@ function Figure({
       </div>
       {subtitle && (
         <div
-          className="text-[13px] mt-2"
+          className="text-[16px] mt-2"
           style={{
             color: colors.textSecondary,
             fontFamily: fonts.body,

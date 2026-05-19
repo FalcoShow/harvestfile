@@ -6,6 +6,14 @@
 // with its computed status (green/yellow/red), the primary value driving that
 // status, and the secondary context that backs it up. Hidden for out_of_season
 // scenarios where signals are not meaningful.
+//
+// M-03 (May 18, 2026) typography pass:
+//   - "Why this recommendation" eyebrow bumped from text-[10px] to text-[14px].
+//   - "MARGIN" / "BASIS" / "PACE" signal labels bumped from text-[10px] to
+//     text-[14px].
+//   - Primary signal value bumped from text-[16px] sm:text-[17px] to
+//     text-[18px] (clear pass above floor).
+//   - Secondary signal context bumped from text-[13px] to text-[16px].
 // =============================================================================
 
 import type { Recommendation, SignalStatus } from '@/lib/sellscore/types';
@@ -68,7 +76,7 @@ export default function SignalRow({
       style={{ borderTop: `1px solid ${colors.borderSubtle}` }}
     >
       <div
-        className="text-[10px] uppercase mb-7"
+        className="text-[14px] uppercase mb-7"
         style={{
           color: colors.textTertiary,
           letterSpacing: '0.22em',
@@ -123,7 +131,7 @@ function SignalItem({
       <div className="flex-1 min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-3 mb-1">
           <span
-            className="text-[10px] uppercase shrink-0"
+            className="text-[14px] uppercase shrink-0"
             style={{
               color: tone.fg,
               letterSpacing: '0.22em',
@@ -134,7 +142,7 @@ function SignalItem({
             {label}
           </span>
           <span
-            className="text-[16px] sm:text-[17px] mt-1 sm:mt-0"
+            className="text-[18px] mt-1 sm:mt-0"
             style={{
               ...tabularNums,
               color: colors.textPrimary,
@@ -147,7 +155,7 @@ function SignalItem({
           </span>
         </div>
         <div
-          className="text-[13px]"
+          className="text-[16px]"
           style={{
             ...tabularNums,
             color: colors.textTertiary,

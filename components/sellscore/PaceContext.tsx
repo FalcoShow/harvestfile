@@ -1,4 +1,12 @@
 // components/sellscore/PaceContext.tsx
+// =============================================================================
+// M-03 (May 18, 2026) typography pass:
+//   - "Marketing Pace" eyebrow bumped from text-[10px] to text-[14px].
+//   - "Behind pace" status label bumped from text-sm to text-[18px].
+//   - "Target by May 18: 71%" supporting line bumped from text-[13px] to
+//     text-[16px].
+// =============================================================================
+
 import type { PaceDisplay } from '@/lib/sellscore/display-types';
 import { colors, fonts, tabularNums } from './_tokens';
 
@@ -23,7 +31,7 @@ export default function PaceContext({ pace }: PaceContextProps) {
       }}
     >
       <div
-        className="text-[10px] uppercase mb-5"
+        className="text-[14px] uppercase mb-5"
         style={{
           color: colors.textTertiary,
           letterSpacing: '0.22em',
@@ -53,7 +61,7 @@ export default function PaceContext({ pace }: PaceContextProps) {
         </p>
 
         <div
-          className="text-sm whitespace-nowrap"
+          className="text-[18px] whitespace-nowrap"
           style={{
             fontFamily: fonts.body,
             color: statusColor,
@@ -68,7 +76,7 @@ export default function PaceContext({ pace }: PaceContextProps) {
       <PaceBar ytd={ytd_pct} target={target_pct} status={status} />
 
       <div
-        className="mt-5 text-[13px]"
+        className="mt-5 text-[16px]"
         style={{
           color: colors.textTertiary,
           fontFamily: fonts.body,

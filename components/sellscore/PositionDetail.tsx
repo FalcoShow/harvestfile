@@ -6,6 +6,15 @@
 // crop: unsold bushels (the headline), total expected (context), pricing pace
 // vs target, and breakeven reference. When all bushels are priced, the card
 // shifts to a quieter "All priced" state.
+//
+// M-03 (May 18, 2026) typography pass:
+//   - "Position" section label bumped from text-[10px] to text-[14px].
+//   - Crop name labels (CORN, SOYBEANS) bumped from text-[12px] to text-[14px].
+//   - "% priced" percentage bumped from text-[12px] to text-[14px].
+//   - "of 50,000 bu expected" supporting line bumped from text-[13px] to
+//     text-[16px].
+//   - "Breakeven ... county default" footer bumped from text-[12px] to
+//     text-[16px].
 // =============================================================================
 
 import type { CropPosition } from '@/lib/sellscore/types';
@@ -29,7 +38,7 @@ export default function PositionDetail({ positions }: PositionDetailProps) {
       style={{ borderTop: `1px solid ${colors.borderSubtle}` }}
     >
       <div
-        className="text-[10px] uppercase mb-6"
+        className="text-[14px] uppercase mb-6"
         style={{
           color: colors.textTertiary,
           letterSpacing: '0.22em',
@@ -69,7 +78,7 @@ function PositionCard({ position }: { position: CropPosition }) {
     >
       <div className="flex items-baseline justify-between mb-5">
         <h3
-          className="text-[12px] uppercase"
+          className="text-[14px] uppercase"
           style={{
             color: colors.textSecondary,
             letterSpacing: '0.22em',
@@ -80,7 +89,7 @@ function PositionCard({ position }: { position: CropPosition }) {
           {cropLabel}
         </h3>
         <span
-          className="text-[12px]"
+          className="text-[14px]"
           style={{
             ...tabularNums,
             color: paceColor,
@@ -107,7 +116,7 @@ function PositionCard({ position }: { position: CropPosition }) {
         {allPriced ? 'All priced' : `${formatters.bushels(position.unsold_bushels)} bu`}
       </div>
       <div
-        className="text-[13px] mt-2"
+        className="text-[16px] mt-2"
         style={{
           ...tabularNums,
           color: colors.textTertiary,
@@ -124,7 +133,7 @@ function PositionCard({ position }: { position: CropPosition }) {
       <PaceMeter pricing={position.pricing_pace_pct} target={target} />
 
       <div
-        className="text-[12px] mt-5 pt-4"
+        className="text-[16px] mt-5 pt-4"
         style={{
           color: colors.textTertiary,
           fontFamily: fonts.body,

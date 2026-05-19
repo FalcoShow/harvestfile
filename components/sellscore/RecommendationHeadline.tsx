@@ -1,4 +1,9 @@
 // components/sellscore/RecommendationHeadline.tsx
+// =============================================================================
+// M-03 (May 18, 2026) typography pass:
+//   - "Today · Status" eyebrow bumped from text-[11px] to text-[14px].
+// =============================================================================
+
 import type { Recommendation } from '@/lib/sellscore/types';
 import type { ElevatorDisplay } from '@/lib/sellscore/display-types';
 import { colors, fonts, formatters, tabularNums } from './_tokens';
@@ -20,7 +25,7 @@ export default function RecommendationHeadline({
   return (
     <section className="px-6 sm:px-10 pt-12 sm:pt-16 pb-10 sm:pb-12">
       <div
-        className="text-[11px] uppercase mb-6"
+        className="text-[14px] uppercase mb-6"
         style={{
           color: colors.textTertiary,
           letterSpacing: '0.22em',

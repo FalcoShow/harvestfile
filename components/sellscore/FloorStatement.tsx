@@ -11,7 +11,13 @@
 //   sentence "Even if soybean prices fall further..." reads correctly
 //   regardless of crop. Plural crop names (soybeans) normalize to singular
 //   nouns (soybean) for natural reading. Also tightened "for the marketing
-//   year" → "through the marketing year".
+//   year" to "through the marketing year".
+//
+// M-03 (May 18, 2026) typography pass:
+//   - "Downside Protection" eyebrow bumped from text-[10px] to text-[14px].
+//   - Downside protection paragraph bumped from text-[15px] sm:text-base to
+//     text-[18px] for clear 18px floor compliance.
+//   - "Built from ..." footer bumped from text-[13px] to text-[16px].
 // =============================================================================
 
 import type { FloorDisplay } from '@/lib/sellscore/display-types';
@@ -42,7 +48,7 @@ export default function FloorStatement({ floor, cropContext }: FloorStatementPro
       }}
     >
       <div
-        className="text-[10px] uppercase mb-6"
+        className="text-[14px] uppercase mb-6"
         style={{
           color: colors.textTertiary,
           letterSpacing: '0.22em',
@@ -96,7 +102,7 @@ export default function FloorStatement({ floor, cropContext }: FloorStatementPro
       </div>
 
       <p
-        className="text-[15px] sm:text-base mb-2.5"
+        className="text-[18px] mb-2.5"
         style={{
           color: colors.textSecondary,
           fontFamily: fonts.body,
@@ -111,7 +117,7 @@ export default function FloorStatement({ floor, cropContext }: FloorStatementPro
       </p>
 
       <p
-        className="text-[13px]"
+        className="text-[16px]"
         style={{
           color: colors.textTertiary,
           fontFamily: fonts.body,
