@@ -12,29 +12,35 @@
 //   auth.uid() -> farms.owner_id (short, sellscore-style)
 // Plus a professionals lookup by auth_id for the display name.
 //
-// Manage subscription is a native HTML form that POSTs to /api/stripe/portal.
-// The endpoint creates a Stripe Customer Portal session and returns a 303
-// redirect to Stripe's hosted page. Native form POST follows that redirect
-// without client-side JavaScript. Tested on iPhone Safari and Android Chrome.
+// Manage subscription is the ManageSubscriptionButton client component
+// (M-02c). It POSTs to /api/stripe/portal via fetch, reads the JSON
+// response containing a Stripe Billing Portal session URL, and sets
+// window.location.href to navigate. See that component's header for
+// the full reasoning.
 //
 // Typography: 18px floor for all body/label/value text per the 58+
 // demographic constraint. Section headers use larger sizes. The same
 // dark mode palette as /sellscore/me (#0a0f0d page, #131918 cards).
 //
 // M-02b fix (May 18, 2026):
-//   - Stripe portal: replaced Next.js <Link> (GET) with native form POST.
-//     Production verification surfaced HTTP 405 from the GET attempt. The
-//     endpoint is POST-only by Stripe convention.
 //   - Status display: formatSubscriptionStatus now treats sellscore_active
 //     as the authoritative source for "Active". Production verification
 //     surfaced "Inactive" rendering for a user with confirmed product
 //     access because the raw subscription_status column held a non-standard
 //     "inactive" string that hit the default case. The boolean wins.
+//
+// M-02c fix (May 18, 2026):
+//   - Stripe portal: replaced native form POST with a client component
+//     that fetches the endpoint and navigates manually. The endpoint
+//     returns JSON, not a redirect, so form POST rendered raw JSON to
+//     the user instead of navigating to Stripe. The endpoint itself is
+//     unchanged because other callers may depend on the JSON shape.
 // =============================================================================
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SignOutButton from '@/components/sellscore/SignOutButton';
+import ManageSubscriptionButton from '@/components/sellscore/ManageSubscriptionButton';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -134,36 +140,9 @@ export default async function SellScoreSettingsPage() {
         <Section title="Subscription">
           <Field label="Plan" value="Sell Score" />
           <Field label="Status" value={subscriptionStatus} />
-          <form
-            action="/api/stripe/portal"
-            method="POST"
-            style={{ marginTop: '20px' }}
-          >
-            <button
-              type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '48px',
-                padding: '0 20px',
-                backgroundColor: '#34D399',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#0a0f0d',
-                cursor: 'pointer',
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                fontFamily:
-                  '"Bricolage Grotesque", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-                letterSpacing: '-0.005em',
-              }}
-            >
-              Manage subscription
-            </button>
-          </form>
+          <div style={{ marginTop: '20px' }}>
+            <ManageSubscriptionButton />
+          </div>
         </Section>
 
         {/* Sign out section */}
