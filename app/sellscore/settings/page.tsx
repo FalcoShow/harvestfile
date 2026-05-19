@@ -12,19 +12,27 @@
 //   auth.uid() -> farms.owner_id (short, sellscore-style)
 // Plus a professionals lookup by auth_id for the display name.
 //
-// Manage subscription is a Link to /api/stripe/portal. That endpoint
-// creates a Stripe Customer Portal session and redirects. If the user
-// has no Stripe customer_id (shouldn't happen for an active Sell Score
-// subscriber, but defensive), the portal endpoint will surface its own
-// error rather than this page failing silently.
+// Manage subscription is a native HTML form that POSTs to /api/stripe/portal.
+// The endpoint creates a Stripe Customer Portal session and returns a 303
+// redirect to Stripe's hosted page. Native form POST follows that redirect
+// without client-side JavaScript. Tested on iPhone Safari and Android Chrome.
 //
 // Typography: 18px floor for all body/label/value text per the 58+
 // demographic constraint. Section headers use larger sizes. The same
 // dark mode palette as /sellscore/me (#0a0f0d page, #131918 cards).
+//
+// M-02b fix (May 18, 2026):
+//   - Stripe portal: replaced Next.js <Link> (GET) with native form POST.
+//     Production verification surfaced HTTP 405 from the GET attempt. The
+//     endpoint is POST-only by Stripe convention.
+//   - Status display: formatSubscriptionStatus now treats sellscore_active
+//     as the authoritative source for "Active". Production verification
+//     surfaced "Inactive" rendering for a user with confirmed product
+//     access because the raw subscription_status column held a non-standard
+//     "inactive" string that hit the default case. The boolean wins.
 // =============================================================================
 
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import SignOutButton from '@/components/sellscore/SignOutButton';
 
@@ -126,9 +134,13 @@ export default async function SellScoreSettingsPage() {
         <Section title="Subscription">
           <Field label="Plan" value="Sell Score" />
           <Field label="Status" value={subscriptionStatus} />
-          <div style={{ marginTop: '20px' }}>
-            <Link
-              href="/api/stripe/portal"
+          <form
+            action="/api/stripe/portal"
+            method="POST"
+            style={{ marginTop: '20px' }}
+          >
+            <button
+              type="submit"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -136,17 +148,22 @@ export default async function SellScoreSettingsPage() {
                 minHeight: '48px',
                 padding: '0 20px',
                 backgroundColor: '#34D399',
+                border: 'none',
                 borderRadius: '10px',
                 fontSize: '18px',
                 fontWeight: 600,
                 color: '#0a0f0d',
-                textDecoration: 'none',
+                cursor: 'pointer',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                fontFamily:
+                  '"Bricolage Grotesque", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
                 letterSpacing: '-0.005em',
               }}
             >
               Manage subscription
-            </Link>
-          </div>
+            </button>
+          </form>
         </Section>
 
         {/* Sign out section */}
@@ -241,26 +258,33 @@ function Field({ label, value }: { label: string; value: string }) {
 // Helpers
 // =============================================================================
 
+// M-02b (May 18, 2026): sellscore_active is the source of truth for whether
+// the user has product access today. If it's true, render "Active" and
+// ignore the raw Stripe lifecycle status. Raw status only matters when
+// access is denied, to explain why (canceled, past due, unpaid, etc.).
 function formatSubscriptionStatus(
   rawStatus: string | null | undefined,
   isActive: boolean | null | undefined,
 ): string {
-  if (isActive === false) return 'Canceled';
-  if (!rawStatus) return isActive ? 'Active' : 'Unknown';
+  if (isActive === true) return 'Active';
+
+  // isActive is false, null, or undefined. Use rawStatus to label why.
+  if (!rawStatus) return 'Inactive';
   switch (rawStatus) {
-    case 'active':
-    case 'trialing':
-      return 'Active';
-    case 'past_due':
-      return 'Past due';
     case 'canceled':
       return 'Canceled';
+    case 'past_due':
+      return 'Past due';
     case 'unpaid':
       return 'Unpaid';
     case 'incomplete':
     case 'incomplete_expired':
       return 'Incomplete';
+    case 'paused':
+      return 'Paused';
     default:
-      return rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+      return (
+        rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase()
+      );
   }
 }
