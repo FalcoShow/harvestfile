@@ -15,6 +15,7 @@
 //   2. sellscore_recommendations → today's recommendation (if compute ran)
 //   3. sellscore_elevators (is_primary=true) → reference elevator info
 //   4. grain_positions    → per-crop expected/contracted for pace calc
+//   5. professionals      → real first name for greeting (M-01, May 18)
 //
 // If no recommendation exists, shows "Preparing your first Sell Score"
 // empty state. Onboard attempts inline compute; if Barchart fails, the
@@ -36,6 +37,17 @@
 //     GREEN/AMBER/RED → label mapping is inverted relative to
 //     rationale.ts paceDetail and needs its own commit after a deeper
 //     signals.ts audit.
+//
+// May 18, 2026 M-01 username fix:
+//   - farmerFirstName(email) removed. Greeting was rendering the email
+//     local-part ("Andrewangerstien1502") as the display name, which read
+//     as broken software in the mobile audit.
+//   - Replaced with extractFirstName(fullName) which reads the linked
+//     professional record's full_name column and returns the first
+//     whitespace-delimited word ("Andrew Angerstien" -> "Andrew").
+//   - professionals.auth_id is the join column (nullable). If no
+//     professional record exists for this auth user, or full_name is
+//     empty, extractFirstName falls back to 'farmer'.
 // =============================================================================
 
 import { redirect } from 'next/navigation';
@@ -102,6 +114,15 @@ export default async function SellScoreMePage() {
     redirect('/onboard');
   }
 
+  // M-01 (May 18, 2026): look up the professional record for this user's
+  // real first name. Link column is auth_id (nullable). If no record exists
+  // or full_name is empty, extractFirstName falls back to 'farmer'.
+  const { data: professional } = await supabase
+    .from('professionals')
+    .select('full_name')
+    .eq('auth_id', user.id)
+    .maybeSingle();
+
   // Latest recommendation across any crop for this farm
   const { data: latestRec } = await supabase
     .from('sellscore_recommendations')
@@ -140,7 +161,7 @@ export default async function SellScoreMePage() {
     latestRec,
     primaryElevator,
     positionRows ?? [],
-    user.email ?? '',
+    professional?.full_name ?? null,
   );
 
   return (
@@ -167,10 +188,10 @@ function composeScreenData(
   rec: any,
   elevator: any,
   positionRows: PositionRow[],
-  userEmail: string,
+  professionalFullName: string | null,
 ): SellScoreScreenData {
   // ── Farm context ───────────────────────────────────────────────────────
-  const firstName = farmerFirstName(userEmail);
+  const firstName = extractFirstName(professionalFullName);
   const today = new Date(rec.recommendation_date);
   const dateLabel = today.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -346,10 +367,22 @@ function composeScreenData(
 // Helpers
 // =============================================================================
 
-function farmerFirstName(email: string): string {
-  const local = email.split('@')[0];
-  if (!local) return 'farmer';
-  return local.charAt(0).toUpperCase() + local.slice(1).toLowerCase();
+// M-01 (May 18, 2026): replaces farmerFirstName(email).
+// Source of truth is professionals.full_name. Returns the first
+// whitespace-delimited word, preserving the original casing the user
+// entered. Falls back to 'farmer' if the full_name is null, undefined,
+// empty, or whitespace-only. Examples:
+//   "Andrew Angerstien" -> "Andrew"
+//   "Mary Jane Watson"  -> "Mary"
+//   "McDonald"          -> "McDonald"
+//   "  "                -> "farmer"
+//   null                -> "farmer"
+function extractFirstName(fullName: string | null | undefined): string {
+  if (!fullName) return 'farmer';
+  const trimmed = fullName.trim();
+  if (!trimmed) return 'farmer';
+  const firstWord = trimmed.split(/\s+/)[0];
+  return firstWord;
 }
 
 function isV1Crop(crop: string): crop is Crop {
