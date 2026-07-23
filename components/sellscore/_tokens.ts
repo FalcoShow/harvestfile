@@ -64,4 +64,17 @@ export const formatters = {
   cents: (n: number) => `${n > 0 ? '+' : ''}${Math.round(n)}¢`,
   percent: (n: number) => `${Math.round(n)}%`,
   perAcre: (n: number) => `$${Math.round(n)}/ac`,
+  // Percentile copy fix (July 23, 2026): always round to an integer before
+  // attaching the ordinal suffix. "14.3th percentile" read as broken
+  // software in the live screenshots; "14th percentile" is the spec voice.
+  ordinal: (n: number) => {
+    const r = Math.round(n);
+    const j = r % 10;
+    const k = r % 100;
+    const suffix =
+      j === 1 && k !== 11 ? 'st' :
+      j === 2 && k !== 12 ? 'nd' :
+      j === 3 && k !== 13 ? 'rd' : 'th';
+    return `${r}${suffix}`;
+  },
 };

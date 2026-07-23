@@ -24,7 +24,7 @@ export default function SupportingRow({ supporting }: SupportingRowProps) {
         <Figure
           label="Basis"
           value={formatters.cents(supporting.basis_cents)}
-          subtitle={`${supporting.basis_percentile}th pct vs 3-yr norm`}
+          subtitle={`${formatters.ordinal(supporting.basis_percentile)} pct vs 3-yr norm`}
         />
         <VerticalDivider />
         <Figure

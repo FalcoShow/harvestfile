@@ -9,10 +9,16 @@
 //
 // Two semantic translations worth understanding:
 //
-// 1. Pace inversion. The engine's pace level represents action urgency:
-//    GREEN means "behind pace, urgent to sell now to catch up." The
-//    display's pace status represents farmer state: 'behind' is a warning
-//    in the visualization. The adapter flips these correctly.
+// 1. Pace semantics (July 23, 2026 fix — v6.6 backlog #1). Engine pace
+//    level per spec §4.4: GREEN = at or behind target ("urgency to sell,
+//    room to catch up"), AMBER = slightly ahead (within 5pp), RED =
+//    materially ahead (no selling urgency). The display signal now maps
+//    DIRECTLY (GREEN→green etc.) — a behind-pace farmer sees a green
+//    pace dot, because green means "this signal favors selling today."
+//    The previous inversion (GREEN→'red') read as a warning on the very
+//    state the engine considers most actionable and cancelled out with a
+//    second inversion in the label copy. Only the human-readable STATE
+//    words ("Behind pace — room to sell") are derived separately.
 //
 // 2. Action mapping. Engine returns 'SELL' | 'WATCH' | 'HOLD' | 'OUT_OF_SEASON'.
 //    Display uses 'sell' | 'hold' | 'pace_alert' | 'out_of_season'.
@@ -60,6 +66,10 @@ export interface AdapterInput {
 type EngineLevel = 'GREEN' | 'AMBER' | 'RED';
 type EngineAction = 'SELL' | 'WATCH' | 'HOLD' | 'OUT_OF_SEASON';
 
+/**
+ * Direct engine-level → display-signal mapping, used for ALL THREE
+ * signals including pace (spec §4.4 semantics carried verbatim).
+ */
 function mapSignalLevel(level: EngineLevel): SignalStatus {
   switch (level) {
     case 'GREEN': return 'green';
@@ -69,30 +79,21 @@ function mapSignalLevel(level: EngineLevel): SignalStatus {
 }
 
 /**
- * Maps engine pace level to display pace status. Inverted from action
- * urgency to farmer state: engine GREEN (behind, urgent) → display 'behind'
- * (visualized as warning); engine AMBER (close to target) → 'on_pace';
- * engine RED (ahead by ≥5pp) → 'ahead'.
+ * Maps engine pace level to the farmer-state word. This is a STATE
+ * descriptor, not a warning level: engine GREEN covers the whole
+ * at-or-behind range, so it splits on whether the farmer has actually
+ * reached target; AMBER (0–5pp ahead) and RED (>5pp ahead) both read
+ * as ahead-of-target states.
  */
-function mapPaceStatus(paceLevel: EngineLevel): 'on_pace' | 'behind' | 'ahead' {
+function mapPaceStatus(
+  paceLevel: EngineLevel,
+  currentPctSold: number,
+  targetPctSold: number,
+): 'on_pace' | 'behind' | 'ahead' {
   switch (paceLevel) {
-    case 'GREEN': return 'behind';
+    case 'GREEN': return currentPctSold >= targetPctSold ? 'on_pace' : 'behind';
     case 'AMBER': return 'on_pace';
     case 'RED':   return 'ahead';
-  }
-}
-
-/**
- * Maps engine pace level to display pace_signal SignalStatus. Same
- * inversion: engine GREEN (behind) reads as a 'red' warning in the signal
- * row; engine AMBER reads as 'green' (no warning); engine RED reads as
- * 'yellow' (mild caution: ahead of pace).
- */
-function mapPaceSignalStatus(paceLevel: EngineLevel): SignalStatus {
-  switch (paceLevel) {
-    case 'GREEN': return 'red';
-    case 'AMBER': return 'green';
-    case 'RED':   return 'yellow';
   }
 }
 
@@ -106,15 +107,24 @@ function mapRecommendationType(
   return 'hold';
 }
 
+/**
+ * Pace status label, voice-spec aligned with rationale.ts paceDetail:
+ * behind pace is stated plainly and framed as capacity ("room to sell"),
+ * matching the green signal it accompanies.
+ */
 function paceStatusLabel(
-  status: 'on_pace' | 'behind' | 'ahead',
+  paceLevel: EngineLevel,
   currentPctSold: number,
+  targetPctSold: number,
 ): string {
   if (currentPctSold >= 99.5) return 'Marketing year complete';
-  switch (status) {
-    case 'on_pace': return 'On pace';
-    case 'behind':  return 'Behind pace';
-    case 'ahead':   return 'Ahead of pace';
+  switch (paceLevel) {
+    case 'GREEN':
+      return currentPctSold >= targetPctSold
+        ? 'On pace'
+        : 'Behind pace — room to sell';
+    case 'AMBER': return 'Slightly ahead of pace';
+    case 'RED':   return 'Ahead of pace';
   }
 }
 
@@ -157,7 +167,11 @@ export function toSellScoreScreenData(input: AdapterInput): SellScoreScreenData 
     engine.rationale.action,
     engine.signals.pace.level,
   );
-  const paceStatus = mapPaceStatus(engine.signals.pace.level);
+  const paceStatus = mapPaceStatus(
+    engine.signals.pace.level,
+    engine.currentPctSold,
+    engine.targetPctSold,
+  );
   const isSell = recommendationType === 'sell';
 
   const cashBid = engine.signals.margin.cashBid;
@@ -178,7 +192,7 @@ export function toSellScoreScreenData(input: AdapterInput): SellScoreScreenData 
     recommended_cash_bid: cashBid,
     margin_signal: mapSignalLevel(engine.signals.margin.level),
     basis_signal: mapSignalLevel(engine.signals.basis.level),
-    pace_signal: mapPaceSignalStatus(engine.signals.pace.level),
+    pace_signal: mapSignalLevel(engine.signals.pace.level),
     current_basis: todayBasis,
     basis_3yr_percentile: basisPercentile,
     effective_floor: STATUTORY_FLOORS[engine.crop]?.dollars_per_bu ?? null,
@@ -208,7 +222,11 @@ export function toSellScoreScreenData(input: AdapterInput): SellScoreScreenData 
     target_pct: Math.round(engine.targetPctSold),
     target_date_label: formatTargetDate(today),
     status: paceStatus,
-    status_label: paceStatusLabel(paceStatus, engine.currentPctSold),
+    status_label: paceStatusLabel(
+      engine.signals.pace.level,
+      engine.currentPctSold,
+      engine.targetPctSold,
+    ),
   };
 
   const floor = STATUTORY_FLOORS[engine.crop] ?? STATUTORY_FLOORS.corn;
@@ -230,6 +248,7 @@ export function toSellScoreScreenData(input: AdapterInput): SellScoreScreenData 
     context,
     recommendation,
     headline: engine.rationale.headline,
+    signal_summary: engine.rationale.signalSummary,
     supporting,
     pace,
     elevator: elevatorDisplay,

@@ -5,22 +5,29 @@
 //   - "Behind pace" status label bumped from text-sm to text-[18px].
 //   - "Target by May 18: 71%" supporting line bumped from text-[13px] to
 //     text-[16px].
+//
+// July 23, 2026 (v6.6 backlog #1): status label and bar now take their
+// color from the PACE SIGNAL itself (spec §4.4 semantics: at-or-behind =
+// GREEN, urgency to sell), not from a re-derived farmer-state word. The
+// previous status→color mapping painted "behind" warm red — the exact
+// inversion the engine semantics forbid. `pace.status` remains in the
+// display contract as a state descriptor but no longer drives color.
 // =============================================================================
 
 import type { PaceDisplay } from '@/lib/sellscore/display-types';
-import { colors, fonts, tabularNums } from './_tokens';
+import type { SignalStatus } from '@/lib/sellscore/types';
+import { colors, fonts, signalColors, tabularNums } from './_tokens';
 
 interface PaceContextProps {
   pace: PaceDisplay;
+  /** The recommendation's pace signal — drives label + bar color */
+  signal: SignalStatus;
 }
 
-export default function PaceContext({ pace }: PaceContextProps) {
-  const { ytd_pct, target_pct, target_date_label, status, status_label } = pace;
+export default function PaceContext({ pace, signal }: PaceContextProps) {
+  const { ytd_pct, target_pct, target_date_label, status_label } = pace;
 
-  const statusColor =
-    status === 'on_pace' ? colors.emerald :
-    status === 'behind' ? colors.warmRed :
-    colors.amber;
+  const statusColor = signalColors[signal].fg;
 
   return (
     <section
@@ -73,7 +80,7 @@ export default function PaceContext({ pace }: PaceContextProps) {
         </div>
       </div>
 
-      <PaceBar ytd={ytd_pct} target={target_pct} status={status} />
+      <PaceBar ytd={ytd_pct} target={target_pct} fillColor={statusColor} />
 
       <div
         className="mt-5 text-[16px]"
@@ -97,18 +104,14 @@ export default function PaceContext({ pace }: PaceContextProps) {
 function PaceBar({
   ytd,
   target,
-  status,
+  fillColor,
 }: {
   ytd: number;
   target: number;
-  status: PaceDisplay['status'];
+  fillColor: string;
 }) {
   const ytdClamped = Math.min(100, Math.max(0, ytd));
   const targetClamped = Math.min(100, Math.max(0, target));
-  const fillColor =
-    status === 'on_pace' ? colors.emerald :
-    status === 'behind' ? colors.warmRed :
-    colors.amber;
 
   return (
     <div

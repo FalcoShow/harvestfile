@@ -65,8 +65,17 @@ function PositionCard({ position }: { position: CropPosition }) {
   const cropLabel = CROP_LABELS[position.crop] ?? position.crop;
   const allPriced = position.unsold_bushels === 0;
   const target = position.target_pace_pct ?? 0;
-  const onPace = target > 0 ? position.pricing_pace_pct >= target : true;
-  const paceColor = onPace ? colors.emerald : colors.amber;
+  // July 23, 2026 (v6.6 backlog #1): per-crop pace chip follows spec §4.4
+  // semantics — at-or-behind target is GREEN (room to sell), 0–5pp ahead
+  // is AMBER, >5pp ahead is warm red. Previously behind-target rendered
+  // amber, the same inversion fixed in PaceContext/persist.
+  const gapPp = position.pricing_pace_pct - target;
+  const paceColor =
+    target <= 0 || gapPp <= 0
+      ? colors.emerald
+      : gapPp <= 5
+        ? colors.amber
+        : colors.warmRed;
 
   return (
     <article

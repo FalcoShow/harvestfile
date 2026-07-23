@@ -311,16 +311,21 @@ function mapToRecommendationRow(
 
   const isSell = recommendationType === 'sell';
 
-  // Margin and basis use direct mapping (GREEN/AMBER/RED → green/yellow/red).
-  // Pace uses INVERTED mapping per adapter.ts "Pace inversion":
-  //   engine GREEN ("behind, urgent to sell") → display 'red' (warning).
-  //   engine AMBER ("close to target")        → display 'green' (no warning).
-  //   engine RED   ("ahead of target")        → display 'yellow' (caution).
+  // ALL THREE signals use direct mapping (GREEN/AMBER/RED → green/yellow/red).
+  //
+  // July 23, 2026 fix (v6.6 backlog #1, HIGH): pace previously used an
+  // inverted mapping (engine GREEN → 'red') on the theory that "behind pace"
+  // should render as a warning. That contradicted spec §4.4 — behind pace is
+  // GREEN (urgency to sell = the signal favors action) — and produced the
+  // July 23 live screenshot showing amber/orange pace at 45% priced vs 88%
+  // target. The stored signal now carries engine semantics verbatim; the
+  // human-readable state ("Behind pace — room to sell") is derived at the
+  // display layer (app/sellscore/me/page.tsx, lib/sellscore/adapter.ts).
+  //
+  // Data note: rows written before this fix carry the inverted pace_signal
+  // until their next recompute (4 AM cron or POST /api/sellscore/compute).
   const directSignal = (level: 'GREEN' | 'AMBER' | 'RED'): string =>
     level === 'GREEN' ? 'green' : level === 'AMBER' ? 'yellow' : 'red';
-
-  const invertedPace = (level: 'GREEN' | 'AMBER' | 'RED'): string =>
-    level === 'GREEN' ? 'red' : level === 'AMBER' ? 'green' : 'yellow';
 
   // Build a multi-line rationale string the /sellscore/me page can split
   // (the page takes the first non-empty line as the headline and uses the
@@ -349,7 +354,7 @@ function mapToRecommendationRow(
     recommended_cash_bid: round2(r.signals.margin.cashBid),
     margin_signal: directSignal(r.signals.margin.level),
     basis_signal: directSignal(r.signals.basis.level),
-    pace_signal: invertedPace(r.signals.pace.level),
+    pace_signal: directSignal(r.signals.pace.level),
     current_basis: round4(r.signals.basis.todayBasis),
     basis_3yr_percentile: round1(r.signals.basis.percentileRank),
     // v1: leave null. v1.1 will compute ARC/PLC + crop insurance floor.

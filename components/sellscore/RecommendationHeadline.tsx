@@ -2,6 +2,12 @@
 // =============================================================================
 // M-03 (May 18, 2026) typography pass:
 //   - "Today · Status" eyebrow bumped from text-[11px] to text-[14px].
+//
+// July 23, 2026 (v6.6 backlog #8): renders the voice-spec signalSummary
+// sentence directly under the headline ("Margin and basis say sell. Pace
+// is the blocker. Wait for the third signal."). The summary was being
+// written to the DB on every compute but never displayed. 18px floor for
+// the 58+ demographic.
 // =============================================================================
 
 import type { Recommendation } from '@/lib/sellscore/types';
@@ -12,12 +18,15 @@ interface RecommendationHeadlineProps {
   recommendation: Recommendation;
   elevator: ElevatorDisplay | null;
   headline: string;
+  /** Voice-spec one-line summary under the headline; hidden when null */
+  signalSummary?: string | null;
 }
 
 export default function RecommendationHeadline({
   recommendation,
   elevator,
   headline,
+  signalSummary,
 }: RecommendationHeadlineProps) {
   const eyebrow = getEyebrow(recommendation.recommendation_type);
   const accent = getAccentColor(recommendation.recommendation_type);
@@ -59,6 +68,22 @@ export default function RecommendationHeadline({
           <span>{headline}</span>
         )}
       </h2>
+
+      {signalSummary && (
+        <p
+          className="text-[18px] sm:text-[20px] mt-6"
+          style={{
+            fontFamily: fonts.body,
+            fontWeight: 400,
+            color: colors.textSecondary,
+            letterSpacing: '-0.008em',
+            lineHeight: 1.5,
+            maxWidth: '46ch',
+          }}
+        >
+          {signalSummary}
+        </p>
+      )}
 
       {accent && (
         <div

@@ -58,11 +58,18 @@ export default function SignalRow({
   // A5: quartile descriptor + null safety. Basis 3-yr percentile can come
   // back null on thin samples; the quartile label puts an instantly readable
   // word in front of the numeric percentile.
-  const basisPctile = recommendation.basis_3yr_percentile;
+  // July 23, 2026 (percentile copy fix): the DB stores one decimal place
+  // (persist.ts round1), which rendered "14.3th percentile." Round to an
+  // integer before building the ordinal, and derive the quartile word from
+  // the same rounded value so the copy stays internally consistent.
+  const basisPctile =
+    recommendation.basis_3yr_percentile == null
+      ? null
+      : Math.round(recommendation.basis_3yr_percentile);
   const basisSecondary =
     basisPctile == null
       ? 'Not enough basis history yet'
-      : `${quartileLabel(basisPctile)} · ${basisPctile}${ordinalSuffix(
+      : `${quartileLabel(basisPctile)} · ${formatters.ordinal(
           basisPctile
         )} percentile vs 3-yr norm`;
 
@@ -190,13 +197,4 @@ function quartileLabel(pctile: number): string {
   if (pctile >= 75) return 'Top quartile';
   if (pctile >= 25) return 'Mid-range';
   return 'Bottom quartile';
-}
-
-function ordinalSuffix(n: number): string {
-  const j = n % 10;
-  const k = n % 100;
-  if (j === 1 && k !== 11) return 'st';
-  if (j === 2 && k !== 12) return 'nd';
-  if (j === 3 && k !== 13) return 'rd';
-  return 'th';
 }

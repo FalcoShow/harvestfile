@@ -36,7 +36,7 @@ export interface PaceDisplay {
   /** Display-formatted target date label, e.g. "May 5" */
   target_date_label: string;
   status: 'on_pace' | 'behind' | 'ahead';
-  /** Display-formatted status label, e.g. "On pace", "Behind pace", "Ahead of pace" */
+  /** Display-formatted status label, e.g. "On pace", "Behind pace — room to sell" */
   status_label: string;
 }
 
@@ -73,6 +73,15 @@ export interface SellScoreScreenData {
   recommendation: Recommendation;
   /** The composed display headline for the recommendation */
   headline: string;
+  /**
+   * Voice-spec one-line signal summary rendered directly under the headline
+   * ("Margin and basis say sell. Pace is the blocker. Wait for the third
+   * signal."). Written by the engine (rationale.ts signalSummary) and stored
+   * in sellscore_recommendations.rationale_text line 2. Null when the source
+   * row predates the summary or the line can't be recovered. (v6.6 backlog
+   * #8 fix, July 23, 2026.)
+   */
+  signal_summary: string | null;
   /** Three supporting figures shown for 'sell' recommendations; null otherwise */
   supporting: SupportingFigure | null;
   /** Pace context block — always present */

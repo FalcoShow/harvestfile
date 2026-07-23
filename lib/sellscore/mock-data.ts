@@ -12,6 +12,17 @@
 //  - Cash prices reflect typical NE Ohio May spreads
 //  - Basis percentiles reflect realistic 3-year same-date distributions
 //  - Pace milestones follow the old-crop calendar from the v1 spec
+//
+// July 23, 2026 (v6.6 backlog #1 + #8): scenarios re-anchored to the
+// corrected pace semantics (spec §4.4: at-or-behind = green signal) and
+// given signal_summary lines matching the rationale.ts voice:
+//  - SELL day now has the farmer slightly BEHIND pace (38% vs 40%) —
+//    engine policy requires pace GREEN for a 3-green SELL, so the old
+//    42%-vs-40% mock could never occur live.
+//  - HOLD day is 1pp ahead → pace signal yellow ("Slightly ahead").
+//  - PACE ALERT is behind pace → pace signal green with amber/yellow
+//    margin+basis blocking the sale (that combination IS the pace_alert
+//    state: HOLD + pace GREEN).
 // =============================================================================
 
 import type { CropPosition, Recommendation, RecommendationType } from './types';
@@ -76,6 +87,9 @@ const floor = {
 };
 
 // ─── Scenario 1: SELL — all three signals green ──────────────────────────────
+// Pace green means at-or-behind target (spec §4.4): the farmer is 38%
+// priced against a 40% milestone, which is exactly the state where the
+// engine fires a sell — room to catch up on a strong-basis day.
 
 const sellRecommendation: Recommendation = {
   farm_id: FARM_ID,
@@ -96,7 +110,7 @@ const sellRecommendation: Recommendation = {
     'Why we recommend selling 2,500 bu of corn today:\n\n' +
     'Margin: $4.85 cash bid is $0.25 above your breakeven of $4.60\n' +
     'Basis: -55¢ today, in the 78th percentile of the last 3 years for early May\n' +
-    'Pace: You\'re 42% priced. Target is 40%. Selling 2,500 bu brings you to 44%, slightly ahead.\n\n' +
+    'Pace: You\'re 38% priced. Target is 40%. Selling 2,500 bu brings you to 40%, right on target.\n\n' +
     'Past performance does not guarantee future results.',
 };
 
@@ -104,6 +118,8 @@ const sellScenario: SellScoreScreenData = {
   context: farmContext,
   recommendation: sellRecommendation,
   headline: 'Sell 2,500 bu of corn today at Buckeye Feed and Grain.',
+  signal_summary:
+    'All three signals line up today. Basis is in the top quartile of recent prices, you\'re behind sales pace with room to catch up, and the cash bid clears your margin target.',
   supporting: {
     cash_price_per_bu: 4.85,
     basis_cents: -55,
@@ -111,11 +127,11 @@ const sellScenario: SellScoreScreenData = {
     profit_per_acre: 52,
   },
   pace: {
-    ytd_pct: 42,
+    ytd_pct: 38,
     target_pct: 40,
     target_date_label: 'May 5',
-    status: 'on_pace',
-    status_label: 'On pace',
+    status: 'behind',
+    status_label: 'Behind pace — room to sell',
   },
   elevator: {
     name: 'Buckeye Feed and Grain',
@@ -123,12 +139,18 @@ const sellScenario: SellScoreScreenData = {
     state: 'OH',
     distance_miles: 22,
   },
-  positions: allPositions,
+  positions: allPositions.map((p) =>
+    p.crop === 'corn'
+      ? { ...p, pricing_pace_pct: 38, unsold_bushels: 89280 }
+      : p
+  ),
   floor,
   breakevens,
 };
 
 // ─── Scenario 2: HOLD — most common state, no action warranted ───────────────
+// 41% priced vs 40% target = 1pp ahead → pace signal yellow (slightly
+// ahead, within the 5pp AMBER band). Margin green alone can't fire a sell.
 
 const holdRecommendation: Recommendation = {
   farm_id: FARM_ID,
@@ -141,7 +163,7 @@ const holdRecommendation: Recommendation = {
   recommended_cash_bid: 4.82,
   margin_signal: 'green',
   basis_signal: 'yellow',
-  pace_signal: 'green',
+  pace_signal: 'yellow',
   current_basis: -0.62,
   basis_3yr_percentile: 52,
   effective_floor: 4.10,
@@ -152,14 +174,15 @@ const holdRecommendation: Recommendation = {
 const holdScenario: SellScoreScreenData = {
   context: farmContext,
   recommendation: holdRecommendation,
-  headline: 'Hold today. You\'re on pace and basis is mid\u2011range.',
+  headline: 'Hold today. You\'re on pace and basis is mid‑range.',
+  signal_summary: 'Today\'s signals don\'t line up for a sale.',
   supporting: null,
   pace: {
     ytd_pct: 41,
     target_pct: 40,
     target_date_label: 'May 5',
     status: 'on_pace',
-    status_label: 'On pace',
+    status_label: 'Slightly ahead of pace',
   },
   elevator: null,
   positions: allPositions.map((p) =>
@@ -170,6 +193,10 @@ const holdScenario: SellScoreScreenData = {
 };
 
 // ─── Scenario 3: PACE ALERT — behind pace, conditions not ideal ──────────────
+// The pace_alert state IS "HOLD while pace is green": the farmer is 12pp
+// behind target (green signal — urgency to sell) but margin and basis are
+// both amber, blocking the sale. The pace signal renders green because it
+// favors action; the blockers render yellow.
 
 const paceAlertRecommendation: Recommendation = {
   farm_id: FARM_ID,
@@ -182,7 +209,7 @@ const paceAlertRecommendation: Recommendation = {
   recommended_cash_bid: 4.66,
   margin_signal: 'yellow',
   basis_signal: 'yellow',
-  pace_signal: 'red',
+  pace_signal: 'green',
   current_basis: -0.68,
   basis_3yr_percentile: 41,
   effective_floor: 4.10,
@@ -194,13 +221,15 @@ const paceAlertScenario: SellScoreScreenData = {
   context: farmContext,
   recommendation: paceAlertRecommendation,
   headline: 'Behind pace. You\'re 28% priced, target is 40%.',
+  signal_summary:
+    'You\'re 12 points behind pace, but today\'s bid doesn\'t clear your margin target. Watch for a stronger bid this week.',
   supporting: null,
   pace: {
     ytd_pct: 28,
     target_pct: 40,
     target_date_label: 'May 5',
     status: 'behind',
-    status_label: 'Behind pace',
+    status_label: 'Behind pace — room to sell',
   },
   elevator: null,
   positions: allPositions.map((p) =>
@@ -235,7 +264,9 @@ const outOfSeasonScenario: SellScoreScreenData = {
   context: { ...farmContext, date_label: 'Wednesday, January 14' },
   recommendation: outOfSeasonRecommendation,
   headline:
-    'No marketing today. Old\u2011crop is fully priced. New\u2011crop window opens March 15.',
+    'No marketing today. Old‑crop is fully priced. New‑crop window opens March 15.',
+  signal_summary:
+    'You\'ve finished marketing the 2025/26 crop. The 2026/27 marketing year begins September 1, 2026.',
   supporting: null,
   pace: {
     ytd_pct: 100,

@@ -47,13 +47,14 @@ export default function SellScoreScreen({ data }: SellScoreScreenProps) {
         recommendation={data.recommendation}
         elevator={data.elevator}
         headline={data.headline}
+        signalSummary={data.signal_summary}
       />
 
       {isSell && data.supporting && (
         <SupportingRow supporting={data.supporting} />
       )}
 
-      <PaceContext pace={data.pace} />
+      <PaceContext pace={data.pace} signal={data.recommendation.pace_signal} />
 
       <PrimaryActions recommendation={data.recommendation} />
 

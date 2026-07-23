@@ -33,10 +33,6 @@
 //     instead of the fragment "Behind pace."
 //   - PreparingFirstScore empty state adds the discipline-aid one-liner
 //     ("We don't predict prices. We enforce the same checklist...")
-//   - paceStatusLabelFromSignal intentionally left alone; the
-//     GREEN/AMBER/RED → label mapping is inverted relative to
-//     rationale.ts paceDetail and needs its own commit after a deeper
-//     signals.ts audit.
 //
 // May 18, 2026 M-01 username fix:
 //   - farmerFirstName(email) removed. Greeting was rendering the email
@@ -48,6 +44,25 @@
 //   - professionals.auth_id is the join column (nullable). If no
 //     professional record exists for this auth user, or full_name is
 //     empty, extractFirstName falls back to 'farmer'.
+//
+// July 23, 2026 signal-semantics fixes (v6.6 backlog #1 and #8):
+//   - Pace inversion resolved end-to-end. persist.ts now stores the engine
+//     pace level directly (spec §4.4: at-or-behind = GREEN, urgency to
+//     sell). paceStatusFromSignal / paceStatusLabelFromSignal here were
+//     rewritten to those semantics: green renders "Behind pace — room to
+//     sell" (or "On pace" when at target), yellow "Slightly ahead of
+//     pace", red "Ahead of pace". Labels and dot colors now agree instead
+//     of cancelling out.
+//   - Rows written BEFORE the persist.ts fix still carry the inverted
+//     pace_signal until their next recompute (4 AM cron or POST
+//     /api/sellscore/compute). We derive a fallback from live pace numbers
+//     when the stored value is missing, but we intentionally do not guess
+//     which convention a stored value used.
+//   - signalSummary (rationale_text line 2) is now surfaced under the
+//     headline via SellScoreScreenData.signal_summary.
+//   - basis_signal fallback no longer blanket-defaults to 'yellow'; when
+//     the column is null we re-derive from basis_3yr_percentile using the
+//     spec §4.4 thresholds (< 25th percentile = red).
 // =============================================================================
 
 import { redirect } from 'next/navigation';
@@ -216,6 +231,26 @@ function composeScreenData(
     state: farm.state ?? '',
   };
 
+  // ── Real pace (ytd + target) for the recommendation's crop ─────────────
+  // Computed BEFORE the recommendation object so signal fallbacks can be
+  // derived from live numbers when a stored signal column is null.
+  const recCrop = rec.crop as string;
+  const recPosition = positionRows.find((p) => p.commodity === recCrop);
+  const expectedForRec = Number(recPosition?.expected_bushels ?? 0);
+  const contractedForRec = Number(recPosition?.bushels_contracted ?? 0);
+
+  const ytdPct =
+    expectedForRec > 0
+      ? Math.round((contractedForRec / expectedForRec) * 100)
+      : 0;
+
+  // Target pace from calendar. Only meaningful for v1 engine crops. Wheat
+  // and sorghum get 0 because pace-calendar models corn/soybeans MY only.
+  let targetPct = 0;
+  if (isV1Crop(recCrop)) {
+    targetPct = Math.round(getTargetPaceForDate(recCrop as Crop, today));
+  }
+
   // ── Recommendation ─────────────────────────────────────────────────────
   const recommendation: Recommendation = {
     crop: rec.crop,
@@ -224,9 +259,13 @@ function composeScreenData(
     recommended_cash_bid: rec.recommended_cash_bid ?? null,
     current_basis: rec.current_basis ?? 0,
     basis_3yr_percentile: rec.basis_3yr_percentile ?? null,
-    margin_signal: (rec.margin_signal as SignalStatus) ?? 'yellow',
-    basis_signal: (rec.basis_signal as SignalStatus) ?? 'yellow',
-    pace_signal: (rec.pace_signal as SignalStatus) ?? 'yellow',
+    margin_signal: normalizeSignal(rec.margin_signal) ?? 'yellow',
+    basis_signal:
+      normalizeSignal(rec.basis_signal) ??
+      basisSignalFromPercentile(rec.basis_3yr_percentile),
+    pace_signal:
+      normalizeSignal(rec.pace_signal) ??
+      paceSignalFromGap(ytdPct - targetPct),
   } as Recommendation;
 
   // ── Elevator ───────────────────────────────────────────────────────────
@@ -250,24 +289,6 @@ function composeScreenData(
         }
       : null;
 
-  // ── Real pace (ytd + target) for the recommendation's crop ─────────────
-  const recCrop = rec.crop as string;
-  const recPosition = positionRows.find((p) => p.commodity === recCrop);
-  const expectedForRec = Number(recPosition?.expected_bushels ?? 0);
-  const contractedForRec = Number(recPosition?.bushels_contracted ?? 0);
-
-  const ytdPct =
-    expectedForRec > 0
-      ? Math.round((contractedForRec / expectedForRec) * 100)
-      : 0;
-
-  // Target pace from calendar. Only meaningful for v1 engine crops. Wheat
-  // and sorghum get 0 because pace-calendar models corn/soybeans MY only.
-  let targetPct = 0;
-  if (isV1Crop(recCrop)) {
-    targetPct = Math.round(getTargetPaceForDate(recCrop as Crop, today));
-  }
-
   const pace: PaceDisplay = {
     ytd_pct: ytdPct,
     target_pct: targetPct,
@@ -275,8 +296,12 @@ function composeScreenData(
       month: 'short',
       day: 'numeric',
     }),
-    status: paceStatusFromSignal(recommendation.pace_signal),
-    status_label: paceStatusLabelFromSignal(recommendation.pace_signal),
+    status: paceStatusFromSignal(recommendation.pace_signal, ytdPct, targetPct),
+    status_label: paceStatusLabelFromSignal(
+      recommendation.pace_signal,
+      ytdPct,
+      targetPct,
+    ),
   };
 
   // ── Positions (one card per primary crop) ──────────────────────────────
@@ -347,8 +372,9 @@ function composeScreenData(
     source_label: 'PLC reference + 85% RP + SCO',
   };
 
-  // ── Headline from rationale_text ───────────────────────────────────────
+  // ── Headline + signal summary from rationale_text ──────────────────────
   const headline = extractHeadline(rec.rationale_text, recommendation);
+  const signalSummary = extractSignalSummary(rec.rationale_text);
 
   return {
     context,
@@ -360,6 +386,7 @@ function composeScreenData(
     breakevens,
     floor,
     headline,
+    signal_summary: signalSummary,
   };
 }
 
@@ -389,16 +416,70 @@ function isV1Crop(crop: string): crop is Crop {
   return V1_ENGINE_CROPS.has(crop as Crop);
 }
 
-function paceStatusFromSignal(s: SignalStatus): 'on_pace' | 'behind' | 'ahead' {
-  if (s === 'green') return 'on_pace';
-  if (s === 'yellow') return 'ahead';
-  return 'behind';
+/** Returns the value if it's a valid SignalStatus, else null. */
+function normalizeSignal(value: unknown): SignalStatus | null {
+  return value === 'green' || value === 'yellow' || value === 'red'
+    ? value
+    : null;
 }
 
-function paceStatusLabelFromSignal(s: SignalStatus): string {
-  if (s === 'green') return 'On pace';
-  if (s === 'yellow') return 'Slightly ahead';
-  return 'Behind pace';
+/**
+ * Fallback basis signal when the stored column is null: re-derive from
+ * the 3-year percentile using spec §4.4 thresholds. Bottom quartile is
+ * RED ("unusually weak"), top quartile GREEN, middle AMBER. Null
+ * percentile (thin history) stays neutral yellow rather than alarming.
+ */
+function basisSignalFromPercentile(pctile: number | null | undefined): SignalStatus {
+  if (pctile == null) return 'yellow';
+  if (pctile >= 75) return 'green';
+  if (pctile >= 25) return 'yellow';
+  return 'red';
+}
+
+/**
+ * Fallback pace signal when the stored column is null: mirror of
+ * lib/sellscore/signals.ts classifyPaceSignal. gap = current − target;
+ * at-or-behind is GREEN (urgency to sell, spec §4.4), 0–5pp ahead AMBER,
+ * >5pp ahead RED.
+ */
+function paceSignalFromGap(gapPp: number): SignalStatus {
+  if (gapPp <= 0) return 'green';
+  if (gapPp <= 5) return 'yellow';
+  return 'red';
+}
+
+/**
+ * July 23, 2026 fix (v6.6 backlog #1): status now follows engine
+ * semantics. Signal green covers the whole at-or-behind range, so it
+ * splits on whether the farmer has reached target; yellow (0–5pp ahead)
+ * reads as on-pace; red (>5pp ahead) reads as ahead.
+ */
+function paceStatusFromSignal(
+  s: SignalStatus,
+  ytdPct: number,
+  targetPct: number,
+): 'on_pace' | 'behind' | 'ahead' {
+  if (s === 'green') return ytdPct >= targetPct ? 'on_pace' : 'behind';
+  if (s === 'yellow') return 'on_pace';
+  return 'ahead';
+}
+
+/**
+ * Voice-spec pace label, aligned with rationale.ts paceDetail: behind
+ * pace is framed as capacity ("room to sell") to match the green signal
+ * it accompanies, not as a scold.
+ */
+function paceStatusLabelFromSignal(
+  s: SignalStatus,
+  ytdPct: number,
+  targetPct: number,
+): string {
+  if (ytdPct >= 99.5) return 'Marketing year complete';
+  if (s === 'green') {
+    return ytdPct >= targetPct ? 'On pace' : 'Behind pace — room to sell';
+  }
+  if (s === 'yellow') return 'Slightly ahead of pace';
+  return 'Ahead of pace';
 }
 
 function estimateExpectedBushels(crop: string, acres: number): number {
@@ -473,6 +554,27 @@ function extractHeadline(
     default:
       return 'Hold today.';
   }
+}
+
+/**
+ * v6.6 backlog #8 fix (July 23, 2026): the voice-spec summary sentence
+ * ("Margin and basis say sell. Pace is the blocker...") is written by
+ * persist.ts as line 2 of rationale_text but was never displayed.
+ * Recover it: second non-empty line, unless that line is already one of
+ * the per-signal detail lines ("Margin: ...") or legal boilerplate —
+ * which happens for rows written before the summary line existed.
+ */
+function extractSignalSummary(rationaleText: string | null): string | null {
+  if (!rationaleText) return null;
+  const lines = rationaleText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length < 2) return null;
+  const candidate = lines[1];
+  if (/^(Margin|Basis|Pace)\s*:/i.test(candidate)) return null;
+  if (/^Past performance/i.test(candidate)) return null;
+  return candidate;
 }
 
 // =============================================================================
