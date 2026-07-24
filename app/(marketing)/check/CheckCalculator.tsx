@@ -1096,6 +1096,43 @@ export default function CheckCalculator() {
                 </div>
 
                 {/* ════════════════════════════════════════════════════════
+                     B5 (July 23, 2026): SELL SCORE BRIDGE
+                     Highest-traffic page (139 visitors/90d) previously
+                     dead-ended after the ARC/PLC number. One line + CTA,
+                     always visible above the tabs regardless of tab state.
+                     ════════════════════════════════════════════════════ */}
+                <div
+                  className="rounded-[16px] px-5 sm:px-7 py-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(15,38,28,0.35) 100%)",
+                    border: "1px solid rgba(52,211,153,0.22)",
+                  }}
+                >
+                  <p className="text-[15px] sm:text-[16px] text-white/75 leading-relaxed m-0">
+                    <span className="font-bold text-white">Programs are your floor.</span>{" "}
+                    <span className="text-[#34D399] font-bold">The Sell Score is your daily decision.</span>{" "}
+                    <span className="text-white/45">
+                      One number every morning: sell, hold, or wait.
+                    </span>
+                  </p>
+                  <Link
+                    href="/pricing"
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 text-[14px] font-bold transition-transform duration-200 hover:scale-[1.02]"
+                    style={{
+                      minHeight: "48px",
+                      backgroundColor: "#34D399",
+                      color: "#0C1F17",
+                    }}
+                  >
+                    Get the Sell Score
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  </Link>
+                </div>
+
+                {/* ════════════════════════════════════════════════════════
                      BUILD 18 DEPLOY 2: TAB NAVIGATION
                      Hero card above, tabs below for deeper analysis.
                      Default tab is "comparison" — shows existing content.

@@ -27,6 +27,7 @@
 
 import { headers } from 'next/headers';
 import { HeroSection } from '@/components/homepage/HeroSection';
+import { SellScoreSection } from '@/components/homepage/SellScoreSection';
 import { MarketTicker } from '@/components/homepage/MarketTicker';
 import { ElectionMapTeaser } from '@/components/homepage/ElectionMapTeaser';
 import { TrustBar } from '@/components/homepage/TrustBar';
@@ -141,6 +142,15 @@ export default async function Home() {
         lng={lng}
         detected={detected}
       />
+
+      <DarkGoldSeparator />
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION 1B — SELL SCORE (B2, July 23 2026)
+          The paid product, named by name, immediately after the hero.
+          Copy reused from the /pricing Sell Score hero band; CTA → /pricing.
+          ═══════════════════════════════════════════════════════════════════ */}
+      <SellScoreSection />
 
       <DarkGoldSeparator />
 

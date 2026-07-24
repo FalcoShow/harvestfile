@@ -6,9 +6,15 @@
 // TO:   4 surface items with farmer-friendly language
 //
 // The mobile nav now tells a clear story:
-//   1. Hero section — the 4 core surfaces (My Farm, Programs, Planner, Advisor)
+//   1. Hero section — Sell Score (the paid product) + the 4 core surfaces
 //   2. Resources — OBBBA Guide, Pricing, About, etc.
 //   3. Expandable — deeper tools still accessible
+//
+// July 23, 2026 (B1): "Sell Score" leads the primary nav. Logged-out and
+// non-subscribers route to /pricing; active subscribers to /sellscore/me
+// (href resolved server-side in marketing-header.tsx). The bottom CTA for
+// paid users keeps the gold-button behavior but is labeled "Sell Score"
+// instead of the stranger-hostile "Dashboard".
 //
 // Same portal-based rendering pattern for iOS compatibility.
 // =============================================================================
@@ -22,6 +28,10 @@ import { Logo } from "./logo";
 
 interface MobileMenuProps {
   isAuthenticated: boolean;
+  /** Active Sell Score subscriber (farms.sellscore_active) */
+  isPaidSellScore: boolean;
+  /** /sellscore/me for subscribers, /pricing for everyone else */
+  sellScoreHref: string;
 }
 
 const PRIMARY_NAV = [
@@ -90,10 +100,30 @@ const MORE_TOOLS = [
   { href: '/insurance', label: 'Crop Insurance' },
 ];
 
-export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
+export function MobileMenu({
+  isAuthenticated,
+  isPaidSellScore,
+  sellScoreHref,
+}: MobileMenuProps) {
   const [open, setOpen] = useState(false);
   const [toolsExpanded, setToolsExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // B1: Sell Score leads the primary nav. Href is auth-aware (resolved
+  // server-side); the icon is the signal-dot motif from the product.
+  const primaryNav = [
+    {
+      href: sellScoreHref,
+      label: "Sell Score",
+      desc: "One number every morning: sell, hold, or wait",
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" />
+        </svg>
+      ),
+    },
+    ...PRIMARY_NAV,
+  ];
 
   useEffect(() => {
     setMounted(true);
@@ -161,11 +191,11 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
         </div>
 
         <nav className="flex-1 px-6 pt-2">
-          {/* Primary nav — the 4 core surfaces */}
+          {/* Primary nav — Sell Score + the 4 core surfaces */}
           <div className="space-y-1 mb-8">
-            {PRIMARY_NAV.map((item) => (
+            {primaryNav.map((item) => (
               <Link
-                key={item.href}
+                key={item.label}
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-4 rounded-xl px-4 py-3.5 transition-colors hover:bg-white/[0.04] group"
@@ -253,11 +283,11 @@ export function MobileMenu({ isAuthenticated }: MobileMenuProps) {
         <div className="px-6 pb-8 pt-6 space-y-3 shrink-0">
           {isAuthenticated ? (
             <Link
-              href="/dashboard"
+              href={isPaidSellScore ? "/sellscore/me" : "/dashboard"}
               onClick={() => setOpen(false)}
               className="flex items-center justify-center gap-2 w-full rounded-xl bg-harvest-gold px-6 py-3.5 text-sm font-semibold text-[#0C1F17] hover:bg-[#E2C366] transition-colors"
             >
-              Go to Dashboard
+              {isPaidSellScore ? "Open Sell Score" : "Go to Dashboard"}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
               </svg>
