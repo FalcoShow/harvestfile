@@ -7,7 +7,8 @@
       "Bash(npm run *)",
       "Bash(cp C:/Users/Andrew/harvestfile/.env.local .env.local && npm run build 2>&1 | tail -25)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(python -)"
     ]
   }
 }

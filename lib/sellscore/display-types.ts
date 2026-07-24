@@ -58,6 +58,54 @@ export interface BreakevenDisplay {
   dollars_per_bu: number;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Below-the-fold depth (spec §4.1, Workstream A items 2–7, July 23 2026)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** One row in the local elevator comparison (A2). */
+export interface ElevatorBidDisplay {
+  /** Barchart locationId, or a synthetic id for pinned rows without one */
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  distance_miles: number | null;
+  /** Today's cash bid for the recommendation's crop, $/bu; null = unavailable */
+  cash_bid: number | null;
+  /** Farmer's pinned elevator(s) from sellscore_elevators */
+  pinned: boolean;
+}
+
+/** Basis chart data (A3): recent county basis vs 3-year same-date norm. */
+export interface BasisChartDisplay {
+  crop: string;
+  county_label: string;
+  /** Recent observations, ascending; time = 'YYYY-MM-DD', value = $/bu */
+  series: Array<{ time: string; value: number }>;
+  /** Mean of the 3-year ±14-day same-date window, $/bu; null = thin history */
+  norm_3yr: number | null;
+  /** Today's basis, $/bu */
+  current: number | null;
+}
+
+/**
+ * Everything the below-the-fold sections need. Optional on
+ * SellScoreScreenData: /sellscore/me and the preview supply it; hosts
+ * that omit it (e.g. legacy /sellscore) render the above-the-fold screen
+ * unchanged.
+ */
+export interface BelowFoldDisplay {
+  /** A2 — pinned + closest elevators with today's cash bids; null = unavailable */
+  elevators: ElevatorBidDisplay[] | null;
+  /** A3 — basis chart data; null = no county history yet */
+  basis: BasisChartDisplay | null;
+  /** A5/A6 — location for weather + spray fetches; null hides both cards */
+  lat: number | null;
+  lng: number | null;
+  /** A6 — spray card is seasonal (April–October) */
+  show_spray: boolean;
+}
+
 /**
  * The full data shape the SellScoreScreen component renders from.
  *
@@ -94,4 +142,10 @@ export interface SellScoreScreenData {
   floor: FloorDisplay;
   /** Breakevens by crop, for context */
   breakevens: BreakevenDisplay[];
+  /**
+   * Below-the-fold depth (spec §4.1: elevator comparison, basis chart,
+   * market summary, weather, spray, quick links). Optional — omitted by
+   * hosts that only render the decision screen.
+   */
+  below_fold?: BelowFoldDisplay | null;
 }

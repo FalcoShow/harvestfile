@@ -22,6 +22,11 @@ import PrimaryActions from './PrimaryActions';
 import SignalRow from './SignalRow';
 import PositionDetail from './PositionDetail';
 import FloorStatement from './FloorStatement';
+import ElevatorComparison from './ElevatorComparison';
+import BasisChart from './BasisChart';
+import MarketSummary from './MarketSummary';
+import FarmConditions from './FarmConditions';
+import QuickLinksRow from './QuickLinksRow';
 
 interface SellScoreScreenProps {
   data: SellScoreScreenData;
@@ -82,6 +87,36 @@ export default function SellScoreScreen({ data, demo = false }: SellScoreScreenP
         floor={data.floor}
         cropContext={data.recommendation.crop}
       />
+
+      {/* ── Below the fold (spec §4.1, Workstream A 2–7) ─────────────────
+          Rendered only when the host supplies below_fold data
+          (/sellscore/me and the preview). Order per spec: elevator
+          comparison, basis chart, market summary, weather, spray,
+          quick links. ─────────────────────────────────────────────── */}
+      {data.below_fold && (
+        <>
+          {data.below_fold.elevators && data.below_fold.elevators.length > 0 && (
+            <ElevatorComparison
+              elevators={data.below_fold.elevators}
+              crop={data.recommendation.crop}
+            />
+          )}
+
+          {data.below_fold.basis && <BasisChart basis={data.below_fold.basis} />}
+
+          <MarketSummary />
+
+          {data.below_fold.lat != null && data.below_fold.lng != null && (
+            <FarmConditions
+              lat={data.below_fold.lat}
+              lng={data.below_fold.lng}
+              showSpray={data.below_fold.show_spray}
+            />
+          )}
+
+          <QuickLinksRow />
+        </>
+      )}
     </div>
   );
 }

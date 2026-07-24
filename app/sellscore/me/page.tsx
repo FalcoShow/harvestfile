@@ -67,9 +67,12 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 import SellScoreScreen from '@/components/sellscore/SellScoreScreen';
 import { getTargetPaceForDate, type Crop } from '@/lib/sellscore/pace-calendar';
 import { REFERENCE_ELEVATORS } from '@/lib/sellscore/reference-elevators';
+import { getGrainBidsByCoords, type GrainElevator } from '@/lib/barchart';
+import { fetchSeasonalBasis } from '@/lib/sellscore/seasonal-basis';
 import type {
   SellScoreScreenData,
   FarmDisplayContext,
@@ -78,6 +81,8 @@ import type {
   PaceDisplay,
   BreakevenDisplay,
   FloorDisplay,
+  BelowFoldDisplay,
+  ElevatorBidDisplay,
 } from '@/lib/sellscore/display-types';
 import type {
   Recommendation,
@@ -148,13 +153,19 @@ export default async function SellScoreMePage() {
     .limit(1)
     .maybeSingle();
 
-  // Primary elevator
-  const { data: primaryElevator } = await supabase
+  // Elevators: primary first, up to two pinned rows total (A2 renders
+  // "pinned + closest" — v1 farms have one primary; the limit keeps the
+  // comparison stable if v1.1 adds a second pin).
+  const { data: elevatorRows } = await supabase
     .from('sellscore_elevators')
     .select('*')
     .eq('farm_id', farm.id)
-    .eq('is_primary', true)
-    .maybeSingle();
+    .order('is_primary', { ascending: false })
+    .limit(2);
+
+  const pinnedElevators = elevatorRows ?? [];
+  const primaryElevator =
+    pinnedElevators.find((e: any) => e.is_primary) ?? pinnedElevators[0] ?? null;
 
   // All positions for this farm. Used for real pace numbers and position
   // cards instead of synthesizing from total_acres × yield.
@@ -178,6 +189,10 @@ export default async function SellScoreMePage() {
     positionRows ?? [],
     professional?.full_name ?? null,
   );
+
+  // Below-the-fold depth (spec §4.1, A2–A7). Every piece is best-effort:
+  // a Barchart or basis-history failure nulls that section, never the page.
+  screenData.below_fold = await composeBelowFold(farm, latestRec, pinnedElevators);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f0d' }}>
@@ -388,6 +403,206 @@ function composeScreenData(
     headline,
     signal_summary: signalSummary,
   };
+}
+
+// =============================================================================
+// Below-the-fold composition (spec §4.1, A2–A7 — July 23, 2026)
+// =============================================================================
+
+/** Barchart commodityName values are title case ("Corn", "Soybeans"). */
+const BARCHART_COMMODITY: Record<string, string> = {
+  corn: 'Corn',
+  soybeans: 'Soybeans',
+  wheat: 'Wheat',
+  sorghum: 'Sorghum',
+};
+
+/** Spray card is seasonal: April (3) through October (9), per spec §4.1. */
+function isSpraySeason(date: Date): boolean {
+  const m = date.getUTCMonth();
+  return m >= 3 && m <= 9;
+}
+
+async function composeBelowFold(
+  farm: any,
+  rec: any,
+  pinnedRows: any[],
+): Promise<BelowFoldDisplay> {
+  const referenceMatch = REFERENCE_ELEVATORS.find(
+    (e) => e.countyFips === farm.county_fips,
+  );
+  const crop = rec.crop as string;
+  const today = new Date(rec.recommendation_date);
+
+  const belowFold: BelowFoldDisplay = {
+    elevators: null,
+    basis: null,
+    // Weather anchor: the reference elevator's coordinates. Farms don't
+    // persist lat/lng in v1; the elevator is "where your market is."
+    lat: referenceMatch?.lat ?? null,
+    lng: referenceMatch?.lng ?? null,
+    show_spray: isSpraySeason(new Date()),
+  };
+
+  // ── A2: pinned + closest elevators with today's cash bids ──────────────
+  try {
+    const commodityName = BARCHART_COMMODITY[crop] ?? null;
+    let nearby: GrainElevator[] = [];
+    if (referenceMatch && commodityName) {
+      // getGrainBidsByCoords never throws: it serves stale cache or []
+      // on failure, and caches successes 15 min during market hours.
+      nearby = await getGrainBidsByCoords(referenceMatch.lat, referenceMatch.lng, {
+        commodities: [commodityName],
+        maxDistance: 60,
+        maxLocations: 10,
+        bidsPerCommodity: 1,
+      });
+    }
+    const merged = mergeElevatorRows(pinnedRows, nearby, commodityName);
+    belowFold.elevators = merged.length > 0 ? merged : null;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[sellscore/me] elevator comparison failed:', err);
+  }
+
+  // ── A3: county basis series + 3-year same-date norm ────────────────────
+  // county_basis_history is a public reference table read with the
+  // service-role client (same convention as persist.ts / compute route).
+  try {
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && serviceKey) {
+      const service = createServiceClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false },
+      });
+
+      const since = new Date(today);
+      since.setUTCDate(since.getUTCDate() - 90);
+
+      const { data: basisRows } = await service
+        .from('county_basis_history')
+        .select('observation_date, basis')
+        .eq('county_fips', farm.county_fips)
+        .eq('crop', crop)
+        .gte('observation_date', formatYmd(since))
+        .order('observation_date', { ascending: true });
+
+      const series = (basisRows ?? [])
+        .filter((r: any) => r.basis != null && r.observation_date)
+        .map((r: any) => ({
+          time: String(r.observation_date),
+          value: Number(r.basis),
+        }));
+
+      let norm3yr: number | null = null;
+      try {
+        const seasonal = await fetchSeasonalBasis(
+          service,
+          farm.county_fips,
+          crop,
+          today,
+        );
+        if (seasonal.values.length > 0) {
+          const mean =
+            seasonal.values.reduce((s, v) => s + v, 0) / seasonal.values.length;
+          norm3yr = Math.round(mean * 10000) / 10000;
+        }
+      } catch {
+        /* thin history — norm line simply doesn't render */
+      }
+
+      if (series.length > 0 || norm3yr != null) {
+        belowFold.basis = {
+          crop,
+          county_label:
+            referenceMatch?.countyName != null
+              ? `${referenceMatch.countyName} County`
+              : (farm.state ?? 'Your county'),
+          series,
+          norm_3yr: norm3yr,
+          current:
+            rec.current_basis ??
+            (series.length > 0 ? series[series.length - 1].value : null),
+        };
+      }
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[sellscore/me] basis chart composition failed:', err);
+  }
+
+  return belowFold;
+}
+
+/**
+ * Pinned rows (sellscore_elevators) first, then the closest Barchart
+ * elevators that aren't already pinned, capped at 3 extras (spec §4.1:
+ * "pinned 2 elevators + closest 3"). Pinned rows keep their true
+ * farm-to-elevator distance; nearby rows carry Barchart's distance from
+ * the reference-elevator query origin.
+ */
+function mergeElevatorRows(
+  pinnedRows: any[],
+  nearby: GrainElevator[],
+  commodityName: string | null,
+): ElevatorBidDisplay[] {
+  const bidFor = (el: GrainElevator): number | null => {
+    const bid =
+      el.bids.find(
+        (b) => (!commodityName || b.commodity === commodityName) && b.cashPrice > 0,
+      ) ?? null;
+    return bid ? bid.cashPrice : null;
+  };
+
+  const out: ElevatorBidDisplay[] = [];
+  const usedIds = new Set<string>();
+  const usedNames = new Set<string>();
+
+  for (const p of pinnedRows.slice(0, 2)) {
+    const pinnedId = p.barchart_elevator_id != null ? String(p.barchart_elevator_id) : null;
+    const match = pinnedId ? nearby.find((n) => n.id === pinnedId) : undefined;
+    if (match) usedIds.add(match.id);
+    const nameKey = `${(p.elevator_name ?? '').toLowerCase()}|${(p.elevator_city ?? '').toLowerCase()}`;
+    usedNames.add(nameKey);
+    out.push({
+      id: pinnedId ?? `pinned-${p.id ?? out.length}`,
+      name: p.elevator_name ?? 'Your elevator',
+      city: p.elevator_city ?? '',
+      state: p.elevator_state ?? '',
+      distance_miles: p.distance_miles != null ? Number(p.distance_miles) : null,
+      cash_bid: match ? bidFor(match) : null,
+      pinned: true,
+    });
+  }
+
+  const sorted = [...nearby].sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+  for (const n of sorted) {
+    if (out.length >= pinnedRows.slice(0, 2).length + 3) break;
+    if (usedIds.has(n.id)) continue;
+    const nameKey = `${n.name.toLowerCase()}|${n.city.toLowerCase()}`;
+    if (usedNames.has(nameKey)) continue;
+    usedIds.add(n.id);
+    usedNames.add(nameKey);
+    out.push({
+      id: n.id,
+      name: n.name,
+      city: n.city,
+      state: n.state,
+      distance_miles: n.distance ?? null,
+      cash_bid: bidFor(n),
+      pinned: false,
+    });
+  }
+
+  return out;
+}
+
+function formatYmd(date: Date): string {
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 // =============================================================================

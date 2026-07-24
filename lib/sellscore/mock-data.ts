@@ -26,10 +26,103 @@
 // =============================================================================
 
 import type { CropPosition, Recommendation, RecommendationType } from './types';
-import type { SellScoreScreenData } from './display-types';
+import type { BelowFoldDisplay, SellScoreScreenData } from './display-types';
 
 const TODAY = new Date('2026-05-05T11:00:00Z');
 const FARM_ID = 'preview-farm-mahoning-oh';
+
+// ─── Below-the-fold mock (A2–A7, July 23 2026) ──────────────────────────────
+// Deterministic — no Date.now/Math.random — so the preview renders the same
+// on every load. Basis series: ~60 weekdays ending May 5, drifting from
+// -70¢ toward -55¢ with a gentle wave, matching the SELL scenario's -55¢.
+
+function buildMockBasisSeries(): Array<{ time: string; value: number }> {
+  const series: Array<{ time: string; value: number }> = [];
+  const end = new Date('2026-05-05T00:00:00Z');
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 84);
+  let i = 0;
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const dow = d.getUTCDay();
+    if (dow === 0 || dow === 6) continue; // weekdays only, like real obs
+    const progress = i / 59;
+    const drift = -0.70 + 0.15 * progress; // -70¢ → -55¢
+    const wave = 0.018 * Math.sin(i / 4.5) + 0.008 * Math.sin(i / 1.7);
+    series.push({
+      time: d.toISOString().slice(0, 10),
+      value: Math.round((drift + wave) * 10000) / 10000,
+    });
+    i++;
+  }
+  return series;
+}
+
+const mockBelowFold: BelowFoldDisplay = {
+  elevators: [
+    {
+      id: 'buckeye-feed-and-grain-dalton-oh',
+      name: 'Buckeye Feed and Grain',
+      city: 'Dalton',
+      state: 'OH',
+      distance_miles: 22,
+      cash_bid: 4.85,
+      pinned: true,
+    },
+    {
+      id: 'mock-heritage-coop',
+      name: 'Heritage Cooperative',
+      city: 'Massillon',
+      state: 'OH',
+      distance_miles: 26,
+      cash_bid: 4.81,
+      pinned: true,
+    },
+    {
+      id: 'mock-deerfield-ag',
+      name: 'Deerfield Ag Services',
+      city: 'Deerfield',
+      state: 'OH',
+      distance_miles: 9,
+      cash_bid: 4.79,
+      pinned: false,
+    },
+    {
+      id: 'mock-centerra',
+      name: 'Centerra Co-op',
+      city: 'Salem',
+      state: 'OH',
+      distance_miles: 14,
+      cash_bid: 4.83,
+      pinned: false,
+    },
+    {
+      id: 'mock-western-reserve',
+      name: 'Western Reserve Grain',
+      city: 'Canfield',
+      state: 'OH',
+      distance_miles: 17,
+      cash_bid: null,
+      pinned: false,
+    },
+  ],
+  basis: {
+    crop: 'corn',
+    county_label: 'Mahoning County',
+    series: buildMockBasisSeries(),
+    norm_3yr: -0.58,
+    current: -0.55,
+  },
+  // Mahoning County, OH
+  lat: 41.02,
+  lng: -80.66,
+  show_spray: true, // May — inside the April–October window
+};
+
+// Out-of-season scenario is dated January 14 — spray card hidden.
+const mockBelowFoldWinter: BelowFoldDisplay = {
+  ...mockBelowFold,
+  show_spray: false,
+};
 
 // ─── Shared farm context across all scenarios ────────────────────────────────
 
@@ -146,6 +239,7 @@ const sellScenario: SellScoreScreenData = {
   ),
   floor,
   breakevens,
+  below_fold: mockBelowFold,
 };
 
 // ─── Scenario 2: HOLD — most common state, no action warranted ───────────────
@@ -190,6 +284,7 @@ const holdScenario: SellScoreScreenData = {
   ),
   floor,
   breakevens,
+  below_fold: mockBelowFold,
 };
 
 // ─── Scenario 3: PACE ALERT — behind pace, conditions not ideal ──────────────
@@ -237,6 +332,7 @@ const paceAlertScenario: SellScoreScreenData = {
   ),
   floor,
   breakevens,
+  below_fold: mockBelowFold,
 };
 
 // ─── Scenario 4: OUT OF SEASON — winter, all bushels priced ──────────────────
@@ -283,6 +379,7 @@ const outOfSeasonScenario: SellScoreScreenData = {
   })),
   floor,
   breakevens,
+  below_fold: mockBelowFoldWinter,
 };
 
 // ─── Public exports ──────────────────────────────────────────────────────────
