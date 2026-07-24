@@ -469,6 +469,11 @@ export default function AdvisorPage() {
           Want county-specific ARC/PLC analysis? Try these free tools:
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
+          {/* B4 (July 23, 2026): the paid product, named by name. Emerald
+              to distinguish it from the free tools around it. */}
+          <Link href="/pricing" className="px-4 py-2 rounded-lg text-sm font-bold bg-[#10B981] text-white hover:bg-[#0EA372] transition-colors">
+            Sell Score — daily sell/hold call →
+          </Link>
           <Link href="/check" className="px-4 py-2 rounded-lg text-sm font-medium bg-[#1B4332] text-white hover:bg-[#234A3B] transition-colors">
             ARC/PLC Calculator →
           </Link>

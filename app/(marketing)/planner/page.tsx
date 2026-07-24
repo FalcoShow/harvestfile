@@ -405,6 +405,91 @@ export default function PlannerPage() {
         </div>
       </section>
 
+      {/* ── B3 (July 23, 2026): SELL SCORE CROSS-SELL ─────────────────────
+          The four module cards above all ship Aug–Q4 2026. This is the
+          one block on the page pointing at the paid product that is live
+          TODAY. Module cards stay untouched. ─────────────────────────── */}
+      <section className="px-6 pb-20 max-w-6xl mx-auto">
+        <div
+          className="relative rounded-2xl overflow-hidden p-8 md:p-10"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 38, 28, 0.45) 100%)',
+            border: '1.5px solid rgba(52, 211, 153, 0.22)',
+          }}
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div>
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1.5 mb-4 rounded-full text-xs font-bold tracking-wide uppercase"
+                style={{
+                  background: 'rgba(52, 211, 153, 0.10)',
+                  color: '#34D399',
+                  border: '1px solid rgba(52, 211, 153, 0.25)',
+                }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full animate-pulse"
+                  style={{ background: '#34D399' }}
+                />
+                Live today
+              </div>
+
+              <h2
+                className="text-3xl md:text-4xl font-semibold tracking-tight mb-3"
+                style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}
+              >
+                While you wait — the Sell Score is live today.
+              </h2>
+
+              <p
+                className="text-lg leading-relaxed max-w-2xl"
+                style={{ color: 'rgba(232, 240, 235, 0.78)' }}
+              >
+                One number every morning:{' '}
+                <span
+                  style={{
+                    color: '#34D399',
+                    fontFamily: 'Instrument Serif, serif',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  sell, hold, or wait.
+                </span>{' '}
+                Your unsold position, breakeven, and local elevator basis —
+                read for you at 5 AM, every day.
+              </p>
+            </div>
+
+            <Link
+              href="/pricing"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-7 text-base font-bold transition-transform duration-200 hover:scale-[1.02]"
+              style={{
+                minHeight: '52px',
+                backgroundColor: '#34D399',
+                color: '#0C1F17',
+              }}
+            >
+              Get the Sell Score
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* WAITLIST */}
       <section
         id="waitlist"
