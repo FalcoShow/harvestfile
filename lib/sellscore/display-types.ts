@@ -106,6 +106,41 @@ export interface BelowFoldDisplay {
   show_spray: boolean;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Sales history ("Your sales this year", Round 2 Item 3, July 23 2026)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** One logged sale from sellscore_sales_log, display-ready. */
+export interface SaleLogEntryDisplay {
+  id: string;
+  crop: string;
+  /** Bushels the farmer reported selling (spec §6.1 bushels_sold) */
+  bushels: number;
+  /** 'YYYY-MM-DD' */
+  sale_date: string;
+  /** Cash bid at sale, $/bu; null when the sale wasn't tied to a recommendation */
+  cash_bid: number | null;
+  /** Resolved elevator display name; null when unknown */
+  elevator_name: string | null;
+}
+
+/**
+ * The "Your sales this year" section: current-marketing-year sales,
+ * newest first, plus the marketing-year window the Item 3 timeline
+ * renders against. Optional on SellScoreScreenData — /sellscore/me and
+ * the preview supply it; other hosts render without the section.
+ */
+export interface SalesHistoryDisplay {
+  /** Marketing-year start (Sept 1), 'YYYY-MM-DD' */
+  marketing_year_start: string;
+  /** Marketing-year end (Aug 31), 'YYYY-MM-DD' */
+  marketing_year_end: string;
+  /** Today, 'YYYY-MM-DD' — the timeline's "today" marker */
+  today: string;
+  /** Reverse-chronological sales for the current marketing year */
+  entries: SaleLogEntryDisplay[];
+}
+
 /**
  * The full data shape the SellScoreScreen component renders from.
  *
@@ -148,4 +183,10 @@ export interface SellScoreScreenData {
    * hosts that only render the decision screen.
    */
   below_fold?: BelowFoldDisplay | null;
+  /**
+   * "Your sales this year" (Round 2 Item 3): current-marketing-year
+   * logged sales, rendered below the position cards. Optional — omitted
+   * by hosts that predate the sales log.
+   */
+  sales_history?: SalesHistoryDisplay | null;
 }

@@ -26,7 +26,11 @@
 // =============================================================================
 
 import type { CropPosition, Recommendation, RecommendationType } from './types';
-import type { BelowFoldDisplay, SellScoreScreenData } from './display-types';
+import type {
+  BelowFoldDisplay,
+  SalesHistoryDisplay,
+  SellScoreScreenData,
+} from './display-types';
 
 const TODAY = new Date('2026-05-05T11:00:00Z');
 const FARM_ID = 'preview-farm-mahoning-oh';
@@ -179,6 +183,151 @@ const floor = {
   source_label: 'PLC reference + 85% RP + SCO',
 };
 
+// ─── Sales history mock (Round 2 Item 3, July 23 2026) ──────────────────────
+// "Your sales this year" below the position cards. The 2025/26 marketing
+// year runs Sept 1, 2025 → Aug 31, 2026; the May 5 scenarios sit ~68% of
+// the way through it. Rows exercise every field combination: with/without
+// price, with/without elevator, both crops.
+//
+// The HOLD scenario intentionally has NO entries: that is the launch-day
+// truth (position pace pre-dates the sales log — history accrues from
+// deploy) and it renders the spec'd empty state for design review.
+
+const salesHistoryMay: SalesHistoryDisplay = {
+  marketing_year_start: '2025-09-01',
+  marketing_year_end: '2026-08-31',
+  today: '2026-05-05',
+  entries: [
+    {
+      id: 'mock-sale-6',
+      crop: 'corn',
+      bushels: 10000,
+      sale_date: '2026-04-22',
+      cash_bid: 4.78,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+    {
+      id: 'mock-sale-5',
+      crop: 'soybeans',
+      bushels: 6000,
+      sale_date: '2026-03-16',
+      cash_bid: 11.62,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+    {
+      id: 'mock-sale-4',
+      crop: 'corn',
+      bushels: 18000,
+      sale_date: '2026-01-15',
+      cash_bid: 4.65,
+      elevator_name: 'Heritage Cooperative',
+    },
+    {
+      id: 'mock-sale-3',
+      crop: 'corn',
+      bushels: 15000,
+      sale_date: '2025-11-14',
+      cash_bid: 4.52,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+    {
+      id: 'mock-sale-2',
+      crop: 'soybeans',
+      bushels: 8000,
+      sale_date: '2025-10-20',
+      cash_bid: null,
+      elevator_name: null,
+    },
+    {
+      id: 'mock-sale-1',
+      crop: 'corn',
+      bushels: 12000,
+      sale_date: '2025-10-03',
+      cash_bid: 4.38,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+  ],
+};
+
+const salesHistoryEmpty: SalesHistoryDisplay = {
+  marketing_year_start: '2025-09-01',
+  marketing_year_end: '2026-08-31',
+  today: '2026-05-05',
+  entries: [],
+};
+
+const salesHistoryBehindPace: SalesHistoryDisplay = {
+  marketing_year_start: '2025-09-01',
+  marketing_year_end: '2026-08-31',
+  today: '2026-05-05',
+  entries: [
+    {
+      id: 'mock-sale-pace-3',
+      crop: 'corn',
+      bushels: 16000,
+      sale_date: '2026-01-15',
+      cash_bid: 4.61,
+      elevator_name: 'Heritage Cooperative',
+    },
+    {
+      id: 'mock-sale-pace-2',
+      crop: 'corn',
+      bushels: 14000,
+      sale_date: '2025-11-14',
+      cash_bid: 4.55,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+    {
+      id: 'mock-sale-pace-1',
+      crop: 'soybeans',
+      bushels: 7000,
+      sale_date: '2025-10-08',
+      cash_bid: null,
+      elevator_name: null,
+    },
+  ],
+};
+
+const salesHistoryWinter: SalesHistoryDisplay = {
+  marketing_year_start: '2025-09-01',
+  marketing_year_end: '2026-08-31',
+  today: '2026-01-14',
+  entries: [
+    {
+      id: 'mock-sale-winter-4',
+      crop: 'corn',
+      bushels: 20000,
+      sale_date: '2026-01-09',
+      cash_bid: 4.70,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+    {
+      id: 'mock-sale-winter-3',
+      crop: 'soybeans',
+      bushels: 12000,
+      sale_date: '2025-12-12',
+      cash_bid: 11.20,
+      elevator_name: 'Heritage Cooperative',
+    },
+    {
+      id: 'mock-sale-winter-2',
+      crop: 'corn',
+      bushels: 25000,
+      sale_date: '2025-11-14',
+      cash_bid: 4.58,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+    {
+      id: 'mock-sale-winter-1',
+      crop: 'corn',
+      bushels: 30000,
+      sale_date: '2025-10-06',
+      cash_bid: 4.41,
+      elevator_name: 'Buckeye Feed and Grain',
+    },
+  ],
+};
+
 // ─── Scenario 1: SELL — all three signals green ──────────────────────────────
 // Pace green means at-or-behind target (spec §4.4): the farmer is 38%
 // priced against a 40% milestone, which is exactly the state where the
@@ -240,6 +389,7 @@ const sellScenario: SellScoreScreenData = {
   floor,
   breakevens,
   below_fold: mockBelowFold,
+  sales_history: salesHistoryMay,
 };
 
 // ─── Scenario 2: HOLD — most common state, no action warranted ───────────────
@@ -285,6 +435,7 @@ const holdScenario: SellScoreScreenData = {
   floor,
   breakevens,
   below_fold: mockBelowFold,
+  sales_history: salesHistoryEmpty,
 };
 
 // ─── Scenario 3: PACE ALERT — behind pace, conditions not ideal ──────────────
@@ -333,6 +484,7 @@ const paceAlertScenario: SellScoreScreenData = {
   floor,
   breakevens,
   below_fold: mockBelowFold,
+  sales_history: salesHistoryBehindPace,
 };
 
 // ─── Scenario 4: OUT OF SEASON — winter, all bushels priced ──────────────────
@@ -380,6 +532,7 @@ const outOfSeasonScenario: SellScoreScreenData = {
   floor,
   breakevens,
   below_fold: mockBelowFoldWinter,
+  sales_history: salesHistoryWinter,
 };
 
 // ─── Public exports ──────────────────────────────────────────────────────────

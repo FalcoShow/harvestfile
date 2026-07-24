@@ -69,7 +69,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import SellScoreScreen from '@/components/sellscore/SellScoreScreen';
-import { getTargetPaceForDate, type Crop } from '@/lib/sellscore/pace-calendar';
+import { getTargetPaceForDate, marketingYearStart, type Crop } from '@/lib/sellscore/pace-calendar';
 import { REFERENCE_ELEVATORS } from '@/lib/sellscore/reference-elevators';
 import { getGrainBidsByCoords, type GrainElevator } from '@/lib/barchart';
 import { fetchSeasonalBasis } from '@/lib/sellscore/seasonal-basis';
@@ -83,6 +83,8 @@ import type {
   FloorDisplay,
   BelowFoldDisplay,
   ElevatorBidDisplay,
+  SalesHistoryDisplay,
+  SaleLogEntryDisplay,
 } from '@/lib/sellscore/display-types';
 import type {
   Recommendation,
@@ -193,6 +195,16 @@ export default async function SellScoreMePage() {
   // Below-the-fold depth (spec §4.1, A2–A7). Every piece is best-effort:
   // a Barchart or basis-history failure nulls that section, never the page.
   screenData.below_fold = await composeBelowFold(farm, latestRec, pinnedElevators);
+
+  // Round 2 Item 3: "Your sales this year" — current-marketing-year rows
+  // from sellscore_sales_log, newest first. Best-effort like below_fold:
+  // until the Round 2 migration runs in an environment, the query errors
+  // and the section renders its empty state.
+  screenData.sales_history = await composeSalesHistory(
+    supabase,
+    farm.id,
+    pinnedElevators,
+  );
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f0d' }}>
@@ -603,6 +615,100 @@ function formatYmd(date: Date): string {
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(date.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+// =============================================================================
+// Sales history composition (Round 2 Item 3 — July 23, 2026)
+// =============================================================================
+
+/**
+ * Today's date as YYYY-MM-DD in US Eastern time — the same calendar-day
+ * convention the 4 AM ET compute cron and the log-sale route use, so the
+ * timeline's "today" marker agrees with how sale rows are dated.
+ */
+function todayYmdEastern(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/**
+ * "Your sales this year": sellscore_sales_log rows for the current
+ * marketing year (Sept 1 boundary — the engine's marketing-year helper),
+ * newest first. Reads with the cookie client so the short owner-chain
+ * RLS policy is the enforcement layer. Never fails the page: until the
+ * Round 2 migration runs, the query errors (42P01) and the section
+ * renders its empty state.
+ */
+async function composeSalesHistory(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  farmId: string,
+  pinnedRows: any[],
+): Promise<SalesHistoryDisplay> {
+  const now = new Date();
+  const myStart = marketingYearStart('corn', now);
+  const myEnd = new Date(Date.UTC(myStart.getUTCFullYear() + 1, 7, 31)); // Aug 31
+
+  let entries: SaleLogEntryDisplay[] = [];
+  try {
+    const { data: rows, error } = await supabase
+      .from('sellscore_sales_log')
+      .select('id, crop, bushels_sold, sale_date, cash_bid_at_sale, elevator_id')
+      .eq('farm_id', farmId)
+      .gte('sale_date', formatYmd(myStart))
+      .order('sale_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('[sellscore/me] sales history query failed:', error.message);
+    } else {
+      entries = (rows ?? []).map(
+        (r: any): SaleLogEntryDisplay => ({
+          id: String(r.id),
+          crop: String(r.crop),
+          bushels: Number(r.bushels_sold ?? 0),
+          sale_date: String(r.sale_date),
+          cash_bid: r.cash_bid_at_sale != null ? Number(r.cash_bid_at_sale) : null,
+          elevator_name: resolveSaleElevatorName(r.elevator_id, pinnedRows),
+        }),
+      );
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[sellscore/me] sales history composition failed:', err);
+  }
+
+  return {
+    marketing_year_start: formatYmd(myStart),
+    marketing_year_end: formatYmd(myEnd),
+    today: todayYmdEastern(),
+    entries,
+  };
+}
+
+/**
+ * sellscore_sales_log stores the Barchart elevator id (spec §6.1
+ * elevator_id, text). Resolve it to a display name via the farmer's
+ * pinned rows, then the reference-elevator table. Never render a raw id
+ * to a 58+ reader — unknown ids display as no elevator at all.
+ */
+function resolveSaleElevatorName(
+  elevatorId: unknown,
+  pinnedRows: any[],
+): string | null {
+  if (elevatorId == null) return null;
+  const id = String(elevatorId);
+  const pinned = pinnedRows.find(
+    (r: any) => r.barchart_elevator_id != null && String(r.barchart_elevator_id) === id,
+  );
+  if (pinned?.elevator_name) return String(pinned.elevator_name);
+  const ref = REFERENCE_ELEVATORS.find((e) => e.elevatorId === id);
+  if (ref) return ref.elevatorName;
+  return null;
 }
 
 // =============================================================================

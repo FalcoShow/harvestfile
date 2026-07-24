@@ -21,6 +21,7 @@ import PaceContext from './PaceContext';
 import PrimaryActions from './PrimaryActions';
 import SignalRow from './SignalRow';
 import PositionDetail from './PositionDetail';
+import SalesHistory from './SalesHistory';
 import FloorStatement from './FloorStatement';
 import ElevatorComparison from './ElevatorComparison';
 import BasisChart from './BasisChart';
@@ -82,6 +83,11 @@ export default function SellScoreScreen({ data, demo = false }: SellScoreScreenP
       )}
 
       <PositionDetail positions={data.positions} />
+
+      {/* Round 2 Item 3: read-only sales history, below the position
+          cards. Rendered only when the host supplies sales_history
+          (/sellscore/me and the preview). */}
+      {data.sales_history && <SalesHistory history={data.sales_history} />}
 
       <FloorStatement
         floor={data.floor}
