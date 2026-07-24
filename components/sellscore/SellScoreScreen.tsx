@@ -25,9 +25,15 @@ import FloorStatement from './FloorStatement';
 
 interface SellScoreScreenProps {
   data: SellScoreScreenData;
+  /**
+   * Preview/design-review mode. Passed through to interactive children
+   * (PrimaryActions) so mock farms simulate writes instead of hitting
+   * the authenticated log-sale API.
+   */
+  demo?: boolean;
 }
 
-export default function SellScoreScreen({ data }: SellScoreScreenProps) {
+export default function SellScoreScreen({ data, demo = false }: SellScoreScreenProps) {
   const recommendationType = data.recommendation.recommendation_type;
   const isSell = recommendationType === 'sell';
   const isOutOfSeason = recommendationType === 'out_of_season';
@@ -56,7 +62,11 @@ export default function SellScoreScreen({ data }: SellScoreScreenProps) {
 
       <PaceContext pace={data.pace} signal={data.recommendation.pace_signal} />
 
-      <PrimaryActions recommendation={data.recommendation} />
+      <PrimaryActions
+        recommendation={data.recommendation}
+        positions={data.positions}
+        demo={demo}
+      />
 
       {!isOutOfSeason && (
         <SignalRow

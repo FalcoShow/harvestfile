@@ -34,7 +34,7 @@ export default function SellScorePreviewPage() {
             active={activeScenario}
             onChange={setActiveScenario}
           />
-          <SellScoreScreen data={data} />
+          <SellScoreScreen data={data} demo />
         </div>
 
         <PreviewFooter />
