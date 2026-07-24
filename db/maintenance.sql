@@ -57,5 +57,26 @@ END $$;
 
 
 -- ----------------------------------------------------------------------------
+-- 2026-07-23 — sellscore_sales_log table + RLS (Round 2 Item 2, spec §6.1)
+-- ----------------------------------------------------------------------------
+-- Context: The locked v1 spec §6.1 sales-log table was never created;
+--          "Log a sale" wrote a position decrement only. Round 2 adds the
+--          table, the best-effort insert in /api/sellscore/log-sale, and the
+--          read-only history section on /sellscore/me. FK targets the live
+--          public.farms table (spec's sellscore_farms superseded). RLS is the
+--          SHORT owner_id chain, SELECT + INSERT only. No CHECK constraints
+--          (spec defines none; introspect with pg_get_constraintdef before
+--          ever adding any — see 2026-05-07 entry above).
+--
+-- Run by:  PENDING — run create-sellscore-sales-log.sql via the Supabase SQL
+--          editor before (or with) the Round 2 deploy. Until it runs, the
+--          app degrades gracefully (best-effort insert logs a console error;
+--          /sellscore/me history renders its empty state).
+-- Idempotent: YES (IF NOT EXISTS guards + DO blocks for policies)
+--
+-- See: create-sellscore-sales-log.sql for the full statement and verify steps.
+
+
+-- ----------------------------------------------------------------------------
 -- (next entries appended below)
 -- ----------------------------------------------------------------------------

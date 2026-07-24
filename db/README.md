@@ -22,6 +22,10 @@ This directory holds SQL files used for database operations performed outside th
 
 
 
+\- \*\*`create-sellscore-sales-log.sql`\*\* — Creates `public.sellscore_sales_log` (Sell Score spec §6.1) with short owner-chain RLS (SELECT/INSERT only). Idempotent. Added July 23, 2026 (Round 2); run via the Supabase SQL editor before or with the Round 2 deploy — the app degrades gracefully until it runs.
+
+
+
 \## Conventions
 
 

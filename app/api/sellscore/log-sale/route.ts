@@ -9,17 +9,38 @@
 // screen, and the SELL-day "Mark as priced" button was a client-side
 // visual toggle that persisted nothing. Both affordances now post here.
 //
-// What this does — deliberately nothing more (the full logging module
-// with sale history, prices, and editing is explicitly OUT of this
-// sprint, gated on the N=8 Path decision):
+// Round 2 Item 2 (July 23, 2026): the spec §6.1 sellscore_sales_log
+// table now exists (db/create-sellscore-sales-log.sql), so this route
+// additionally writes one bookkeeping row per logged sale. The position
+// update remains the critical path; the log insert is best-effort — a
+// failure (including the table not yet existing in an environment) is
+// logged to the Vercel console and never fails the request.
+//
+// What this does:
 //   1. Auth: cookie session → farms.owner_id ownership (SHORT chain).
 //   2. Increment grain_positions.bushels_contracted for the crop's
 //      newest crop_year row, clamped to expected_bushels.
 //   3. Keep pricing_pace_pct in sync on the same row.
-//   4. Re-run computeAndPersistForFarm so today's recommendation row
+//   4. Insert one sellscore_sales_log row (best-effort). Recommendation
+//      context (cash bid, recommendation id, followed flag, elevator) is
+//      joined from the newest recommendation row on or before the sale
+//      date — the row /sellscore/me was showing when the farmer pressed
+//      the button — and only when its crop matches the sale. Read BEFORE
+//      the recompute in step 5 so the linkage reflects the screen the
+//      farmer acted on, not the post-sale rewrite.
+//   5. Re-run computeAndPersistForFarm so today's recommendation row
 //      reflects the new position (§5.3 auto-update). If the recompute
 //      fails (Barchart outage, missing key), the position update still
 //      stands — the 4 AM cron reconciles the recommendation.
+//
+// Date convention: "today" is the US Eastern calendar day, matching the
+// 4 AM ET compute cron that stamps recommendation_date. A UTC "today"
+// would roll over at 8 PM ET / 7 PM CT — prime evening logging hours —
+// and date evening sales tomorrow, orphaning them from the day's
+// recommendation (Round 2 review finding, July 23, 2026).
+//
+// Still explicitly OUT (gated Path B decision): future-sale planning,
+// editing milestones, editing or deleting logged sales.
 //
 // Auth chain mirrors app/api/sellscore/compute/route.ts.
 
@@ -34,9 +55,61 @@ export const dynamic = 'force-dynamic';
 interface LogSaleBody {
   crop?: string;
   bushels?: number;
+  /**
+   * Optional sale date, YYYY-MM-DD (spec §6.1 sale_date). The current UI
+   * never sends it — the sale is logged for today. Kept in the contract
+   * so the API doesn't need a version bump if a dated entry form ships
+   * later. Must not be in the future; bounded to the last 400 days so a
+   * typo can't write a row outside any renderable marketing year.
+   */
+  sale_date?: string;
 }
 
 const SUPPORTED_CROPS = new Set(['corn', 'soybeans', 'wheat', 'sorghum']);
+
+const SALE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_SALE_AGE_DAYS = 400;
+
+/**
+ * Today's date as YYYY-MM-DD in US Eastern time — the same calendar-day
+ * convention the 4 AM ET compute cron uses for recommendation_date.
+ * en-CA formats as YYYY-MM-DD directly.
+ */
+function todayYmdEastern(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/**
+ * Validates an optional sale_date. Returns the effective YYYY-MM-DD string
+ * (today, US Eastern, when absent) or null when the supplied value is
+ * unusable.
+ */
+function resolveSaleDate(raw: string | undefined): string | null {
+  const today = todayYmdEastern();
+  if (raw === undefined) return today;
+  if (typeof raw !== 'string' || !SALE_DATE_PATTERN.test(raw)) return null;
+
+  const parsed = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  // Reject normalized dates (e.g. 2026-02-31 parses to March 3).
+  const yyyy = parsed.getUTCFullYear();
+  const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getUTCDate()).padStart(2, '0');
+  if (`${yyyy}-${mm}-${dd}` !== raw) return null;
+
+  // YYYY-MM-DD compares correctly as a string.
+  if (raw > today) return null;
+
+  const ageMs = Date.parse(`${today}T00:00:00Z`) - parsed.getTime();
+  if (ageMs > MAX_SALE_AGE_DAYS * 24 * 60 * 60 * 1000) return null;
+
+  return raw;
+}
 
 export async function POST(request: NextRequest) {
   // ── Parse + validate body ────────────────────────────────────────────────
@@ -59,6 +132,17 @@ export async function POST(request: NextRequest) {
   if (!Number.isFinite(bushels) || bushels <= 0) {
     return NextResponse.json(
       { error: 'bushels must be a positive number' },
+      { status: 400 },
+    );
+  }
+
+  const saleDate = resolveSaleDate(body.sale_date);
+  if (!saleDate) {
+    return NextResponse.json(
+      {
+        error:
+          'sale_date must be YYYY-MM-DD, not in the future, and within the last 400 days',
+      },
       { status: 400 },
     );
   }
@@ -128,9 +212,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Clamp to the open position. Farmers occasionally sell a few bushels
-  // over their expected figure; v1 caps at expected so pace math stays
-  // 0–100. The v1.1 position editor is the place to raise expected.
+  // Clamp the POSITION update to the open position. Farmers occasionally
+  // sell a few bushels over their expected figure; v1 caps at expected so
+  // pace math stays 0–100. The v1.1 position editor is the place to raise
+  // expected. (The sales-log row below records the uncapped figure — the
+  // books record what was sold; the clamp is a pace-math constraint.)
   const logged = Math.min(bushels, unsoldBefore);
   const newContracted = contracted + logged;
   const newPacePct =
@@ -150,6 +236,80 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'Failed to update position', detail: updateErr.message },
       { status: 500 },
+    );
+  }
+
+  // ── Round 2 Item 2: best-effort sellscore_sales_log row ──────────────────
+  // Runs BEFORE the recompute so the joined recommendation context is the
+  // row the farmer was looking at, not the post-sale rewrite.
+  //
+  // bushels_sold records the REQUESTED figure ("crop, bushels, sale_date
+  // from request" — handoff verbatim): the farmer's books say what they
+  // sold, even when the position update above capped at expected. When the
+  // two differ, the cap is recorded in notes so the discrepancy against
+  // pace math is explained on the row itself.
+  let saleLogged = false;
+  try {
+    // Newest recommendation on or before the sale date — mirrors the
+    // /sellscore/me headline query (recommendation_date DESC, created_at
+    // DESC, limit 1), i.e. the recommendation the farmer was acting on.
+    // An exact-date match would orphan sales made between UTC midnight
+    // and the 4 AM ET cron, when the newest row is still dated yesterday.
+    const { data: recRow } = await adminClient
+      .from('sellscore_recommendations')
+      .select(
+        'id, crop, recommendation_type, recommended_cash_bid, recommended_elevator_id',
+      )
+      .eq('farm_id', farm.id)
+      .lte('recommendation_date', saleDate)
+      .order('recommendation_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const recMatchesSale = recRow != null && recRow.crop === crop;
+
+    const { error: logErr } = await adminClient
+      .from('sellscore_sales_log')
+      .insert({
+        farm_id: farm.id,
+        crop,
+        bushels_sold: bushels,
+        sale_date: saleDate,
+        cash_bid_at_sale: recMatchesSale
+          ? (recRow.recommended_cash_bid ?? null)
+          : null,
+        elevator_id: recMatchesSale
+          ? (recRow.recommended_elevator_id ?? null)
+          : null,
+        recommendation_id: recMatchesSale ? recRow.id : null,
+        // True only when the recommendation the farmer saw said SELL for
+        // this crop and they sold it. Null (not false) when no
+        // recommendation existed for this crop — absence of advice isn't
+        // defiance.
+        followed_recommendation: recMatchesSale
+          ? recRow.recommendation_type === 'sell'
+          : null,
+        notes:
+          logged !== bushels
+            ? `Position update capped at ${logged.toLocaleString('en-US')} bu — expected bushels for this crop were already reached.`
+            : null,
+      });
+
+    if (logErr) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[api/sellscore/log-sale] sales_log insert failed for farm=${farm.id} crop=${crop}:`,
+        logErr.message,
+      );
+    } else {
+      saleLogged = true;
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[api/sellscore/log-sale] sales_log insert threw for farm=${farm.id} crop=${crop}:`,
+      err instanceof Error ? err.message : String(err),
     );
   }
 
@@ -185,6 +345,8 @@ export async function POST(request: NextRequest) {
     expectedBushels: expected,
     unsoldBushels: Math.max(0, expected - newContracted),
     pricingPacePct: newPacePct,
+    saleLogged,
+    saleDate,
     recomputed,
     recomputeDetail,
   });
