@@ -18,6 +18,13 @@
 // active when pathname exactly equals tab.href or starts with tab.href + '/'.
 // The startsWith check covers nested routes (e.g. /sellscore/settings/billing
 // still highlights Settings).
+//
+// Round 2 Item 1 (July 23, 2026, v6.6 backlog #4): the HARVESTFILE wordmark
+// is now the back-navigation path to the marketing site
+// (https://www.harvestfile.com/) instead of a redundant Score shortcut —
+// the Score tab two inches to the right already covers that. Plain <a>
+// rather than next/link: the marketing site is a full-page navigation out
+// of the app shell, so client-side routing has nothing to prefetch.
 // =============================================================================
 
 'use client';
@@ -62,13 +69,15 @@ export default function SellScoreNav() {
           height: '64px',
         }}
       >
-        {/* Brand wordmark (also acts as a Score shortcut) */}
-        <Link
-          href="/sellscore/me"
+        {/* Brand wordmark — back-navigation to the marketing site */}
+        <a
+          href="https://www.harvestfile.com/"
+          aria-label="Back to the HarvestFile website"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             minHeight: '48px',
+            minWidth: '48px',
             fontSize: '15px',
             fontWeight: 600,
             letterSpacing: '0.04em',
@@ -80,7 +89,7 @@ export default function SellScoreNav() {
           }}
         >
           HarvestFile
-        </Link>
+        </a>
 
         {/* Tabs */}
         <div
