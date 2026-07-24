@@ -2,11 +2,20 @@
 // =============================================================================
 // Sell Score Settings page (server component, M-02, May 18, 2026)
 //
-// Minimum-viable settings page that earns the Settings tab's existence.
-// Four sections: Account, Farm, Subscription, Sign out. Read-only at v1.
-// Editing capabilities (name, email change, password reset, notification
-// preferences) defer to v1.1 once the Coverage Optimizer ports back from
-// /dashboard in Phase 2 (August).
+// Round 2 Item 4 (July 23, 2026, spec v6.6 §5): no longer read-only.
+// Adds the spec'd farm-data controls between the read-only sections:
+//   - Per-crop breakeven with the §5.4 source indicator ("county
+//     default" vs "your number") and a reset-to-default affordance.
+//   - Expected bushels per crop.
+//   - Unsold/contracted position correction ("bushels already priced").
+//   - Pinned elevator management (2 pins per the v1 lock; pick from the
+//     nearby Barchart list, choose which is primary).
+//   - County (choose from the 25 supported reference counties — the
+//     county selects the elevator whose bids and basis history feed the
+//     engine).
+// Saves POST to /api/sellscore/settings, which validates/clamps and runs
+// the same §5.3 recompute path log-sale uses whenever an engine input
+// (breakeven, expected bu, position, county) changed.
 //
 // Auth chain matches /sellscore/me:
 //   auth.uid() -> farms.owner_id (short, sellscore-style)
@@ -41,9 +50,36 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SignOutButton from '@/components/sellscore/SignOutButton';
 import ManageSubscriptionButton from '@/components/sellscore/ManageSubscriptionButton';
+import SettingsFarmData, {
+  type CropSettingsDisplay,
+  type CountyOptionDisplay,
+  type ElevatorOptionDisplay,
+} from '@/components/sellscore/SettingsFarmData';
+import { REFERENCE_ELEVATORS } from '@/lib/sellscore/reference-elevators';
+import { getGrainBidsByCoords, type GrainElevator } from '@/lib/barchart';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+// v1 engine crops — the only crops with grain_positions rows.
+const POSITION_CROPS = new Set(['corn', 'soybeans']);
+
+// County defaults, matching onboarding and /api/sellscore/settings.
+const DEFAULT_BREAKEVENS: Record<string, number> = {
+  corn: 4.0,
+  soybeans: 10.5,
+};
+
+/** Barchart commodityName values are title case ("Corn", "Soybeans"). */
+const BARCHART_COMMODITY: Record<string, string> = {
+  corn: 'Corn',
+  soybeans: 'Soybeans',
+  wheat: 'Wheat',
+  sorghum: 'Sorghum',
+};
+
+/** Nearby (non-pinned) elevator options offered for pinning. */
+const MAX_NEARBY_OPTIONS = 8;
 
 export default async function SellScoreSettingsPage() {
   const supabase = await createClient();
@@ -60,11 +96,11 @@ export default async function SellScoreSettingsPage() {
     .eq('auth_id', user.id)
     .maybeSingle();
 
-  // Farm record for farm/subscription display
+  // Farm record for farm/subscription display + farm-data controls
   const { data: farm } = await supabase
     .from('farms')
     .select(
-      'id, name, county_fips, state, sellscore_active, subscription_status',
+      'id, name, county_fips, state, sellscore_active, sellscore_primary_crops, subscription_status',
     )
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
@@ -79,6 +115,129 @@ export default async function SellScoreSettingsPage() {
     farm?.subscription_status,
     farm?.sellscore_active,
   );
+
+  // ── Round 2 Item 4: farm-data control state ──────────────────────────────
+  let cropSettings: CropSettingsDisplay[] = [];
+  let elevatorOptions: ElevatorOptionDisplay[] = [];
+  const countyOptions: CountyOptionDisplay[] = [...REFERENCE_ELEVATORS]
+    .sort((a, b) =>
+      a.state === b.state
+        ? a.countyName.localeCompare(b.countyName)
+        : a.state.localeCompare(b.state),
+    )
+    .map((e) => ({
+      county_fips: e.countyFips,
+      label: `${e.countyName} County, ${e.state}`,
+    }));
+
+  if (farm) {
+    // Newest position row per v1 crop.
+    const { data: positionRows } = await supabase
+      .from('grain_positions')
+      .select(
+        'commodity, crop_year, expected_bushels, bushels_contracted, breakeven_dollars_per_bu, breakeven_source',
+      )
+      .eq('farm_id', farm.id)
+      .order('crop_year', { ascending: false });
+
+    const seenCrops = new Set<string>();
+    for (const row of positionRows ?? []) {
+      const crop = String(row.commodity ?? '');
+      if (!POSITION_CROPS.has(crop) || seenCrops.has(crop)) continue;
+      seenCrops.add(crop);
+      cropSettings.push({
+        crop,
+        crop_year: Number(row.crop_year),
+        expected_bushels: Number(row.expected_bushels ?? 0),
+        bushels_contracted: Number(row.bushels_contracted ?? 0),
+        breakeven_dollars_per_bu: Number(
+          row.breakeven_dollars_per_bu ?? DEFAULT_BREAKEVENS[crop],
+        ),
+        breakeven_source: String(row.breakeven_source ?? 'county_default'),
+        county_default_breakeven: DEFAULT_BREAKEVENS[crop],
+      });
+    }
+    // Stable order: corn, then soybeans.
+    cropSettings = cropSettings.sort((a, b) => a.crop.localeCompare(b.crop));
+
+    // Pinned rows first, then nearby elevators available to pin.
+    const { data: elevatorRows } = await supabase
+      .from('sellscore_elevators')
+      .select('*')
+      .eq('farm_id', farm.id)
+      .order('is_primary', { ascending: false })
+      .limit(2);
+    const pinnedRows = elevatorRows ?? [];
+
+    const usedIds = new Set<string>();
+    const usedNames = new Set<string>();
+    for (const p of pinnedRows) {
+      const id =
+        p.barchart_elevator_id != null
+          ? String(p.barchart_elevator_id)
+          : `pinned-${p.id ?? usedIds.size}`;
+      usedIds.add(id);
+      usedNames.add(
+        `${String(p.elevator_name ?? '').toLowerCase()}|${String(p.elevator_city ?? '').toLowerCase()}`,
+      );
+      elevatorOptions.push({
+        barchart_elevator_id: id,
+        name: p.elevator_name ?? 'Your elevator',
+        city: p.elevator_city ?? '',
+        state: p.elevator_state ?? '',
+        distance_miles: p.distance_miles != null ? Number(p.distance_miles) : null,
+        pinned: true,
+        is_primary: p.is_primary === true,
+      });
+    }
+
+    // Nearby options are best-effort: a Barchart failure just means the
+    // farmer sees their current pins without swap candidates today.
+    try {
+      const reference = REFERENCE_ELEVATORS.find(
+        (e) => e.countyFips === farm.county_fips,
+      );
+      if (reference) {
+        const primaryCrops: string[] = farm.sellscore_primary_crops ?? [];
+        const commodities = primaryCrops
+          .map((c) => BARCHART_COMMODITY[c])
+          .filter((c): c is string => Boolean(c));
+        const nearby: GrainElevator[] = await getGrainBidsByCoords(
+          reference.lat,
+          reference.lng,
+          {
+            commodities: commodities.length > 0 ? commodities : ['Corn'],
+            maxDistance: 60,
+            maxLocations: 15,
+            bidsPerCommodity: 1,
+          },
+        );
+        const sorted = [...nearby].sort(
+          (a, b) => (a.distance ?? 0) - (b.distance ?? 0),
+        );
+        for (const n of sorted) {
+          if (elevatorOptions.length >= pinnedRows.length + MAX_NEARBY_OPTIONS) break;
+          if (usedIds.has(n.id)) continue;
+          const nameKey = `${n.name.toLowerCase()}|${n.city.toLowerCase()}`;
+          if (usedNames.has(nameKey)) continue;
+          usedIds.add(n.id);
+          usedNames.add(nameKey);
+          elevatorOptions.push({
+            barchart_elevator_id: n.id,
+            name: n.name,
+            city: n.city,
+            state: n.state,
+            distance_miles: n.distance ?? null,
+            pinned: false,
+            is_primary: false,
+          });
+        }
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[sellscore/settings] nearby elevator fetch failed:', err);
+    }
+  }
 
   return (
     <div
@@ -135,6 +294,14 @@ export default async function SellScoreSettingsPage() {
           <Field label="Farm name" value={farmName} />
           <Field label="State" value={farmState} />
         </Section>
+
+        {/* Round 2 Item 4: farm-data controls (client) */}
+        <SettingsFarmData
+          positions={cropSettings}
+          countyFips={farm?.county_fips ?? null}
+          countyOptions={countyOptions}
+          elevators={elevatorOptions}
+        />
 
         {/* Subscription section */}
         <Section title="Subscription">
