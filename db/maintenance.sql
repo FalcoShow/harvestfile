@@ -78,5 +78,48 @@ END $$;
 
 
 -- ----------------------------------------------------------------------------
+-- 2026-07-24 — grain_positions updated_at trigger (Hotfix R2.1 Item B #3)
+-- ----------------------------------------------------------------------------
+-- Context: Item B diagnostics showed updated_at EXISTS on grain_positions
+--          but never moves on UPDATE (both test-farm rows still carried
+--          their 2026-05-07 insert timestamp after multiple log-sale
+--          writes) — no BEFORE UPDATE trigger. That made the corn
+--          25,000→27,200 change untimestampable. Adds the trigger
+--          (+ column defensively).
+--
+-- Run by:  PENDING — run add-grain-positions-updated-at.sql via the
+--          Supabase SQL editor BEFORE the corn correction below, so the
+--          correction itself gets a timestamp.
+-- Idempotent: YES (IF NOT EXISTS / OR REPLACE / DROP TRIGGER IF EXISTS)
+--
+-- See: add-grain-positions-updated-at.sql for the full statement + verify.
+
+
+-- ----------------------------------------------------------------------------
+-- 2026-07-24 — Corn position correction, Sell Score Test Farm (Hotfix R2.1)
+-- ----------------------------------------------------------------------------
+-- Context: Corn bushels_contracted moved 25,000→27,200 with no sales_log
+--          row. Root cause: a 2,200 bu corn sale POSTed to
+--          /api/sellscore/log-sale during the July 23 evidence gap — the
+--          A1 deploy (20:52 ET) wrote positions with no sales_log insert
+--          in the code, and the table was created in prod later still.
+--          Arithmetic matches the route exactly (25,000+2,200=27,200;
+--          pace 54 = round(27,200/50,000×100)). Sales history contains
+--          only the soybean 2,500 bu sale, so corn is restored to 25,000
+--          to keep position and books consistent. Write paths are now
+--          loudly logged (POSITION_WRITE / EVENT_INSERT_FAILED) and
+--          duplicate-guarded — this class of silent change is closed.
+--
+-- Run by:  PENDING — run correct-corn-position-2026-07-24.sql via the
+--          Supabase SQL editor AFTER the trigger entry above, then
+--          recompute (Inngest sellscore-compute manual run, or
+--          POST /api/sellscore/compute) and verify /sellscore/me shows
+--          corn 50% priced.
+-- Idempotent: YES (guarded on bushels_contracted = 27200; re-run = 0 rows)
+--
+-- See: correct-corn-position-2026-07-24.sql for the full statement + verify.
+
+
+-- ----------------------------------------------------------------------------
 -- (next entries appended below)
 -- ----------------------------------------------------------------------------

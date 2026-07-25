@@ -26,6 +26,14 @@ This directory holds SQL files used for database operations performed outside th
 
 
 
+\- \*\*`add-grain-positions-updated-at.sql`\*\* — Adds the missing BEFORE UPDATE trigger (and, defensively, the column) so `grain_positions.updated_at` actually moves on every write. Idempotent. Added July 24, 2026 (Hotfix R2.1 Item B #3); run BEFORE the corn correction.
+
+
+
+\- \*\*`correct-corn-position-2026-07-24.sql`\*\* — Restores the Sell Score Test Farm corn position (27,200 → 25,000) after the July 23 evidence-gap write. Guarded on the spurious value — safe to re-run. Added July 24, 2026 (Hotfix R2.1 Item B); run AFTER the updated_at trigger, then recompute.
+
+
+
 \## Conventions
 
 
