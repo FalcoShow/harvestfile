@@ -94,6 +94,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 export async function POST(request: NextRequest) {
+  // Hotfix R2.1 hardening #2: request id for the structured write log.
+  const requestId = request.headers.get('x-vercel-id') ?? 'local';
+
   // ── Parse body ────────────────────────────────────────────────────────────
   let body: SettingsBody;
   try {
@@ -178,6 +181,9 @@ export async function POST(request: NextRequest) {
   interface PlannedPositionUpdate {
     positionId: string;
     crop: string;
+    cropYear: number;
+    previousContracted: number;
+    previousPace: number;
     updateFields: Record<string, number | string>;
     result: (typeof updated.positions)[number];
   }
@@ -200,7 +206,7 @@ export async function POST(request: NextRequest) {
       const { data: position, error: posErr } = await adminClient
         .from('grain_positions')
         .select(
-          'id, crop_year, expected_bushels, bushels_contracted, breakeven_dollars_per_bu, breakeven_source',
+          'id, crop_year, expected_bushels, bushels_contracted, breakeven_dollars_per_bu, breakeven_source, pricing_pace_pct',
         )
         .eq('farm_id', farm.id)
         .eq('commodity', crop)
@@ -219,6 +225,7 @@ export async function POST(request: NextRequest) {
       const currentContracted = Number(position.bushels_contracted ?? 0);
       const currentBreakeven = Number(position.breakeven_dollars_per_bu ?? 0);
       const currentSource = String(position.breakeven_source ?? 'county_default');
+      const currentPace = Number(position.pricing_pace_pct ?? 0);
 
       // Expected bushels — the denominator of every pace number.
       let newExpected = currentExpected;
@@ -314,6 +321,9 @@ export async function POST(request: NextRequest) {
       plannedPositions.push({
         positionId: String(position.id),
         crop,
+        cropYear: Number(position.crop_year),
+        previousContracted: currentContracted,
+        previousPace: currentPace,
         updateFields,
         result: {
           crop,
@@ -341,6 +351,15 @@ export async function POST(request: NextRequest) {
           );
         }
         engineInputsChanged = true;
+
+        // Hotfix R2.1 hardening #2: structured write log, one line per
+        // grain_positions write, same shape across log-sale / settings /
+        // onboard. Old→new even when a field didn't move (breakeven-only
+        // saves still touch the row).
+        // eslint-disable-next-line no-console
+        console.log(
+          `[sellscore/settings] POSITION_WRITE farm=${farm.id} crop=${plan.crop} year=${plan.cropYear} contracted=${plan.previousContracted}->${plan.result.bushels_contracted} pace=${plan.previousPace}->${plan.result.pricing_pace_pct} req=${requestId}`,
+        );
       }
       updated.positions.push(plan.result);
     }

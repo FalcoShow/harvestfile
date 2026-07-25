@@ -67,6 +67,9 @@ const DEFAULT_BREAKEVENS: Record<string, number> = {
 };
 
 export async function POST(request: NextRequest) {
+  // Hotfix R2.1 hardening #2: request id for the structured write log.
+  const requestId = request.headers.get('x-vercel-id') ?? 'local';
+
   // ── Parse + validate body ─────────────────────────────────────────────────
   let body: SubmitBody;
   try {
@@ -268,6 +271,13 @@ export async function POST(request: NextRequest) {
         positionErr,
       );
       // Non-fatal: farm setup is complete; compute can be retried manually.
+    } else {
+      // Hotfix R2.1 hardening #2: structured write log, one line per
+      // grain_positions write, same shape across log-sale / settings /
+      // onboard. Inserts log the seeded values.
+      console.log(
+        `[sellscore/onboard] POSITION_WRITE farm=${farmId} crop=${crop} year=${cropYear} contracted=insert->0 pace=insert->0 req=${requestId}`,
+      );
     }
   }
 

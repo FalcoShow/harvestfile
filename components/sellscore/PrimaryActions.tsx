@@ -15,6 +15,13 @@
 //   - `demo` prop: the /sellscore/preview page runs unauthenticated with
 //     mock farms, so demo mode simulates the write locally.
 //
+// Hotfix R2.1 Item B (July 24, 2026): the log-sale API now reports
+// eventRecorded — false means the sale updated the position but the
+// best-effort sellscore_sales_log bookkeeping row failed. That silent
+// gap is how a corn position once moved with no evidence. When it
+// happens, the confirmation now says the record-keeping entry is
+// delayed instead of pretending everything landed.
+//
 // Typography/touch rules for the 58+ demographic: 18px body floor on all
 // new text, 48px minimum touch targets (buttons here are 56px).
 // =============================================================================
@@ -43,6 +50,13 @@ const CROP_LABELS: Record<string, string> = {
 interface LoggedSale {
   crop: string;
   bushels: number;
+  /** False when the position updated but the bookkeeping row didn't land */
+  eventRecorded: boolean;
+}
+
+interface SubmitResult {
+  failure: string | null;
+  eventRecorded: boolean;
 }
 
 export default function PrimaryActions({
@@ -87,11 +101,11 @@ export default function PrimaryActions({
     return null;
   }
 
-  async function submitSale(crop: string, bushels: number): Promise<string | null> {
+  async function submitSale(crop: string, bushels: number): Promise<SubmitResult> {
     if (demo) {
       // Preview build: simulate latency, never hit the network.
       await new Promise((r) => setTimeout(r, 500));
-      return null;
+      return { failure: null, eventRecorded: true };
     }
     try {
       const res = await fetch('/api/sellscore/log-sale', {
@@ -101,13 +115,24 @@ export default function PrimaryActions({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        return typeof json.error === 'string'
-          ? json.error
-          : 'Could not log the sale. Try again.';
+        return {
+          failure:
+            typeof json.error === 'string'
+              ? json.error
+              : 'Could not log the sale. Try again.',
+          eventRecorded: false,
+        };
       }
-      return null;
+      // Hotfix R2.1: eventRecorded=false means the sale saved but the
+      // record-keeping row is delayed. Older responses without the field
+      // are treated as recorded.
+      return { failure: null, eventRecorded: json.eventRecorded !== false };
     } catch {
-      return 'Could not reach the server. Check your connection and try again.';
+      return {
+        failure:
+          'Could not reach the server. Check your connection and try again.',
+        eventRecorded: false,
+      };
     }
   }
 
@@ -115,19 +140,20 @@ export default function PrimaryActions({
     if (marked || marking || !recommendation.recommended_bushels) return;
     setMarking(true);
     setError(null);
-    const failure = await submitSale(
+    const result = await submitSale(
       recommendation.crop,
       recommendation.recommended_bushels,
     );
     setMarking(false);
-    if (failure) {
-      setError(failure);
+    if (result.failure) {
+      setError(result.failure);
       return;
     }
     setMarked(true);
     setLastLogged({
       crop: recommendation.crop,
       bushels: recommendation.recommended_bushels,
+      eventRecorded: result.eventRecorded,
     });
     if (!demo) router.refresh();
   };
@@ -284,6 +310,13 @@ export default function PrimaryActions({
           <span style={tabularNums}>{formatters.bushels(lastLogged.bushels)} bu</span>
           {' '}of {CROP_LABELS[lastLogged.crop] ?? lastLogged.crop}. Your pace and
           score update to match.
+          {!lastLogged.eventRecorded && (
+            <>
+              {' '}
+              Your record-keeping entry is delayed — it will appear in your
+              sales history shortly.
+            </>
+          )}
         </p>
       )}
 
@@ -317,7 +350,7 @@ function LogSaleDialog({
 }: {
   openPositions: CropPosition[];
   defaultCrop: string;
-  onSubmit: (crop: string, bushels: number) => Promise<string | null>;
+  onSubmit: (crop: string, bushels: number) => Promise<SubmitResult>;
   onLogged: (sale: LoggedSale) => void;
   onClose: () => void;
 }) {
@@ -350,13 +383,17 @@ function LogSaleDialog({
     if (!valid || submitting) return;
     setSubmitting(true);
     setError(null);
-    const failure = await onSubmit(selected.crop, bushels);
+    const result = await onSubmit(selected.crop, bushels);
     setSubmitting(false);
-    if (failure) {
-      setError(failure);
+    if (result.failure) {
+      setError(result.failure);
       return;
     }
-    onLogged({ crop: selected.crop, bushels });
+    onLogged({
+      crop: selected.crop,
+      bushels,
+      eventRecorded: result.eventRecorded,
+    });
   };
 
   return (

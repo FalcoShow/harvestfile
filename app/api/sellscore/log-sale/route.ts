@@ -16,6 +16,25 @@
 // failure (including the table not yet existing in an environment) is
 // logged to the Vercel console and never fails the request.
 //
+// Hotfix R2.1 Item B (July 24, 2026) — position-integrity hardening.
+// Root cause of the corn 25,000→27,200 mystery: a sale logged through
+// this endpoint during the window when the position write existed but
+// the sales_log insert didn't (A1 shipped 7/23 20:52; the sales_log
+// table + insert landed 23:48 and the table creation ran later still).
+// The position moved with zero bookkeeping evidence. Hardening:
+//   1. EVENT_INSERT_FAILED: a failed sales_log insert now logs a
+//      structured, greppable error AND the response carries
+//      eventRecorded:false so the client can tell the farmer the
+//      record-keeping entry is delayed. Never again a silent gap.
+//   2. POSITION_WRITE: one structured log line per grain_positions
+//      write (route, farm, crop, old→new contracted, old→new pace,
+//      request id). Greppable in Vercel across all writer routes.
+//   3. Idempotency guard: an identical (farm, crop, bushels) POST
+//      within 30 seconds of a logged sale is rejected with 409 —
+//      cheap protection against client double-fires. Best-effort via
+//      recent sales_log lookup; if the table is unreachable the
+//      request proceeds (the guard must never block a real sale).
+//
 // What this does:
 //   1. Auth: cookie session → farms.owner_id ownership (SHORT chain).
 //   2. Increment grain_positions.bushels_contracted for the crop's
@@ -70,6 +89,9 @@ const SUPPORTED_CROPS = new Set(['corn', 'soybeans', 'wheat', 'sorghum']);
 const SALE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_SALE_AGE_DAYS = 400;
 
+// Hotfix R2.1 hardening #4: window for the duplicate-POST guard.
+const DUPLICATE_WINDOW_SECONDS = 30;
+
 /**
  * Today's date as YYYY-MM-DD in US Eastern time — the same calendar-day
  * convention the 4 AM ET compute cron uses for recommendation_date.
@@ -112,6 +134,9 @@ function resolveSaleDate(raw: string | undefined): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  // Vercel stamps every invocation; 'local' keeps dev logs greppable too.
+  const requestId = request.headers.get('x-vercel-id') ?? 'local';
+
   // ── Parse + validate body ────────────────────────────────────────────────
   let body: LogSaleBody;
   try {
@@ -184,10 +209,47 @@ export async function POST(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
+  // ── Hotfix R2.1 hardening #4: duplicate-POST guard ────────────────────────
+  // A second identical (farm, crop, bushels) POST within 30 seconds is a
+  // client double-fire (ghost tap, Enter+click), not a second sale. Checked
+  // against sales_log because serverless instances share no memory. Best-
+  // effort: any lookup failure (e.g. table missing in an environment) lets
+  // the request proceed — the guard must never block a real sale.
+  try {
+    const windowStart = new Date(
+      Date.now() - DUPLICATE_WINDOW_SECONDS * 1000,
+    ).toISOString();
+    const { data: recentDupe } = await adminClient
+      .from('sellscore_sales_log')
+      .select('id')
+      .eq('farm_id', farm.id)
+      .eq('crop', crop)
+      .eq('bushels_sold', bushels)
+      .gte('created_at', windowStart)
+      .limit(1)
+      .maybeSingle();
+
+    if (recentDupe) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[sellscore/log-sale] DUPLICATE_POST_REJECTED farm=${farm.id} crop=${crop} bu=${bushels} req=${requestId}`,
+      );
+      return NextResponse.json(
+        {
+          error: `That sale was already logged a moment ago (${bushels.toLocaleString('en-US')} bu of ${crop}). Nothing was double-counted.`,
+          duplicate: true,
+        },
+        { status: 409 },
+      );
+    }
+  } catch {
+    // Guard is best-effort by design; fall through to the real work.
+  }
+
   // ── Load the newest position row for this crop ───────────────────────────
   const { data: position, error: posErr } = await adminClient
     .from('grain_positions')
-    .select('crop_year, expected_bushels, bushels_contracted')
+    .select('crop_year, expected_bushels, bushels_contracted, pricing_pace_pct')
     .eq('farm_id', farm.id)
     .eq('commodity', crop)
     .order('crop_year', { ascending: false })
@@ -203,6 +265,7 @@ export async function POST(request: NextRequest) {
 
   const expected = Number(position.expected_bushels ?? 0);
   const contracted = Number(position.bushels_contracted ?? 0);
+  const paceBefore = Number(position.pricing_pace_pct ?? 0);
   const unsoldBefore = Math.max(0, expected - contracted);
 
   if (unsoldBefore <= 0) {
@@ -239,6 +302,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Hotfix R2.1 hardening #2: structured write log, one line per
+  // grain_positions write, same shape across log-sale / settings / onboard.
+  // eslint-disable-next-line no-console
+  console.log(
+    `[sellscore/log-sale] POSITION_WRITE farm=${farm.id} crop=${crop} year=${position.crop_year} contracted=${contracted}->${newContracted} pace=${paceBefore}->${newPacePct} req=${requestId}`,
+  );
+
   // ── Round 2 Item 2: best-effort sellscore_sales_log row ──────────────────
   // Runs BEFORE the recompute so the joined recommendation context is the
   // row the farmer was looking at, not the post-sale rewrite.
@@ -249,6 +319,7 @@ export async function POST(request: NextRequest) {
   // two differ, the cap is recorded in notes so the discrepancy against
   // pace math is explained on the row itself.
   let saleLogged = false;
+  let eventInsertReason: string | null = null;
   try {
     // Newest recommendation on or before the sale date — mirrors the
     // /sellscore/me headline query (recommendation_date DESC, created_at
@@ -297,19 +368,21 @@ export async function POST(request: NextRequest) {
       });
 
     if (logErr) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `[api/sellscore/log-sale] sales_log insert failed for farm=${farm.id} crop=${crop}:`,
-        logErr.message,
-      );
+      eventInsertReason = logErr.message;
     } else {
       saleLogged = true;
     }
   } catch (err) {
+    eventInsertReason = err instanceof Error ? err.message : String(err);
+  }
+
+  if (!saleLogged) {
+    // Hotfix R2.1 hardening #1: the silent best-effort failure was exactly
+    // how the corn position moved with no evidence. Loud, structured,
+    // greppable — and surfaced to the client via eventRecorded below.
     // eslint-disable-next-line no-console
     console.error(
-      `[api/sellscore/log-sale] sales_log insert threw for farm=${farm.id} crop=${crop}:`,
-      err instanceof Error ? err.message : String(err),
+      `[sellscore/log-sale] EVENT_INSERT_FAILED farm=${farm.id} crop=${crop} bu=${bushels} reason=${eventInsertReason ?? 'unknown'} req=${requestId}`,
     );
   }
 
@@ -346,6 +419,11 @@ export async function POST(request: NextRequest) {
     unsoldBushels: Math.max(0, expected - newContracted),
     pricingPacePct: newPacePct,
     saleLogged,
+    // Hotfix R2.1 hardening #1: explicit contract for the client. False
+    // means the position updated but the bookkeeping row didn't land —
+    // the client should tell the farmer the record-keeping entry is
+    // delayed rather than leaving the gap invisible.
+    eventRecorded: saleLogged,
     saleDate,
     recomputed,
     recomputeDetail,
