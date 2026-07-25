@@ -11,10 +11,16 @@
 //   3. Expandable — deeper tools still accessible
 //
 // July 23, 2026 (B1): "Sell Score" leads the primary nav. Logged-out and
-// non-subscribers route to /pricing; active subscribers to /sellscore/me
-// (href resolved server-side in marketing-header.tsx). The bottom CTA for
-// paid users keeps the gold-button behavior but is labeled "Sell Score"
-// instead of the stranger-hostile "Dashboard".
+// non-subscribers route to /pricing; active subscribers to /sellscore/me.
+// The bottom CTA for paid users keeps the gold-button behavior but is
+// labeled "Sell Score" instead of the stranger-hostile "Dashboard".
+//
+// July 24, 2026 (Hotfix R2.1 Item A): auth state no longer arrives as
+// props from the server header — MarketingHeader is now synchronous and
+// cookie-free so the static /[state]/... pages stop 500ing. Auth resolves
+// client-side via useHeaderAuth() (shared, cached island — one resolution
+// per pageview across desktop CTA, nav link, and this menu). Until
+// resolved the menu shows the logged-out default, matching the header.
 //
 // Same portal-based rendering pattern for iOS compatibility.
 // =============================================================================
@@ -25,14 +31,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Logo } from "./logo";
-
-interface MobileMenuProps {
-  isAuthenticated: boolean;
-  /** Active Sell Score subscriber (farms.sellscore_active) */
-  isPaidSellScore: boolean;
-  /** /sellscore/me for subscribers, /pricing for everyone else */
-  sellScoreHref: string;
-}
+import { useHeaderAuth } from "./HeaderAuthCta";
 
 const PRIMARY_NAV = [
   {
@@ -100,17 +99,18 @@ const MORE_TOOLS = [
   { href: '/insurance', label: 'Crop Insurance' },
 ];
 
-export function MobileMenu({
-  isAuthenticated,
-  isPaidSellScore,
-  sellScoreHref,
-}: MobileMenuProps) {
+export function MobileMenu() {
   const [open, setOpen] = useState(false);
   const [toolsExpanded, setToolsExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // B1: Sell Score leads the primary nav. Href is auth-aware (resolved
-  // server-side); the icon is the signal-dot motif from the product.
+  // Hotfix R2.1: auth resolved client-side (shared cached island).
+  const { resolved, isAuthenticated, isPaidSellScore } = useHeaderAuth();
+  const showAuthed = resolved && isAuthenticated;
+  const sellScoreHref = isPaidSellScore ? "/sellscore/me" : "/pricing";
+
+  // B1: Sell Score leads the primary nav. Href is auth-aware; the icon is
+  // the signal-dot motif from the product.
   const primaryNav = [
     {
       href: sellScoreHref,
@@ -281,7 +281,7 @@ export function MobileMenu({
 
         {/* Bottom CTAs */}
         <div className="px-6 pb-8 pt-6 space-y-3 shrink-0">
-          {isAuthenticated ? (
+          {showAuthed ? (
             <Link
               href={isPaidSellScore ? "/sellscore/me" : "/dashboard"}
               onClick={() => setOpen(false)}
